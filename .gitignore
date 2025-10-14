@@ -1,52 +1,30 @@
-# Cache and logs (Symfony2)
-/app/cache/*
-/app/logs/*
-!app/cache/.gitkeep
-!app/logs/.gitkeep
+# Environment files (auto-generated or local overrides)
+backend/.env.docker
+backend/.env.local
+backend/.env.*.local
+backend/var/.fixtures_loaded
+frontend/.env.docker
+frontend/.env.local
+frontend/.env.*.local
 
-# Email spool folder
-/app/spool/*
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Cache, session files and logs (Symfony3)
-/var/cache/*
-/var/logs/*
-/var/sessions/*
-!var/cache/.gitkeep
-!var/logs/.gitkeep
-!var/sessions/.gitkeep
+# OS
+.DS_Store
+Thumbs.db
+.DS_Store?
+._*
 
-# Logs (Symfony4)
-/var/log/*
-!var/log/.gitkeep
+# Docker volumes and data
+volumes/
+data/
 
-# Parameters
-/app/config/parameters.yml
-/app/config/parameters.ini
+# Logs
+*.log
+logs/
 
-# Managed by Composer
-/app/bootstrap.php.cache
-/var/bootstrap.php.cache
-/bin/*
-!bin/console
-!bin/symfony_requirements
-/vendor/
-
-# Assets and user uploads
-/web/bundles/
-/web/uploads/
-
-# PHPUnit
-/app/phpunit.xml
-/phpunit.xml
-
-# Build data
-/build/
-
-# Composer PHAR
-/composer.phar
-
-# Backup entities generated with doctrine:generate:entities command
-**/Entity/*~
-
-# Embedded web-server pid file
-/.web-server-pid
