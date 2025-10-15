@@ -49,15 +49,37 @@ class VectorType extends Type
             return null;
         }
 
+        // MariaDB VECTOR Type Best Practice:
+        // 1. Use VEC_FromText() for inserts
+        // 2. Format: [1.0,2.0,3.0] (no spaces)
+        // 3. Let Doctrine handle as binary data internally
+
         if (is_array($value)) {
-            return json_encode($value);
+            // Convert to MariaDB VECTOR format
+            // Format each float with precision, no trailing zeros
+            $formatted = array_map(function($v) {
+                $float = floatval($v);
+                // Use rtrim to remove trailing zeros and decimal point if needed
+                return rtrim(rtrim(sprintf('%.8f', $float), '0'), '.');
+            }, $value);
+            
+            return '[' . implode(',', $formatted) . ']';
         }
 
         if (is_string($value)) {
-            // Ensure it's valid JSON
-            $decoded = json_decode($value, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
+            // If already in correct format, return as-is
+            if (preg_match('/^\[[\d.,\-e]+\]$/', $value)) {
                 return $value;
+            }
+            
+            // Try to parse as JSON and convert
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $formatted = array_map(function($v) {
+                    $float = floatval($v);
+                    return rtrim(rtrim(sprintf('%.8f', $float), '0'), '.');
+                }, $decoded);
+                return '[' . implode(',', $formatted) . ']';
             }
         }
 

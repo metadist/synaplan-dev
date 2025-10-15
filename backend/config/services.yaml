@@ -49,7 +49,7 @@ services:
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
         arguments:
-            $tikaBaseUrl: '%env(TIKA_URL)%'
+            $tikaBaseUrl: '%env(TIKA_BASE_URL)%'
             $uploadsDir: '%kernel.project_dir%/public/up'
     App\Service\Message\MessageSorter: ~
     App\Service\Message\MessageClassifier: ~
@@ -83,16 +83,24 @@ services:
     # File Processing Services
     App\Service\File\TikaClient:
         arguments:
-            $tikaUrl: '%env(TIKA_URL)%'
+            $tikaUrl: '%env(TIKA_BASE_URL)%'
             $tikaTimeoutMs: '%env(int:TIKA_TIMEOUT_MS)%'
             $tikaRetries: '%env(int:TIKA_RETRIES)%'
             $tikaRetryBackoffMs: '%env(int:TIKA_RETRY_BACKOFF_MS)%'
             $tikaHttpUser: '%env(default::TIKA_HTTP_USER)%'
             $tikaHttpPass: '%env(default::TIKA_HTTP_PASS)%'
 
+    App\Service\File\FileStorageService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+    
+    App\Controller\FileServeController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     App\Service\File\PdfRasterizer:
         arguments:
-            $uploadDir: '%kernel.project_dir%/public/up'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
             $rasterizeDpi: '%env(int:RASTERIZE_DPI)%'
             $rasterizePageCap: '%env(int:RASTERIZE_PAGE_CAP)%'
             $rasterizeTimeoutMs: '%env(int:RASTERIZE_TIMEOUT_MS)%'
@@ -101,7 +109,7 @@ services:
 
     App\Service\File\FileProcessor:
         arguments:
-            $uploadDir: '%kernel.project_dir%/public/up'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
             $tikaMinLength: '%env(int:TIKA_MIN_LENGTH)%'
             $tikaMinEntropy: '%env(float:TIKA_MIN_ENTROPY)%'
 

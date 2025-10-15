@@ -3,11 +3,12 @@ set -e
 
 echo "🔧 Checking environment files..."
 
-# Backend .env.docker
-BACKEND_ENV="/var/www/html/.env.docker"
-if [ ! -f "$BACKEND_ENV" ]; then
-    echo "📝 Creating backend/.env.docker..."
-    cat > "$BACKEND_ENV" << 'EOF'
+# Backend .env.local (Symfony prefers .env.local over .env in dev/prod)
+BACKEND_ENV_LOCAL="/var/www/html/.env.local"
+
+if [ ! -f "$BACKEND_ENV_LOCAL" ]; then
+    echo "📝 Creating backend/.env.local with Docker configuration..."
+    cat > "$BACKEND_ENV_LOCAL" << 'EOF'
 ###> symfony/framework-bundle ###
 APP_ENV=dev
 APP_SECRET=change_me_in_production_12345678901234567890
@@ -32,6 +33,22 @@ TIKA_BASE_URL=http://tika:9998
 AI_DEFAULT_PROVIDER=ollama
 ###< AI Providers ###
 
+###> Tika Configuration ###
+TIKA_TIMEOUT_MS=30000
+TIKA_RETRIES=3
+TIKA_RETRY_BACKOFF_MS=1000
+TIKA_HTTP_USER=
+TIKA_HTTP_PASS=
+TIKA_MIN_LENGTH=10
+TIKA_MIN_ENTROPY=2.0
+###< Tika Configuration ###
+
+###> PDF Rasterizer Configuration ###
+RASTERIZE_DPI=150
+RASTERIZE_PAGE_CAP=10
+RASTERIZE_TIMEOUT_MS=30000
+###< PDF Rasterizer Configuration ###
+
 ###> External AI API Keys (optional) ###
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
@@ -45,14 +62,10 @@ JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
 JWT_PASSPHRASE=change_me_in_production
 ###< lexik/jwt-authentication-bundle ###
 EOF
-    echo "✅ backend/.env.docker created"
+    echo "✅ backend/.env.local created (overrides .env)"
 else
-    echo "✅ backend/.env.docker already exists"
+    echo "✅ backend/.env.local already exists (not overwriting)"
 fi
-
-# Frontend .env.docker (will be created in mounted frontend directory)
-FRONTEND_ENV="/app/.env.docker"
-echo "📝 Frontend .env.docker will be created by frontend container..."
 
 echo "✅ Environment check completed!"
 

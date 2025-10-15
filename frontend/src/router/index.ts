@@ -106,6 +106,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/rag',
+      name: 'rag',
+      component: () => import('../views/RagSearchView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/config',
       redirect: '/config/inbound',
       meta: { requiresAuth: true }

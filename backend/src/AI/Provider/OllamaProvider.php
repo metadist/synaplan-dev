@@ -230,9 +230,11 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     public function getDimensions(string $model): int
     {
         return match(true) {
+            str_contains($model, 'bge-m3') => 1024,
             str_contains($model, 'nomic-embed-text') => 768,
             str_contains($model, 'mxbai-embed-large') => 1024,
-            default => 768
+            str_contains($model, 'all-minilm') => 384,
+            default => 1024 // Default to 1024 for Ollama models
         };
     }
 }

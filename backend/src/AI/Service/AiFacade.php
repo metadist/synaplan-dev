@@ -142,11 +142,14 @@ class AiFacade
      * 
      * @param string $text Text to embed
      * @param int|null $userId User ID for config lookup
-     * @param string|null $providerName Override provider
+     * @param array $options Additional options (provider, model, etc.)
      * @return array Vector embedding
      */
-    public function embed(string $text, ?int $userId = null, ?string $providerName = null): array
+    public function embed(string $text, ?int $userId = null, array $options = []): array
     {
+        $providerName = $options['provider'] ?? null;
+        $model = $options['model'] ?? null;
+        
         // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
@@ -157,10 +160,11 @@ class AiFacade
         $this->logger->info('AI embedding request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
+            'model' => $model ?? 'default',
             'text_length' => strlen($text),
         ]);
         
-        return $provider->embed($text);
+        return $provider->embed($text, $options);
     }
 
     /**

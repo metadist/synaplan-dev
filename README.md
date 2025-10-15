@@ -20,11 +20,11 @@ AUTO_DOWNLOAD_MODELS=true docker compose up -d
 That's it! Docker Compose automatically:
 - ✅ Starts Backend (Symfony + PHP 8.3) on port 8000
 - ✅ Starts Frontend (Vue.js + Vite) on port 5173
-- ✅ Creates environment files (`backend/.env.docker`, `frontend/.env.docker`)
+- ✅ Creates environment files (`backend/.env.local`, `frontend/.env.docker`)
 - ✅ Runs database migrations
 - ✅ Seeds test users and fixtures
-- ✅ Downloads AI models in background
-- ✅ System ready in ~20 seconds (models continue downloading)
+- ✅ Downloads AI models in background (if AUTO_DOWNLOAD_MODELS=true)
+- ✅ System ready in ~20 seconds (models continue downloading in background)
 
 **Check model download progress:**
 ```bash
@@ -49,6 +49,17 @@ docker compose logs -f backend | grep -i "model\|background"
 | demo@synaplan.com | demo123 | PRO |
 | test@example.com | test123 | NEW |
 
+## 🧠 RAG System
+
+The system includes a full RAG (Retrieval-Augmented Generation) pipeline:
+
+- **Upload**: Multi-level processing (Extract Only, Extract + Vectorize, Full Analysis)
+- **Extraction**: Tika (documents), Tesseract OCR (images), Whisper (audio)
+- **Vectorization**: bge-m3 embeddings (1024 dimensions) via Ollama
+- **Storage**: Native MariaDB VECTOR type with VEC_DISTANCE_COSINE similarity search
+- **Search**: Semantic search UI with configurable thresholds and group filtering
+- **Sharing**: Private by default, public sharing with optional expiry
+
 ## 📁 Project Structure
 
 ```
@@ -65,12 +76,10 @@ synaplan-dev/
 ## ⚙️ Environment Configuration
 
 Environment files are auto-generated on first start:
-- `backend/.env.docker` (auto-created by backend container)
+- `backend/.env.local` (auto-created by backend container, only if not exists)
 - `frontend/.env.docker` (auto-created by frontend container)
 
-For local customization, create:
-- `backend/.env.local` (overrides `.env.docker`)
-- `frontend/.env.local` (overrides `.env.docker`)
+**Note:** `.env.local` is never overwritten. To reset: delete the file and restart container.
 
 Example files provided:
 - `backend/.env.docker.example` (reference)
@@ -122,14 +131,15 @@ You'll see messages like:
 
 ## ✨ Features
 
-- ✅ AI Chat with multiple providers (Ollama, OpenAI, Anthropic, Groq, Gemini)
-- ✅ RAG System with document-based answers
-- ✅ Document processing (PDF, Word, Excel, Images)
-- ✅ Audio transcription (Whisper.cpp)
-- ✅ Vector search (MariaDB Vector DB)
-- ✅ Session management
-- ✅ Multi-user with roles
-- ✅ Responsive UI (Vue.js + TailwindCSS)
+- ✅ **AI Chat**: Multiple providers (Ollama, OpenAI, Anthropic, Groq, Gemini)
+- ✅ **RAG System**: Semantic search with MariaDB VECTOR + bge-m3 embeddings (1024 dim)
+- ✅ **Document Processing**: PDF, Word, Excel, Images (Tika + OCR)
+- ✅ **Audio Transcription**: Whisper.cpp integration
+- ✅ **File Management**: Upload, share (public/private), organize with expiry
+- ✅ **App Modes**: Easy mode (simplified) and Advanced mode (full features)
+- ✅ **Security**: Private files by default, secure sharing with tokens
+- ✅ **Multi-user**: Role-based access with JWT authentication
+- ✅ **Responsive UI**: Vue.js 3 + TypeScript + Tailwind CSS
 
 ## 📄 License
 

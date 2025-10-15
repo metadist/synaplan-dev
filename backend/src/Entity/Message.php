@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use App\Repository\MessageRepository;
 
@@ -270,6 +272,153 @@ class Message
     {
         $this->chat = $chat;
         $this->chatId = $chat?->getId();
+        return $this;
+    }
+
+    // MessageMeta Relation
+    #[ORM\OneToMany(targetEntity: MessageMeta::class, mappedBy: 'message', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $metadata;
+
+    public function __construct()
+    {
+        $this->metadata = new ArrayCollection();
+    }
+
+    public function getMetadata(): Collection
+    {
+        return $this->metadata;
+    }
+
+    /**
+     * Get meta value by key
+     */
+    public function getMeta(string $key, ?string $default = null): ?string
+    {
+        foreach ($this->metadata as $meta) {
+            if ($meta->getMetaKey() === $key) {
+                return $meta->getMetaValue();
+            }
+        }
+        return $default;
+    }
+
+    /**
+     * Set meta value (creates or updates)
+     */
+    public function setMeta(string $key, string $value): self
+    {
+        // Update existing
+        foreach ($this->metadata as $meta) {
+            if ($meta->getMetaKey() === $key) {
+                $meta->setMetaValue($value);
+                return $this;
+            }
+        }
+
+        // Create new
+        $meta = new MessageMeta();
+        $meta->setMessage($this);
+        $meta->setMetaKey($key);
+        $meta->setMetaValue($value);
+        $this->metadata->add($meta);
+
+        return $this;
+    }
+
+    /**
+     * Remove meta by key
+     */
+    public function removeMeta(string $key): self
+    {
+        foreach ($this->metadata as $meta) {
+            if ($meta->getMetaKey() === $key) {
+                $this->metadata->removeElement($meta);
+                break;
+            }
+        }
+        return $this;
+    }
+
+    // File Sharing Helpers
+
+    /**
+     * Check if file is publicly accessible
+     */
+    public function isPublic(): bool
+    {
+        return $this->getMeta('file.is_public') === '1';
+    }
+
+    /**
+     * Set public/private status
+     */
+    public function setPublic(bool $public): self
+    {
+        return $this->setMeta('file.is_public', $public ? '1' : '0');
+    }
+
+    /**
+     * Get share token
+     */
+    public function getShareToken(): ?string
+    {
+        return $this->getMeta('file.share_token');
+    }
+
+    /**
+     * Generate new share token
+     */
+    public function generateShareToken(): string
+    {
+        $token = bin2hex(random_bytes(32));
+        $this->setMeta('file.share_token', $token);
+        $this->setMeta('file.share_created_at', (string)time());
+        return $token;
+    }
+
+    /**
+     * Set share expiry timestamp
+     */
+    public function setShareExpires(?int $timestamp): self
+    {
+        if ($timestamp) {
+            $this->setMeta('file.share_expires', (string)$timestamp);
+        } else {
+            $this->removeMeta('file.share_expires');
+        }
+        return $this;
+    }
+
+    /**
+     * Get share expiry timestamp
+     */
+    public function getShareExpires(): ?int
+    {
+        $expires = $this->getMeta('file.share_expires');
+        return $expires ? (int)$expires : null;
+    }
+
+    /**
+     * Check if share link has expired
+     */
+    public function isShareExpired(): bool
+    {
+        $expires = $this->getShareExpires();
+        if (!$expires) {
+            return false;
+        }
+        return time() > $expires;
+    }
+
+    /**
+     * Revoke public access (remove share data)
+     */
+    public function revokeShare(): self
+    {
+        $this->setPublic(false);
+        $this->removeMeta('file.share_token');
+        $this->removeMeta('file.share_expires');
+        $this->removeMeta('file.share_created_at');
         return $this;
     }
 }

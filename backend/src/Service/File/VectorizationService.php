@@ -64,10 +64,22 @@ class VectorizationService
                 return ['success' => false, 'chunks_created' => 0, 'error' => 'No embedding model configured'];
             }
 
+            // Get model details (name, provider)
+            $model = $this->em->getRepository('App\Entity\Model')->find($embeddingModelId);
+            if (!$model) {
+                $this->logger->error('VectorizationService: Model not found', ['model_id' => $embeddingModelId]);
+                return ['success' => false, 'chunks_created' => 0, 'error' => 'Model not found'];
+            }
+
+            $modelName = $model->getProviderId(); // BPROVID contains the actual model name (e.g., 'bge-m3')
+            $provider = strtolower($model->getService()); // BSERVICE contains provider name, normalize to lowercase (e.g., 'ollama')
+
             $this->logger->info('VectorizationService: Starting vectorization', [
                 'user_id' => $userId,
                 'message_id' => $messageId,
                 'model_id' => $embeddingModelId,
+                'model_name' => $modelName,
+                'provider' => $provider,
                 'group_key' => $groupKey,
                 'text_length' => strlen($fileText)
             ]);
@@ -84,8 +96,11 @@ class VectorizationService
 
             foreach ($chunks as $chunk) {
                 try {
-                    // Get embedding vector for this chunk
-                    $embedding = $this->aiFacade->embed($chunk['content'], $userId);
+                    // Get embedding vector for this chunk with correct model
+                    $embedding = $this->aiFacade->embed($chunk['content'], $userId, [
+                        'model' => $modelName,
+                        'provider' => $provider
+                    ]);
                     
                     if (empty($embedding)) {
                         $this->logger->warning('VectorizationService: Empty embedding returned', [
@@ -94,30 +109,45 @@ class VectorizationService
                         continue;
                     }
 
-                    // Create RAG document entry
-                    $ragDoc = new RagDocument();
-                    $ragDoc->setUserId($userId);
-                    $ragDoc->setMessageId($messageId);
-                    $ragDoc->setGroupKey($groupKey);
-                    $ragDoc->setFileType($fileType);
-                    $ragDoc->setStartLine($chunk['start_line']);
-                    $ragDoc->setEndLine($chunk['end_line']);
-                    $ragDoc->setEmbedding($embedding);
-
-                    $this->em->persist($ragDoc);
+                    // MariaDB VECTOR Type: Use native SQL with VEC_FromText()
+                    // Doctrine doesn't handle VECTOR type correctly with prepared statements
+                    $vectorStr = '[' . implode(',', array_map('floatval', $embedding)) . ']';
+                    
+                    $conn = $this->em->getConnection();
+                    $sql = 'INSERT INTO BRAG (BUID, BMID, BGROUPKEY, BTYPE, BSTART, BEND, BTEXT, BEMBED, BCREATED) 
+                            VALUES (:uid, :mid, :gkey, :ftype, :start, :end, :text, VEC_FromText(:vec), :created)';
+                    
+                    $conn->executeStatement($sql, [
+                        'uid' => $userId,
+                        'mid' => $messageId,
+                        'gkey' => $groupKey,
+                        'ftype' => $fileType,
+                        'start' => $chunk['start_line'],
+                        'end' => $chunk['end_line'],
+                        'text' => $chunk['content'],
+                        'vec' => $vectorStr,
+                        'created' => time()
+                    ]);
+                    
                     $chunksCreated++;
 
                 } catch (\Throwable $e) {
-                    $this->logger->error('VectorizationService: Failed to vectorize chunk', [
-                        'chunk_start' => $chunk['start_line'],
-                        'error' => $e->getMessage()
-                    ]);
+                    $errorMsg = sprintf(
+                        'Chunk %d-%d failed: %s | SQL: %s | Vec Length: %d',
+                        $chunk['start_line'],
+                        $chunk['end_line'],
+                        $e->getMessage(),
+                        substr($sql ?? 'N/A', 0, 100),
+                        count($embedding ?? [])
+                    );
+                    $this->logger->error('VectorizationService: ' . $errorMsg);
+                    error_log('VECTORIZATION ERROR: ' . $errorMsg); // Force stderr
                     // Continue with next chunk
                 }
             }
 
-            // Flush all at once
-            $this->em->flush();
+            // Note: We use native SQL for VECTOR inserts, so no flush needed
+            // $this->em->flush(); // Not needed with native SQL
 
             $this->logger->info('VectorizationService: Vectorization complete', [
                 'user_id' => $userId,

@@ -28,3 +28,19 @@ data/
 *.log
 logs/
 
+# Backend cache & build
+backend/var/cache/
+backend/var/log/
+backend/.phpunit.cache/
+backend/vendor/
+
+# Frontend cache & build
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/package-lock.json
+
+# Test artifacts
+*.cache
+test-results
+
