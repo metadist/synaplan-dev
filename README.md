@@ -143,4 +143,4 @@ You'll see messages like:
 
 ## 📄 License
 
-See [LICENSE.md](LICENSE.md)
+See [LICENSE](LICENSE)
