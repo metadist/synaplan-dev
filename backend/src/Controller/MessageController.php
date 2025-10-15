@@ -284,6 +284,21 @@ class MessageController extends AbstractController
                 'enhanced' => $enhancedText
             ]);
 
+        } catch (\App\AI\Exception\ProviderException $e) {
+            $this->logger->warning('Enhancement provider error', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+                'provider' => $e->getProvider(),
+                'context' => $e->getContext()
+            ]);
+
+            // Return user-friendly error message
+            return $this->json([
+                'error' => 'Enhancement temporarily unavailable',
+                'message' => $e->getMessage(),
+                'provider' => $e->getProvider(),
+                'context' => $e->getContext()
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Enhancement failed', [
                 'user_id' => $user->getId(),
@@ -295,11 +310,7 @@ class MessageController extends AbstractController
 
             return $this->json([
                 'error' => 'Enhancement failed',
-                'message' => $e->getMessage(),
-                'debug' => [
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine()
-                ]
+                'message' => $e->getMessage()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

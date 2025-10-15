@@ -65,7 +65,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         if (!$this->client) {
-            throw new ProviderException('OpenAI client not initialized', 'openai');
+            throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
         try {
@@ -100,7 +100,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         if (!$this->client) {
-            throw new ProviderException('OpenAI client not initialized', 'openai');
+            throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
         try {
@@ -141,7 +141,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         if (!$this->client) {
-            throw new ProviderException('OpenAI client not initialized', 'openai');
+            throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
         try {
@@ -166,7 +166,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         if (!$this->client) {
-            throw new ProviderException('OpenAI client not initialized', 'openai');
+            throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
         try {

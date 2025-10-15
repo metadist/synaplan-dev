@@ -139,7 +139,95 @@ class StreamController extends AbstractController
                 );
 
                 if (!$result['success']) {
-                    throw new \RuntimeException($result['error']);
+                    // Build user-friendly error message as AI response
+                    $isDev = $this->getParameter('kernel.environment') === 'dev';
+                    
+                    $errorMessage = "## ⚠️ " . $result['error'] . "\n\n";
+                    
+                    // Add installation instructions ONLY in dev mode
+                    if ($isDev && isset($result['context'])) {
+                        $context = $result['context'];
+                        
+                        // If a specific model was requested, show it prominently
+                        if (isset($context['requested_model']) && isset($context['install_command'])) {
+                            $errorMessage .= "### 💡 Install the Model You Selected\n\n";
+                            $errorMessage .= "```bash\n" . $context['install_command'] . "\n```\n\n";
+                        }
+                        
+                        // Show alternative models if available
+                        if (isset($context['suggested_models'])) {
+                            $errorMessage .= "### 📦 Or Try These Alternatives\n\n";
+                            
+                            if (isset($context['suggested_models']['quick'])) {
+                                $errorMessage .= "**Quick & Light:**\n";
+                                foreach ($context['suggested_models']['quick'] as $model) {
+                                    $errorMessage .= "- `{$model}`\n";
+                                }
+                                $errorMessage .= "\n";
+                            }
+                            
+                            if (isset($context['suggested_models']['medium'])) {
+                                $errorMessage .= "**Medium (Better Quality):**\n";
+                                foreach ($context['suggested_models']['medium'] as $model) {
+                                    $errorMessage .= "- `{$model}`\n";
+                                }
+                                $errorMessage .= "\n";
+                            }
+                            
+                            if (isset($context['suggested_models']['large'])) {
+                                $errorMessage .= "**Large (Best Quality):**\n";
+                                foreach ($context['suggested_models']['large'] as $model) {
+                                    $errorMessage .= "- `{$model}`\n";
+                                }
+                                $errorMessage .= "\n";
+                            }
+                        }
+                        
+                        $errorMessage .= "*After downloading, refresh the page and try again.*";
+                    } elseif (!$isDev) {
+                        // Production: Generic message without technical details
+                        $errorMessage .= "*Please contact your system administrator or try selecting a different AI model.*";
+                    }
+                    
+                    // Stream the error message as data chunks (like normal AI response)
+                    $this->sendSSE('data', ['chunk' => $errorMessage]);
+                    
+                    // Save error message to database
+                    $outgoingMessage = new Message();
+                    $outgoingMessage->setUserId($user->getId());
+                    $outgoingMessage->setChat($chat);
+                    $outgoingMessage->setTrackingId($trackId);
+                    $outgoingMessage->setProviderIndex($result['provider'] ?? 'system');
+                    $outgoingMessage->setUnixTimestamp(time());
+                    $outgoingMessage->setDateTime(date('YmdHis'));
+                    $outgoingMessage->setMessageType('WEB');
+                    $outgoingMessage->setFile(0);
+                    $outgoingMessage->setTopic('ERROR');
+                    $outgoingMessage->setLanguage('en');
+                    $outgoingMessage->setText($errorMessage);
+                    $outgoingMessage->setDirection('OUT');
+                    $outgoingMessage->setStatus('complete');
+                    
+                    $this->em->persist($outgoingMessage);
+                    
+                    // Update incoming message
+                    $incomingMessage->setTopic('ERROR');
+                    $incomingMessage->setStatus('error');
+                    
+                    $chat->updateTimestamp();
+                    $this->em->flush();
+                    
+                    // Send complete event
+                    $this->sendSSE('complete', [
+                        'messageId' => $outgoingMessage->getId(),
+                        'trackId' => $trackId,
+                        'provider' => $result['provider'] ?? 'system',
+                        'model' => 'error',
+                        'topic' => 'ERROR',
+                        'language' => 'en',
+                    ]);
+                    
+                    return; // Exit early
                 }
 
                 $classification = $result['classification'];
@@ -230,6 +318,26 @@ class StreamController extends AbstractController
                     'topic' => $classification['topic'],
                 ]);
 
+            } catch (\App\AI\Exception\ProviderException $e) {
+                $this->logger->error('AI Provider failed', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                    'provider' => $e->getProviderName(),
+                    'context' => $e->getContext(),
+                ]);
+
+                $errorData = [
+                    'error' => $e->getMessage(),
+                    'provider' => $e->getProviderName(),
+                ];
+                
+                // Add installation instructions if available
+                if ($context = $e->getContext()) {
+                    $errorData['install_command'] = $context['install_command'] ?? null;
+                    $errorData['suggested_models'] = $context['suggested_models'] ?? null;
+                }
+
+                $this->sendSSE('error', $errorData);
             } catch (\Exception $e) {
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),

@@ -107,6 +107,15 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'error' => $e->getMessage(),
                 'model' => $options['model'] ?? 'unknown'
             ]);
+            
+            // Check if error is about model not found
+            $errorMsg = $e->getMessage();
+            if (stripos($errorMsg, '404') !== false || 
+                stripos($errorMsg, 'not found') !== false || 
+                stripos($errorMsg, 'model') !== false) {
+                throw ProviderException::noModelAvailable('chat', 'ollama', $model, $e);
+            }
+            
             throw new ProviderException(
                 'Ollama chat error: ' . $e->getMessage(),
                 'ollama'
@@ -122,6 +131,24 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $model = $options['model'];
+            
+            // Check if model exists before attempting to use it
+            $availableModels = $this->getAvailableModels();
+            if (empty($availableModels)) {
+                throw ProviderException::noModelAvailable('chat', 'ollama', $model);
+            }
+            
+            $modelExists = false;
+            foreach ($availableModels as $availableModel) {
+                if (stripos($availableModel, $model) !== false || stripos($model, $availableModel) !== false) {
+                    $modelExists = true;
+                    break;
+                }
+            }
+            
+            if (!$modelExists) {
+                throw ProviderException::noModelAvailable('chat', 'ollama', $model);
+            }
             
             $this->logger->info('🔵 Ollama streaming chat START', [
                 'model' => $model,
@@ -184,15 +211,48 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'chunks_sent' => $chunkCount,
                 'total_length' => strlen($fullResponse)
             ]);
+        } catch (ProviderException $e) {
+            // Re-throw ProviderException as-is (with our friendly message)
+            throw $e;
         } catch (\Exception $e) {
             $this->logger->error('🔴 Ollama streaming error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            
+            // Check if error is about model not found (404, "not found", etc.)
+            $errorMsg = $e->getMessage();
+            if (stripos($errorMsg, '404') !== false || 
+                stripos($errorMsg, 'not found') !== false || 
+                stripos($errorMsg, 'model') !== false) {
+                throw ProviderException::noModelAvailable('chat', 'ollama', $model, $e);
+            }
+            
             throw new ProviderException(
                 'Ollama streaming error: ' . $e->getMessage(),
-                'ollama'
+                'ollama',
+                null,
+                0,
+                $e
             );
+        }
+    }
+    
+    /**
+     * Get list of available models from Ollama
+     */
+    private function getAvailableModels(): array
+    {
+        try {
+            $models = $this->client->models()->list();
+            $modelNames = [];
+            foreach (($models->models ?? []) as $model) {
+                $modelNames[] = $model->model ?? $model->name ?? '';
+            }
+            return array_filter($modelNames);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to list Ollama models', ['error' => $e->getMessage()]);
+            return [];
         }
     }
 

@@ -570,6 +570,17 @@
   "message": {
     "thinking": "Thinking process",
     "reasoning": "AI Reasoning"
+  },
+  "aiProvider": {
+    "error": {
+      "prefix": "Error",
+      "noModelTitle": "Model Download Required",
+      "quickModels": "Quick & Light",
+      "mediumModels": "Medium (Better Quality)",
+      "largeModels": "Large (Best Quality)",
+      "exampleCommand": "Installation Command",
+      "restartNote": "After downloading, refresh the page and try again."
+    }
   }
 }
 

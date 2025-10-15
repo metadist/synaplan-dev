@@ -3,7 +3,7 @@
     <!-- New Chat Button -->
     <button
       @click="createNewChat"
-      class="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-brand-from to-brand-to hover:opacity-90 text-white rounded-lg transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      class="btn-primary w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />

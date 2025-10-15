@@ -51,18 +51,16 @@ class AiFacade
             $response = $this->circuitBreaker->execute(
                 callback: fn() => $provider->chat($messages, $options),
                 serviceName: 'ai_provider_' . $provider->getName(),
-                fallback: function() use ($messages, $options) {
-                    // Fallback zu anderem Provider
-                    $this->logger->warning('Using fallback provider');
-                    $fallbackProvider = $this->registry->getChatProvider('test');
-                    return $fallbackProvider->chat($messages, $options);
-                }
+                fallback: null // NO FALLBACK - let ProviderException bubble up
             );
+        } catch (ProviderException $e) {
+            // Re-throw ProviderException with helpful message (no model installed, etc.)
+            throw $e;
         } catch (\Exception $e) {
-            $this->logger->error('AI chat failed with all providers', [
+            $this->logger->error('AI chat failed', [
                 'error' => $e->getMessage()
             ]);
-            throw new ProviderException('All AI providers failed', $e);
+            throw new ProviderException('AI provider failed', 'unknown', null, 0, $e);
         }
         
         return [
@@ -115,19 +113,17 @@ class AiFacade
                     return null; // void return
                 },
                 serviceName: 'ai_provider_' . $provider->getName(),
-                fallback: function() use ($messages, $streamCallback, $options) {
-                    $this->logger->warning('⚠️  AiFacade: Using fallback provider for streaming');
-                    $fallbackProvider = $this->registry->getChatProvider('test');
-                    $fallbackProvider->chatStream($messages, $streamCallback, $options);
-                    return null;
-                }
+                fallback: null // NO FALLBACK - let ProviderException bubble up
             );
+        } catch (ProviderException $e) {
+            // Re-throw ProviderException with helpful message (no model installed, etc.)
+            throw $e;
         } catch (\Exception $e) {
-            $this->logger->error('🔴 AiFacade: Chat stream failed with all providers', [
+            $this->logger->error('🔴 AiFacade: Chat stream failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new ProviderException('All AI providers failed for streaming', $e);
+            throw new ProviderException('AI provider failed for streaming', 'unknown', null, 0, $e);
         }
         
         return [

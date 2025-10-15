@@ -105,13 +105,28 @@ class FileServeController extends AbstractController
             ], Response::HTTP_GONE);
         }
 
-        // 4. Build absolute path
+        // 4. Build absolute path with path traversal protection
         $absolutePath = $this->uploadDir . '/' . $path;
+        
+        // Resolve to real path (prevents symlink attacks)
+        $realPath = realpath($absolutePath);
+        $realUploadDir = realpath($this->uploadDir);
+        
+        // Security: Ensure file is within upload directory (no path traversal)
+        if (!$realPath || !$realUploadDir || strpos($realPath, $realUploadDir) !== 0) {
+            $this->logger->error('Path traversal attempt detected', [
+                'path' => $path,
+                'absolute_path' => $absolutePath,
+                'real_path' => $realPath,
+                'upload_dir' => $realUploadDir
+            ]);
+            throw $this->createNotFoundException('Invalid file path');
+        }
 
-        if (!file_exists($absolutePath)) {
+        if (!file_exists($realPath)) {
             $this->logger->error('File not found on disk', [
                 'path' => $path,
-                'absolute_path' => $absolutePath
+                'real_path' => $realPath
             ]);
             throw $this->createNotFoundException('File not found on disk');
         }
@@ -124,13 +139,19 @@ class FileServeController extends AbstractController
             ? ResponseHeaderBag::DISPOSITION_INLINE
             : ResponseHeaderBag::DISPOSITION_ATTACHMENT;
 
-        // 6. Create response
+        // 6. Create response with proper MIME type
         $filename = $message->getText()
             ? str_replace('File uploaded: ', '', $message->getText())
             : basename($path);
 
-        $response = new BinaryFileResponse($absolutePath);
+        $response = new BinaryFileResponse($realPath);
         $response->setContentDisposition($disposition, $filename);
+        
+        // Set explicit MIME type based on extension
+        $mimeType = $this->getMimeType($extension);
+        if ($mimeType) {
+            $response->headers->set('Content-Type', $mimeType);
+        }
 
         // 7. Cache headers
         if ($message->isPublic()) {
@@ -146,6 +167,8 @@ class FileServeController extends AbstractController
 
         // 8. Security headers
         $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
 
         $this->logger->info('File served', [
             'path' => $path,
@@ -155,6 +178,48 @@ class FileServeController extends AbstractController
         ]);
 
         return $response;
+    }
+    
+    /**
+     * Get MIME type for file extension
+     */
+    private function getMimeType(string $extension): ?string
+    {
+        return match(strtolower($extension)) {
+            // Images
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'bmp' => 'image/bmp',
+            'svg' => 'image/svg+xml',
+            // Documents
+            'pdf' => 'application/pdf',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt' => 'application/vnd.ms-powerpoint',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'txt' => 'text/plain',
+            'csv' => 'text/csv',
+            'json' => 'application/json',
+            'xml' => 'application/xml',
+            // Audio/Video
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'ogg' => 'audio/ogg',
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+            'avi' => 'video/x-msvideo',
+            // Archives
+            'zip' => 'application/zip',
+            'rar' => 'application/x-rar-compressed',
+            '7z' => 'application/x-7z-compressed',
+            'tar' => 'application/x-tar',
+            'gz' => 'application/gzip',
+            default => null
+        };
     }
 }
 

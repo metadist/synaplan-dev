@@ -28,6 +28,7 @@
           <div class="relative">
             <select
               v-model="defaultConfig[capability as Capability]"
+              @change="handleModelChange(capability as Capability, $event)"
               :disabled="isSystemModel(capability)"
               :class="[
                 'w-full px-4 py-3 pl-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all appearance-none',
@@ -186,7 +187,7 @@ import {
   ChevronDownIcon
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { getModels, getDefaultModels, saveDefaultModels, type ModelInfo } from '@/services/api/configApi'
+import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability, type ModelInfo } from '@/services/api/configApi'
 import { serviceColors } from '@/mocks/aiModels'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useNotification } from '@/composables/useNotification'
@@ -224,7 +225,10 @@ const defaultConfig = ref<Record<Capability, number | null>>({
 const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig.value })
 const selectedPurpose = ref<Capability | null>(null)
 
-const { success, error: showError } = useNotification()
+const { success, error: showError, warning, info } = useNotification()
+
+// Check if we're in development mode
+const isDev = import.meta.env.DEV
 
 onMounted(async () => {
   await loadData()
@@ -315,6 +319,44 @@ const saveConfiguration = async () => {
 
 const resetForm = () => {
   defaultConfig.value = { ...originalConfig.value }
+}
+
+/**
+ * Handle model selection change - check availability and show warnings
+ */
+const handleModelChange = async (capability: Capability, event: Event) => {
+  const modelId = (event.target as HTMLSelectElement).value
+  if (!modelId) return
+
+  try {
+    const check = await checkModelAvailability(parseInt(modelId))
+    
+    // Only show warnings/info in DEV mode
+    if (!isDev) return
+    
+    if (!check.available) {
+      if (check.provider_type === 'local' && check.install_command) {
+        // Ollama: Show install command
+        warning(
+          `Model "${check.model_name}" not downloaded yet.\n\nRun this command:\n${check.install_command}`,
+          10000
+        )
+      } else if (check.provider_type === 'external' && check.setup_instructions) {
+        // External API: Show API key setup
+        warning(
+          `API key required for ${check.service}.\n\n${check.setup_instructions}`,
+          10000
+        )
+      } else {
+        warning(check.message || 'Model may not be available', 5000)
+      }
+    } else {
+      // Model is available - show success
+      info(`Model "${check.model_name}" is ready to use!`, 3000)
+    }
+  } catch (error) {
+    console.error('Failed to check model availability:', error)
+  }
 }
 </script>
 

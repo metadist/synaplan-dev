@@ -120,6 +120,26 @@ class MessageProcessor
                 'response' => $response,
                 'preprocessed' => $preprocessed,
             ];
+        } catch (\App\AI\Exception\ProviderException $e) {
+            // Handle ProviderException specially to preserve context (install instructions, etc.)
+            $this->logger->error('AI Provider failed', [
+                'error' => $e->getMessage(),
+                'provider' => $e->getProviderName(),
+                'context' => $e->getContext(),
+            ]);
+
+            $errorResult = [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'provider' => $e->getProviderName(),
+            ];
+            
+            // Include context data (install_command, suggested_models) if available
+            if ($context = $e->getContext()) {
+                $errorResult['context'] = $context;
+            }
+
+            return $errorResult;
         } catch (\Exception $e) {
             $this->logger->error('Message processing failed', [
                 'error' => $e->getMessage(),
@@ -224,6 +244,31 @@ class MessageProcessor
                 'preprocessing' => $preprocessed
             ];
 
+        } catch (\App\AI\Exception\ProviderException $e) {
+            // Handle ProviderException specially to preserve context (install instructions, etc.)
+            $this->logger->error('AI Provider failed', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+                'provider' => $e->getProviderName(),
+                'context' => $e->getContext(),
+            ]);
+            
+            error_log('🔴 AI PROVIDER FAILED: ' . $e->getMessage());
+
+            $this->notify($statusCallback, 'error', $e->getMessage());
+
+            $errorResult = [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'provider' => $e->getProviderName(),
+            ];
+            
+            // Include context data (install_command, suggested_models) if available
+            if ($context = $e->getContext()) {
+                $errorResult['context'] = $context;
+            }
+
+            return $errorResult;
         } catch (\Throwable $e) {
             $errorDetails = [
                 'message_id' => $message->getId(),
