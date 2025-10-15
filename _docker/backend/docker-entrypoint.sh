@@ -6,6 +6,11 @@ echo "🚀 Starting Synaplan Backend..."
 # Initialize environment configuration
 /usr/local/bin/init-env.sh
 
+# Generate JWT keys if they don't exist
+echo "🔑 Checking JWT keys..."
+php bin/console lexik:jwt:generate-keypair --skip-if-exists
+echo "✅ JWT keys ready!"
+
 # Wait for database to be ready (already handled by healthcheck, but double-check)
 echo "⏳ Waiting for database connection..."
 until php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do

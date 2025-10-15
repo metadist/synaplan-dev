@@ -72,6 +72,10 @@ class AnthropicProvider implements ChatProviderInterface
             throw new ProviderException('Model must be specified in options', 'anthropic');
         }
 
+        if (empty($this->apiKey)) {
+            throw ProviderException::missingApiKey('anthropic', 'ANTHROPIC_API_KEY');
+        }
+
         try {
             $response = $this->httpClient->request('POST', $this->baseUrl . '/messages', [
                 'headers' => $this->getHeaders(),
@@ -101,6 +105,10 @@ class AnthropicProvider implements ChatProviderInterface
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'anthropic');
+        }
+
+        if (empty($this->apiKey)) {
+            throw ProviderException::missingApiKey('anthropic', 'ANTHROPIC_API_KEY');
         }
 
         try {

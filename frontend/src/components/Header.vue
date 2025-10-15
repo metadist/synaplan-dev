@@ -13,6 +13,16 @@
       </div>
 
       <div class="flex items-center gap-3">
+        <!-- Mode Switcher -->
+        <button
+          @click="appModeStore.toggleMode()"
+          class="dropdown-trigger"
+          :title="appModeStore.isEasyMode ? 'Switch to Advanced Mode' : 'Switch to Easy Mode'"
+        >
+          <AdjustmentsHorizontalIcon class="w-5 h-5" />
+          <span class="hidden md:inline text-sm font-medium">{{ appModeStore.isEasyMode ? 'Easy' : 'Advanced' }}</span>
+        </button>
+
         <div class="relative isolate">
           <button
             @click="isLangOpen = !isLangOpen"
@@ -60,13 +70,15 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import { SunIcon, MoonIcon, GlobeAltIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { SunIcon, MoonIcon, GlobeAltIcon, Bars3Icon, AdjustmentsHorizontalIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { useSidebarStore } from '../stores/sidebar'
+import { useAppModeStore } from '../stores/appMode'
 import { useI18n } from 'vue-i18n'
 
 const themeStore = useTheme()
 const sidebarStore = useSidebarStore()
+const appModeStore = useAppModeStore()
 const { locale } = useI18n()
 const isLangOpen = ref(false)
 

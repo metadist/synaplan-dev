@@ -406,8 +406,10 @@ const toggleEnhance = async () => {
     originalMessage.value = currentText
     message.value = result.enhanced
     enhanceEnabled.value = true
-  } catch (err) {
-    showError('Failed to enhance message')
+  } catch (err: any) {
+    // Show detailed error message if available
+    const errorMsg = err.response?.data?.message || err.message || 'Failed to enhance message'
+    showError(errorMsg)
     console.error('Enhancement error:', err)
   } finally {
     enhanceLoading.value = false

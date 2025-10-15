@@ -58,7 +58,13 @@ class CircuitBreaker
                     return $fallback();
                 }
                 
-                throw new \RuntimeException("Circuit breaker is OPEN for service: $serviceName");
+                // Throw ProviderException instead of RuntimeException
+                // Extract provider name from service name (format: ai_provider_xxx)
+                $providerName = str_replace('ai_provider_', '', $serviceName);
+                throw new \App\AI\Exception\ProviderException(
+                    "Service temporarily unavailable (circuit breaker is OPEN). Please try again in " . $this->timeout . " seconds.",
+                    $providerName
+                );
             }
         }
 
@@ -66,7 +72,12 @@ class CircuitBreaker
         if ($state === self::STATE_HALF_OPEN) {
             if ($this->getHalfOpenAttempts($serviceName) >= $this->halfOpenMaxCalls) {
                 $this->setState($serviceName, self::STATE_OPEN);
-                throw new \RuntimeException("Circuit breaker exceeded HALF_OPEN max calls for: $serviceName");
+                // Throw ProviderException instead of RuntimeException
+                $providerName = str_replace('ai_provider_', '', $serviceName);
+                throw new \App\AI\Exception\ProviderException(
+                    "Service temporarily unavailable (too many test attempts). Please try again later.",
+                    $providerName
+                );
             }
             $this->incrementHalfOpenAttempts($serviceName);
         }

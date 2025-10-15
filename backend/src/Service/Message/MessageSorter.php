@@ -142,6 +142,14 @@ class MessageSorter
                 'model_name' => $modelName
             ];
 
+        } catch (\App\AI\Exception\ProviderException $e) {
+            // Re-throw ProviderException to preserve install instructions
+            $this->logger->error('MessageSorter: AI Provider failed', [
+                'error' => $e->getMessage(),
+                'provider' => $e->getProviderName(),
+                'context' => $e->getContext()
+            ]);
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger->error('MessageSorter: Classification failed', [
                 'error' => $e->getMessage()

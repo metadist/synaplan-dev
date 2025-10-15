@@ -46,6 +46,17 @@ export interface SaveDefaultsRequest {
   }
 }
 
+export interface ModelCheckResponse {
+  available: boolean
+  provider_type: 'local' | 'external' | 'unknown'
+  model_name: string
+  service: string
+  message?: string
+  install_command?: string
+  env_var?: string
+  setup_instructions?: string
+}
+
 /**
  * Helper function to make authenticated API calls
  */
@@ -99,9 +110,17 @@ export const saveDefaultModels = async (defaults: SaveDefaultsRequest): Promise<
   })
 }
 
+/**
+ * Check if a model is available/ready to use
+ */
+export const checkModelAvailability = async (modelId: number): Promise<ModelCheckResponse> => {
+  return apiFetch<ModelCheckResponse>(`/api/v1/config/models/${modelId}/check`)
+}
+
 export const configApi = {
   getModels,
   getDefaultModels,
-  saveDefaultModels
+  saveDefaultModels,
+  checkModelAvailability
 }
 

@@ -120,12 +120,14 @@ import { useRoute } from 'vue-router'
 import { ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, FolderIcon, Cog6ToothIcon, ChartBarIcon, Bars3Icon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
+import { useAppModeStore } from '../stores/appMode'
 import { useTheme } from '../composables/useTheme'
 import SidebarChatList from './SidebarChatList.vue'
 import UserMenu from './UserMenu.vue'
 
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
+const appModeStore = useAppModeStore()
 const { theme } = useTheme()
 const route = useRoute()
 const expandedMenus = ref<string[]>([])
@@ -138,38 +140,66 @@ const isDark = computed(() => {
 
 const logoSrc = computed(() => isDark.value ? '/synaplan-light.svg' : '/synaplan-dark.svg')
 
-const navItems = [
-  { path: '/', label: 'Chat', icon: ChatBubbleLeftRightIcon },
-  { 
-    path: '/tools', 
-    label: 'Tools', 
-    icon: WrenchScrewdriverIcon,
-    children: [
-      { path: '/tools/introduction', label: 'Introduction' },
-      { path: '/tools/chat-widget', label: 'Chat Widget' },
-      { path: '/tools/doc-summary', label: 'Doc Summary' },
-      { path: '/tools/mail-handler', label: 'Mail Handler' },
-    ]
-  },
-  { path: '/files', label: 'Files & RAG', icon: FolderIcon },
-  { 
-    path: '/config', 
-    label: 'AI Config', 
-    icon: Cog6ToothIcon,
-    children: [
-      { path: '/config/inbound', label: 'Inbound' },
-      { path: '/config/ai-models', label: 'AI Models' },
-      { path: '/config/task-prompts', label: 'Task Prompts' },
-      { path: '/config/sorting-prompt', label: 'Sorting Prompt' },
-      { path: '/config/api-keys', label: 'API Keys' },
-    ]
-  },
-  { path: '/statistics', label: 'Statistics', icon: ChartBarIcon },
-]
+const navItems = computed(() => {
+  const items = [
+    { path: '/', label: 'Chat', icon: ChatBubbleLeftRightIcon },
+  ]
+
+  // Tools: nur in Advanced Mode
+  if (appModeStore.isAdvancedMode) {
+    items.push({ 
+      path: '/tools', 
+      label: 'Tools', 
+      icon: WrenchScrewdriverIcon,
+      children: [
+        { path: '/tools/introduction', label: 'Introduction' },
+        { path: '/tools/chat-widget', label: 'Chat Widget' },
+        { path: '/tools/doc-summary', label: 'Doc Summary' },
+        { path: '/tools/mail-handler', label: 'Mail Handler' },
+      ]
+    })
+  }
+
+  // Files & RAG: Easy Mode = nur Files, Advanced = mit Submenu
+  if (appModeStore.isEasyMode) {
+    items.push({ path: '/files', label: 'Files', icon: FolderIcon })
+  } else {
+    items.push({ 
+      path: '/files', 
+      label: 'Files & RAG', 
+      icon: FolderIcon,
+      children: [
+        { path: '/files', label: 'File Manager' },
+        { path: '/rag', label: 'Semantic Search' },
+      ]
+    })
+  }
+
+  // AI Config: nur in Advanced Mode
+  if (appModeStore.isAdvancedMode) {
+    items.push({ 
+      path: '/config', 
+      label: 'AI Config', 
+      icon: Cog6ToothIcon,
+      children: [
+        { path: '/config/inbound', label: 'Inbound' },
+        { path: '/config/ai-models', label: 'AI Models' },
+        { path: '/config/task-prompts', label: 'Task Prompts' },
+        { path: '/config/sorting-prompt', label: 'Sorting Prompt' },
+        { path: '/config/api-keys', label: 'API Keys' },
+      ]
+    })
+  }
+
+  items.push({ path: '/statistics', label: 'Statistics', icon: ChartBarIcon })
+  items.push({ path: '/settings', label: 'Settings', icon: Cog6ToothIcon })
+
+  return items
+})
 
 // Funktion zum Finden des übergeordneten Menüs basierend auf der aktuellen Route
 const findParentMenu = (currentPath: string) => {
-  for (const item of navItems) {
+  for (const item of navItems.value) {
     if (item.children) {
       const isChildActive = item.children.some(child => currentPath.startsWith(child.path))
       if (isChildActive && !expandedMenus.value.includes(item.path)) {

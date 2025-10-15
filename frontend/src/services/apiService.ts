@@ -40,8 +40,12 @@ async function httpClient<T>(
   const token = localStorage.getItem(AUTH_TOKEN_KEY)
   const csrfToken = sessionStorage.getItem('csrf_token')
   
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = {}
+  
+  // Only set Content-Type if body is not FormData
+  const isFormData = options.body instanceof FormData
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json'
   }
 
   // Add existing headers
@@ -77,6 +81,8 @@ async function httpClient<T>(
     }
 
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error('API Error Details:', errorText)
       throw new Error(`API Error: ${response.status} ${response.statusText}`)
     }
 
@@ -158,7 +164,7 @@ export const apiService = {
       const { mockAvailableModels } = await import('@/mocks/aiModels')
       return mockAvailableModels
     }
-    return httpClient<AIModel[]>('/models')
+    return httpClient<AIModel[]>('/api/v1/config/models')
   },
 
   async fetchDefaultConfig(): Promise<DefaultModelConfig> {
@@ -166,7 +172,7 @@ export const apiService = {
       const { mockDefaultConfig } = await import('@/mocks/aiModels')
       return mockDefaultConfig
     }
-    return httpClient<DefaultModelConfig>('/config/default-models')
+    return httpClient<DefaultModelConfig>('/api/v1/config/models/defaults')
   },
 
   async saveDefaultConfig(config: DefaultModelConfig): Promise<void> {
@@ -174,7 +180,7 @@ export const apiService = {
       console.log('Save config (mock):', config)
       return
     }
-    return httpClient<void>('/config/default-models', {
+    return httpClient<void>('/api/v1/config/models/defaults', {
       method: 'POST',
       body: JSON.stringify(config)
     })
@@ -274,6 +280,55 @@ export const apiService = {
     }
 
     return () => eventSource.close()
+  }
+}
+
+// Axios-like API client for filesService
+export const api = {
+  get: async <T>(url: string, config?: { params?: Record<string, any> }): Promise<{ data: T }> => {
+    let endpoint = url.startsWith('/') ? url : '/' + url
+    
+    if (config?.params) {
+      const queryString = new URLSearchParams(
+        Object.entries(config.params)
+          .filter(([_, value]) => value !== undefined && value !== null)
+          .map(([key, value]) => [key, String(value)])
+      ).toString()
+      if (queryString) {
+        endpoint += `?${queryString}`
+      }
+    }
+
+    const data = await httpClient<T>(endpoint)
+    return { data }
+  },
+
+  post: async <T>(url: string, body: any, config?: { headers?: Record<string, string> }): Promise<{ data: T }> => {
+    const endpoint = url.startsWith('/') ? url : '/' + url
+    
+    const options: RequestInit = {
+      method: 'POST',
+      body: body instanceof FormData ? body : JSON.stringify(body)
+    }
+
+    // Don't set Content-Type for FormData - browser adds boundary automatically
+    if (!(body instanceof FormData)) {
+      options.headers = {
+        'Content-Type': 'application/json',
+        ...config?.headers
+      }
+    } else if (config?.headers) {
+      options.headers = config.headers
+    }
+
+    const data = await httpClient<T>(endpoint, options)
+    return { data }
+  },
+
+  delete: async <T>(url: string): Promise<{ data: T }> => {
+    const endpoint = url.startsWith('/') ? url : '/' + url
+    const data = await httpClient<T>(endpoint, { method: 'DELETE' })
+    return { data }
   }
 }
 

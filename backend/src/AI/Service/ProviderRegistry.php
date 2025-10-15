@@ -115,10 +115,15 @@ class ProviderRegistry
 
     /**
      * Get provider by capability and name (with DB capability check)
+     * 
+     * CASE-INSENSITIVE: Supports both 'Ollama' and 'ollama'
      */
     private function getProvider(string $capability, ?string $name = null)
     {
         $name = $name ?? $this->defaultProvider;
+        
+        // Normalize to lowercase for case-insensitive matching
+        $normalizedName = strtolower($name);
         
         if (!isset($this->providers[$capability])) {
             throw new ProviderException(
@@ -128,11 +133,13 @@ class ProviderRegistry
         }
         
         foreach ($this->providers[$capability] as $provider) {
-            if ($provider->getName() === $name && $provider->isAvailable()) {
-                // Check if capability is enabled in DB
-                if (!$this->isCapabilityEnabled($name, $capability)) {
+            // Case-insensitive comparison
+            if (strtolower($provider->getName()) === $normalizedName && $provider->isAvailable()) {
+                // Check if capability is enabled in DB (using normalized name)
+                if (!$this->isCapabilityEnabled($normalizedName, $capability)) {
                     $this->logger->warning('Provider capability disabled in DB', [
                         'provider' => $name,
+                        'normalized' => $normalizedName,
                         'capability' => $capability
                     ]);
                     throw new ProviderException(
@@ -140,12 +147,25 @@ class ProviderRegistry
                         $name
                     );
                 }
+                
+                $this->logger->debug('Provider found and available', [
+                    'provider' => $provider->getName(),
+                    'capability' => $capability,
+                    'requested_name' => $name
+                ]);
+                
                 return $provider;
             }
         }
         
+        // Enhanced error message with available providers
+        $availableProviders = array_map(
+            fn($p) => $p->getName(),
+            $this->providers[$capability] ?? []
+        );
+        
         throw new ProviderException(
-            "{$capability} provider '{$name}' not found or unavailable",
+            "{$capability} provider '{$name}' not found or unavailable. Available: " . implode(', ', $availableProviders),
             $name
         );
     }

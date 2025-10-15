@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Config;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\AI\Service\ProviderRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,7 +21,8 @@ class ConfigController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private ConfigRepository $configRepository,
-        private ModelRepository $modelRepository
+        private ModelRepository $modelRepository,
+        private ProviderRegistry $providerRegistry
     ) {}
 
     /**
@@ -179,6 +181,114 @@ class ConfigController extends AbstractController
             'success' => true,
             'message' => 'Default models saved successfully'
         ]);
+    }
+
+    /**
+     * Check if a model is available/ready to use
+     * 
+     * @param int $modelId Model ID to check
+     * @return JsonResponse {available: bool, provider_type: string, message?: string, install_command?: string}
+     */
+    #[Route('/models/{modelId}/check', name: 'models_check', methods: ['GET'])]
+    public function checkModelAvailability(
+        int $modelId,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $model = $this->modelRepository->find($modelId);
+        if (!$model) {
+            return $this->json([
+                'available' => false,
+                'error' => 'Model not found'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $service = strtolower($model->getService());
+        $providerType = 'unknown';
+        $available = false;
+        $message = null;
+        $installCommand = null;
+        $envVar = null;
+
+        // Determine provider type and check availability
+        if ($service === 'ollama') {
+            $providerType = 'local';
+            
+            // Check if Ollama provider is available
+            try {
+                $provider = $this->providerRegistry->getChatProvider('ollama');
+                
+                // Check if the specific model exists
+                $modelName = $model->getProviderId() ?: $model->getName();
+                
+                // Try to list available models
+                $status = $provider->getStatus();
+                if (!empty($status['healthy'])) {
+                    // Model is available if Ollama is running
+                    // We assume it's available; the user will get a proper error if not
+                    $available = true;
+                } else {
+                    $message = "Ollama server is not running";
+                }
+                
+                // Always provide install command for Ollama models
+                $installCommand = "docker compose exec ollama ollama pull {$modelName}";
+            } catch (\Exception $e) {
+                $message = "Ollama not available: " . $e->getMessage();
+            }
+        } elseif (in_array($service, ['openai', 'anthropic', 'groq', 'gemini', 'google', 'mistral'])) {
+            $providerType = 'external';
+            
+            // Check if API key is configured
+            $envVarMap = [
+                'openai' => 'OPENAI_API_KEY',
+                'anthropic' => 'ANTHROPIC_API_KEY',
+                'groq' => 'GROQ_API_KEY',
+                'gemini' => 'GEMINI_API_KEY',
+                'google' => 'GOOGLE_API_KEY',
+                'mistral' => 'MISTRAL_API_KEY'
+            ];
+            
+            $envVar = $envVarMap[$service] ?? null;
+            
+            if ($envVar) {
+                // Check if env var is set and not empty
+                $apiKey = $_ENV[$envVar] ?? '';
+                $available = !empty($apiKey) && $apiKey !== 'your-api-key-here';
+                
+                if (!$available) {
+                    $message = "API key not configured for {$service}";
+                }
+            }
+        } else {
+            // Unknown provider (e.g., test, custom)
+            $available = true; // Assume available
+        }
+
+        $response = [
+            'available' => $available,
+            'provider_type' => $providerType,
+            'model_name' => $model->getProviderId() ?: $model->getName(),
+            'service' => $service
+        ];
+
+        if ($message) {
+            $response['message'] = $message;
+        }
+
+        if ($installCommand) {
+            $response['install_command'] = $installCommand;
+        }
+
+        if ($envVar) {
+            $response['env_var'] = $envVar;
+            $response['setup_instructions'] = "Add {$envVar}=your-api-key to your .env.local file";
+        }
+
+        return $this->json($response);
     }
 }
 

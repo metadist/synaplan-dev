@@ -36,7 +36,8 @@ RUN install-php-extensions \
     redis grpc intl opcache
 
 # PHP Configuration
-RUN printf "upload_max_filesize=128M\npost_max_size=128M\nmax_file_uploads=50\nmemory_limit=512M\n" \
+RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
+    printf "upload_max_filesize=128M\npost_max_size=128M\nmax_file_uploads=50\nmemory_limit=512M\nupload_tmp_dir=/var/www/uploads\nsys_temp_dir=/var/www/uploads\n" \
     > /usr/local/etc/php/conf.d/uploads.ini && \
     printf "opcache.enable=1\nopcache.memory_consumption=256\nopcache.max_accelerated_files=20000\n" \
     > /usr/local/etc/php/conf.d/opcache.ini
@@ -50,8 +51,10 @@ COPY backend/ .
 # Install dependencies (skip scripts during build)
 RUN composer install --prefer-dist --no-interaction --optimize-autoloader --no-scripts
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/var
+# Create required directories and set permissions
+RUN mkdir -p /var/www/html/var/cache /var/www/html/var/log /var/www/html/public/up && \
+    chmod -R 777 /var/www/html/public/up && \
+    chown -R www-data:www-data /var/www/html/var
 
 # Copy and setup entrypoint scripts
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/

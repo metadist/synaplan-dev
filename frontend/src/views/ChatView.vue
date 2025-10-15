@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
@@ -75,6 +76,8 @@ import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api'
 import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
 import { parseAIResponse } from '@/utils/responseParser'
+
+const { t } = useI18n()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const autoScroll = ref(true)
@@ -486,11 +489,49 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             processingStatus.value = ''
             processingMetadata.value = {}
             
+            // Format user-friendly error message with installation instructions
+            let displayError = '## ⚠️ ' + errorMsg + '\n\n'
+            
+            if (data.install_command && data.suggested_models) {
+              displayError += '### 📦 ' + t('aiProvider.error.noModelTitle') + '\n\n'
+              
+              if (data.suggested_models.quick) {
+                displayError += '**' + t('aiProvider.error.quickModels') + ':**\n'
+                data.suggested_models.quick.forEach((model: string) => {
+                  displayError += `- \`${model}\`\n`
+                })
+                displayError += '\n'
+              }
+              
+              if (data.suggested_models.medium) {
+                displayError += '**' + t('aiProvider.error.mediumModels') + ':**\n'
+                data.suggested_models.medium.forEach((model: string) => {
+                  displayError += `- \`${model}\`\n`
+                })
+                displayError += '\n'
+              }
+              
+              if (data.suggested_models.large) {
+                displayError += '**' + t('aiProvider.error.largeModels') + ':**\n'
+                data.suggested_models.large.forEach((model: string) => {
+                  displayError += `- \`${model}\`\n`
+                })
+                displayError += '\n'
+              }
+              
+              displayError += '### 💡 ' + t('aiProvider.error.exampleCommand') + '\n\n'
+              displayError += '```bash\n' + data.install_command + '\n```\n\n'
+              displayError += '*' + t('aiProvider.error.restartNote') + '*'
+            }
+            
+            // Always show error as message (not in streaming message, but as new assistant message)
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message && message.parts.length > 0) {
+              // If there's already content, finish it and create a new error message
               historyStore.finishStreamingMessage(messageId)
             } else {
-              historyStore.updateStreamingMessage(messageId, 'Error: ' + errorMsg)
+              // No content yet, replace with error message
+              historyStore.updateStreamingMessage(messageId, displayError)
               historyStore.finishStreamingMessage(messageId)
             }
           } else {
