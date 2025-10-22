@@ -71,14 +71,42 @@ class MessageProcessor
                 'model_name' => $sortingModelName
             ]);
             
-            // Get conversation history for context
-            $conversationHistory = $this->messageRepository->findConversationHistory(
-                $message->getUserId(),
-                $message->getTrackingId(),
-                10
-            );
+            // Get conversation history for context - STREAMING VERSION
+            // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
+            if ($message->getChatId()) {
+                $conversationHistory = $this->messageRepository->findChatHistory(
+                    $message->getUserId(),
+                    $message->getChatId(),
+                    30,      // Max 30 messages
+                    15000    // Max ~15k chars (~4k tokens)
+                );
+                $this->logger->debug('Using chat history for streaming', [
+                    'chat_id' => $message->getChatId(),
+                    'history_count' => count($conversationHistory)
+                ]);
+            } else {
+                // Fallback for legacy messages without chatId
+                $conversationHistory = $this->messageRepository->findConversationHistory(
+                    $message->getUserId(),
+                    $message->getTrackingId(),
+                    10
+                );
+                $this->logger->debug('Using legacy trackingId history for streaming', [
+                    'tracking_id' => $message->getTrackingId(),
+                    'history_count' => count($conversationHistory)
+                ]);
+            }
 
             $classification = $this->classifier->classify($message, $conversationHistory);
+            
+            // Override model_id if explicitly provided (e.g., from "Again" functionality)
+            if (isset($options['model_id']) && $options['model_id']) {
+                $classification['model_id'] = $options['model_id'];
+                $this->logger->info('MessageProcessor: Overriding classification model with user selection', [
+                    'original_model_id' => $classification['model_id'] ?? null,
+                    'new_model_id' => $options['model_id']
+                ]);
+            }
             
             $this->notify($statusCallback, 'classified', sprintf(
                 'Topic: %s, Language: %s, Source: %s',
@@ -191,12 +219,31 @@ class MessageProcessor
                 'model_name' => $sortingModelName
             ]);
             
-            // Get conversation history for context
-            $conversationHistory = $this->messageRepository->findConversationHistory(
-                $message->getUserId(),
-                $message->getTrackingId(),
-                10
-            );
+            // Get conversation history for context - NON-STREAMING VERSION
+            // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
+            if ($message->getChatId()) {
+                $conversationHistory = $this->messageRepository->findChatHistory(
+                    $message->getUserId(),
+                    $message->getChatId(),
+                    30,      // Max 30 messages
+                    15000    // Max ~15k chars (~4k tokens)
+                );
+                $this->logger->debug('Using chat history for non-streaming', [
+                    'chat_id' => $message->getChatId(),
+                    'history_count' => count($conversationHistory)
+                ]);
+            } else {
+                // Fallback for legacy messages without chatId
+                $conversationHistory = $this->messageRepository->findConversationHistory(
+                    $message->getUserId(),
+                    $message->getTrackingId(),
+                    10
+                );
+                $this->logger->debug('Using legacy trackingId history for non-streaming', [
+                    'tracking_id' => $message->getTrackingId(),
+                    'history_count' => count($conversationHistory)
+                ]);
+            }
 
             $classification = $this->classifier->classify($message, $conversationHistory);
             

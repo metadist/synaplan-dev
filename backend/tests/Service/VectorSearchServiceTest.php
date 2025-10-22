@@ -86,8 +86,8 @@ class VectorSearchServiceTest extends KernelTestCase
         $results = $this->vectorSearchService->semanticSearch(
             'artificial intelligence',
             $this->testUserId,
-            5,
-            'TEST'
+            'TEST', // group
+            5 // limit as int
         );
 
         $this->assertIsArray($results);

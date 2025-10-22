@@ -347,12 +347,152 @@
         "activate": "Activate",
         "delete": "Delete"
       },
-      "confirmRevoke": "Are you sure you want to revoke this API key?",
-      "confirmDelete": "Are you sure you want to delete this API key?",
-      "keyCreated": "API key created successfully!",
+      "confirmRevokeTitle": "Revoke API Key",
+      "confirmRevoke": "Are you sure you want to revoke this API key? It will no longer be able to access the API.",
+      "confirmDeleteTitle": "Delete API Key",
+      "confirmDelete": "Are you sure you want to permanently delete this API key? This action cannot be undone.",
+      "keyCreated": "API Key Created Successfully",
+      "keyCreatedSuccess": "API key created successfully",
+      "modal": {
+        "subtitle": "Your new API key has been created. Copy it now and store it securely.",
+        "yourKey": "Your API Key",
+        "warningTitle": "Important: Save this key now!",
+        "warningText": "For security reasons, this key will only be shown once. Make sure to copy and store it in a secure location before closing this window.",
+        "autoClose": "This window will close automatically in {seconds} seconds"
+      },
+      "revokedSuccess": "API key revoked successfully",
+      "activatedSuccess": "API key activated successfully",
+      "deletedSuccess": "API key deleted successfully",
+      "errorCreating": "Failed to create API key",
+      "errorCopying": "Failed to copy to clipboard",
+      "errorRevoking": "Failed to revoke API key",
+      "errorActivating": "Failed to activate API key",
+      "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
       "usageCount": "requests"
+    },
+    "phoneVerification": {
+      "title": "Phone Verification",
+      "description": "Verify your phone number to unlock full features and higher rate limits via WhatsApp.",
+      "phoneNumber": "Phone Number",
+      "phoneNumberPlaceholder": "+49 123 456789",
+      "phoneNumberHint": "Include country code (e.g., +49 for Germany)",
+      "sendCode": "Send Verification Code",
+      "codeSent": "Verification code sent to {phone}",
+      "codeSentSuccess": "Verification code sent to your WhatsApp",
+      "verificationCode": "Verification Code",
+      "codePlaceholder": "000000",
+      "verify": "Verify",
+      "resendCode": "Resend Code",
+      "verified": "Phone Number Verified",
+      "verifiedAt": "Verified on {date}",
+      "verifiedSuccess": "Phone number verified successfully!",
+      "removePhone": "Remove Phone Number",
+      "confirmRemoveTitle": "Remove Phone Verification",
+      "confirmRemove": "Are you sure you want to remove your phone number? You will lose access to full features.",
+      "removedSuccess": "Phone number removed successfully",
+      "errorLoading": "Failed to load verification status",
+      "errorSending": "Failed to send verification code",
+      "errorVerifying": "Failed to verify code",
+      "errorRemoving": "Failed to remove phone number"
+    },
+    "usage": {
+      "title": "Usage Statistics",
+      "description": "Track your API usage across all channels and features",
+      "export": "Export CSV",
+      "exportSuccess": "Usage data exported successfully",
+      "errorLoading": "Failed to load usage statistics",
+      "errorExporting": "Failed to export usage data",
+      "subscription": "Subscription",
+      "userLevel": "User Level",
+      "phoneVerified": "Phone Verified",
+      "subscriptionActive": "Status",
+      "totalRequests": "Total Requests",
+      "usageByType": "Usage by Type",
+      "bySource": "By Source",
+      "byTime": "By Time Period",
+      "recentActivity": "Recent Activity",
+      "lifetime": "lifetime",
+      "remaining": "Remaining",
+      "resetsAt": "Resets",
+      "actionTypes": "action types",
+      "noData": "No data available",
+      "time": "Time",
+      "action": "Action",
+      "source": "Source",
+      "tokens": "Tokens",
+      "latency": "Latency",
+      "noRecentActivity": "No recent activity",
+      "actions": {
+        "messages": "Messages",
+        "images": "Images",
+        "videos": "Videos",
+        "audios": "Audio Files",
+        "file_analysis": "File Analysis"
+      },
+      "sources": {
+        "whatsapp": "WhatsApp",
+        "email": "Email",
+        "web": "Web"
+      },
+      "periods": {
+        "today": "Today",
+        "this_week": "This Week",
+        "this_month": "This Month"
+      }
     }
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Free Limit Reached",
+      "description": "You've used all {limit} {action} in your free plan. Upgrade to continue!"
+    },
+    "hourly": {
+      "title": "Hourly Limit Reached",
+      "description": "You've reached your hourly limit of {limit} {action}. Your limit will reset soon."
+    },
+    "monthly": {
+      "title": "Monthly Limit Reached",
+      "description": "You've used all {limit} {action} this month. Upgrade for more!"
+    },
+    "currentUsage": "Current Usage",
+    "remaining": "Remaining",
+    "resetsIn": "Resets in",
+    "noReset": "No automatic reset",
+    "upgradesBenefits": "Upgrade benefits:",
+    "benefits": {
+      "unlimited": "Unlimited or higher limits",
+      "allFeatures": "Access to all features",
+      "priority": "Priority processing",
+      "support": "Premium support"
+    },
+    "upgradeNow": "Upgrade Now",
+    "verifyPhone": "Verify Phone Number",
+    "footerNote": "Questions? Contact our support team."
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "save": "Save",
+    "close": "Close",
+    "sending": "Sending...",
+    "yes": "Yes",
+    "no": "No",
+    "active": "Active",
+    "inactive": "Inactive",
+    "now": "Now",
+    "justNow": "Just now",
+    "minutesAgo": "{count} minute ago | {count} minutes ago",
+    "hoursAgo": "{count} hour ago | {count} hours ago",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "leave": "Leave",
+    "stay": "Stay"
   },
   "auth": {
     "login": "Login",
@@ -581,6 +721,27 @@
       "exampleCommand": "Installation Command",
       "restartNote": "After downloading, refresh the page and try again."
     }
+  },
+  "chatShare": {
+    "title": "Share Chat",
+    "chatId": "Chat ID",
+    "notPublic": "This chat is currently",
+    "private": "private",
+    "makePublicDescription": "Make it public to share with others and get indexed by search engines.",
+    "benefits": "Why share your chat?",
+    "benefit1": "Anyone with the link can view the conversation",
+    "benefit2": "Searchable by Google and other search engines",
+    "benefit3": "Perfect for sharing knowledge and examples",
+    "generating": "Generating link...",
+    "makePublic": "Make Public & Generate Link",
+    "isPublic": "Chat is public",
+    "publicLink": "Public Link",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "seoTitle": "SEO Optimization Active",
+    "seoDescription": "This chat is now indexed by search engines like Google. Share the link on social media or embed it on your website!",
+    "revoking": "Revoking...",
+    "revoke": "Revoke Public Access"
   }
 }
 

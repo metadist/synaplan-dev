@@ -224,7 +224,7 @@ watch(() => historyStore.messages, () => {
   scrollToBottom()
 }, { deep: true })
 
-const handleSendMessage = async (content: string, options?: { includeReasoning?: boolean }) => {
+const handleSendMessage = async (content: string, options?: { includeReasoning?: boolean, modelId?: number, fileIds?: number[] }) => {
   autoScroll.value = true
 
   // Add user message
@@ -244,7 +244,7 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
   }
 }
 
-const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean }) => {
+const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean; modelId?: number; fileIds?: number[] }) => {
   streamingAbortController = new AbortController()
   
   // Get current selected model from store
@@ -290,6 +290,10 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
       
       const includeReasoning = options?.includeReasoning ?? false
       const webSearch = options?.webSearch ?? false
+      const modelId = options?.modelId
+      const fileIds = options?.fileIds || [] // Array of fileIds
+      
+      console.log('🚀 Streaming with options:', { includeReasoning, webSearch, modelId, fileIds, fileCount: fileIds.length })
       
       const stopStreaming = chatApi.streamMessage(
         userId,
@@ -455,7 +459,7 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               })
             }
           } else if (data.status === 'complete') {
-            console.log('Complete:', data)
+            console.log('✅ Complete event received:', data)
             
             // Clear processing status
             processingStatus.value = ''
@@ -464,25 +468,42 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             // Store againData and backendMessageId if provided
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
+              console.log('📍 Found message to update:', message.id)
+              
               if (data.again) {
+                console.log('🔄 Setting againData from backend:', {
+                  eligibleCount: data.again.eligible?.length || 0,
+                  hasPredictedNext: !!data.again.predictedNext,
+                  eligible: data.again.eligible,
+                  predictedNext: data.again.predictedNext
+                })
                 message.againData = data.again
+              } else {
+                console.warn('⚠️ No againData in complete event!', data)
               }
-                  if (data.messageId) {
-                    message.backendMessageId = data.messageId
-                  }
-                  // Update provider and model from backend metadata
-                  if (data.metadata?.provider) {
-                    message.provider = data.metadata.provider
-                  }
-                  if (data.metadata?.model) {
-                    message.modelLabel = data.metadata.model
-                  }
-                }
-                
-                // Generate chat title from first message
-                generateChatTitleFromFirstMessage(userMessage)
-                
-                historyStore.finishStreamingMessage(messageId)
+              
+              if (data.messageId) {
+                console.log('🆔 Setting backendMessageId:', data.messageId)
+                message.backendMessageId = data.messageId
+              }
+              
+              // Update provider and model from backend metadata
+              if (data.provider) {
+                message.provider = data.provider
+                console.log('🏢 Updated provider:', data.provider)
+              }
+              if (data.model) {
+                message.modelLabel = data.model
+                console.log('🤖 Updated model label:', data.model)
+              }
+            } else {
+              console.error('❌ Could not find message with id:', messageId)
+            }
+            
+            // Generate chat title from first message
+            generateChatTitleFromFirstMessage(userMessage)
+            
+            historyStore.finishStreamingMessage(messageId)
           } else if (data.status === 'error') {
             const errorMsg = data.error || data.message || 'Unknown error'
             console.error('Error:', errorMsg, data)
@@ -539,7 +560,9 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
           }
         },
         includeReasoning,
-        webSearch
+        webSearch,
+        modelId,
+        fileIds // Pass array of fileIds
       )
       
       // Store cleanup function
@@ -564,38 +587,46 @@ const handleStopStreaming = () => {
 
 // Handle "Again" with specific model from backend
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
-  console.log('Handle Again:', backendMessageId, modelId)
+  console.log('🔄 Handle Again:', backendMessageId, modelId)
   
-  try {
-    const response = await chatApi.sendAgainMessage(backendMessageId, modelId)
-    
-    if (response.success && response.message) {
-      // Mark previous message as superseded
-      const previousMessage = historyStore.messages.find(
-        m => m.backendMessageId === backendMessageId && m.role === 'assistant'
-      )
-      if (previousMessage) {
-        historyStore.markSuperseded(previousMessage.id)
-      }
-      
-      // Add new AI response to history
-      historyStore.addMessage(
-        'assistant',
-        [{ type: 'text', content: response.message.text }],
-        response.message.provider,
-        'AI Model',
-        response.again,
-        response.message.id,
-        backendMessageId
-      )
-    }
-  } catch (error) {
-    console.error('Again request failed:', error)
-    historyStore.addMessage(
-      'assistant',
-      [{ type: 'text', content: 'Failed to regenerate response. Please try again.' }]
-    )
+  // Find the original user message for this assistant response
+  const assistantMessage = historyStore.messages.find(
+    m => m.backendMessageId === backendMessageId && m.role === 'assistant'
+  )
+  
+  if (!assistantMessage) {
+    console.error('❌ Could not find assistant message with backendMessageId:', backendMessageId)
+    return
   }
+  
+  // Mark previous response as superseded
+  historyStore.markSuperseded(assistantMessage.id)
+  
+  // Find the user message (should be right before the assistant message)
+  const messageIndex = historyStore.messages.indexOf(assistantMessage)
+  const userMessage = messageIndex > 0 ? historyStore.messages[messageIndex - 1] : null
+  
+  if (!userMessage || userMessage.role !== 'user') {
+    console.error('❌ Could not find user message before assistant message')
+    return
+  }
+  
+  // Extract user text from parts
+  const userText = userMessage.parts
+    .filter(p => p.type === 'text')
+    .map(p => p.content)
+    .join('\n')
+  
+  if (!userText) {
+    console.error('❌ No text found in user message')
+    return
+  }
+  
+  console.log('✅ Re-sending user message:', userText.substring(0, 50) + '...')
+  
+  // Re-send the user message with the selected model
+  // This will trigger normal streaming flow
+  await handleSendMessage(userText, { modelId })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {

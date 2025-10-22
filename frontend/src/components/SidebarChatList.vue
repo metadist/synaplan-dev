@@ -117,6 +117,16 @@
         </div>
       </div>
     </div>
+
+    <!-- Chat Share Modal -->
+    <ChatShareModal
+      :is-open="shareModalOpen"
+      :chat-id="shareModalChatId"
+      :chat-title="shareModalChatTitle"
+      @close="shareModalOpen = false"
+      @shared="chatsStore.loadChats()"
+      @unshared="chatsStore.loadChats()"
+    />
   </div>
 </template>
 
@@ -125,6 +135,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronRightIcon, PuzzlePieceIcon } from '@heroicons/vue/24/outline'
 import SidebarChatListItem from './SidebarChatListItem.vue'
+import ChatShareModal from './ChatShareModal.vue'
 import { useChatsStore } from '@/stores/chats'
 import { useHistoryStore } from '@/stores/history'
 import { useDialog } from '@/composables/useDialog'
@@ -213,9 +224,15 @@ const openChat = async (id: string) => {
   }
 }
 
+const shareModalOpen = ref(false)
+const shareModalChatId = ref<number | null>(null)
+const shareModalChatTitle = ref<string>('')
+
 const handleShare = (id: string) => {
-  console.log('Share chat:', id)
-  // TODO: Implement share functionality
+  const chat = chatsStore.chats.find(c => c.id === Number(id))
+  shareModalChatId.value = Number(id)
+  shareModalChatTitle.value = chat?.title || 'Chat'
+  shareModalOpen.value = true
 }
 
 const handleRename = async (id: string) => {

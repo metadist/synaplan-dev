@@ -191,15 +191,15 @@ class ModelConfigService
         return [
             'chat' => [
                 'provider' => $this->getDefaultProvider($userId, 'chat'),
-                'model' => $this->getDefaultModel($userId, $this->getDefaultProvider($userId, 'chat'), 'chat'),
+                'model' => $this->getDefaultModel('CHAT', $userId),
             ],
             'vision' => [
                 'provider' => $this->getDefaultProvider($userId, 'vision'),
-                'model' => $this->getDefaultModel($userId, $this->getDefaultProvider($userId, 'vision'), 'vision'),
+                'model' => $this->getDefaultModel('VISION', $userId),
             ],
             'embedding' => [
                 'provider' => $this->getDefaultProvider($userId, 'embedding'),
-                'model' => $this->getDefaultModel($userId, $this->getDefaultProvider($userId, 'embedding'), 'embedding'),
+                'model' => $this->getDefaultModel('EMBEDDING', $userId),
             ],
         ];
     }

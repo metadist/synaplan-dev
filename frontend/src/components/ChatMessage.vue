@@ -85,6 +85,20 @@
       
         <!-- Bubble content (only non-thinking parts) -->
         <div class="px-4 py-3 overflow-hidden space-y-3">
+          <!-- Attached Files (NEW) -->
+          <div v-if="files && files.length > 0" class="flex flex-wrap gap-2 mb-3">
+            <div
+              v-for="file in files"
+              :key="file.id"
+              class="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors cursor-pointer text-sm"
+              @click="downloadFile(file)"
+            >
+              <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
+              <span class="font-medium truncate max-w-[200px]">{{ file.filename }}</span>
+              <span v-if="file.fileSize" class="text-xs opacity-60">{{ formatFileSize(file.fileSize) }}</span>
+            </div>
+          </div>
+          
           <MessagePart
             v-for="(part, index) in contentParts"
             :key="index"
@@ -118,20 +132,21 @@
           </div>
         </div>
 
-        <!-- Right: Actions (assistant only, hidden during streaming or if no againData) -->
-        <div v-if="role === 'assistant' && !isStreaming && (againData || backendMessageId)" class="flex items-center gap-2 flex-shrink-0">
+        <!-- Right: Actions (assistant only, hidden during streaming, only show if we have models) -->
+        <div v-if="role === 'assistant' && !isStreaming && (againData || backendMessageId) && modelOptions.length > 0" class="flex items-center gap-2 flex-shrink-0">
           <button
             @click="handleAgain"
             type="button"
-            :disabled="isSuperseded"
+            :disabled="isSuperseded || !selectedModel"
             :class="[
               'pill text-xs whitespace-nowrap',
-              isSuperseded ? 'opacity-50 cursor-not-allowed' : ''
+              (isSuperseded || !selectedModel) ? 'opacity-50 cursor-not-allowed' : ''
             ]"
             :aria-label="$t('chatMessage.again')"
           >
             <ArrowPathIcon class="w-4 h-4" />
-            <span class="font-medium hidden sm:inline">{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span>
+            <span v-if="selectedModel" class="font-medium hidden sm:inline">{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span>
+            <span v-else class="font-medium hidden sm:inline">{{ $t('chatMessage.again') }}</span>
             <span class="font-medium sm:hidden">{{ $t('chatMessage.again') }}</span>
           </button>
 
@@ -207,7 +222,7 @@ import { Icon } from '@iconify/vue'
 import { useModelsStore } from '@/stores/models'
 import { getProviderIcon } from '@/utils/providerIcons'
 import MessagePart from './MessagePart.vue'
-import type { Part } from '@/stores/history'
+import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
 
 interface Props {
@@ -222,6 +237,7 @@ interface Props {
   backendMessageId?: number
   processingStatus?: string
   processingMetadata?: any
+  files?: MessageFile[] // NEW: attached files
 }
 
 interface ModelOption {
@@ -251,54 +267,68 @@ const emit = defineEmits<{
 const modelsStore = useModelsStore()
 const modelDropdownOpen = ref(false)
 
-const defaultModelOptions: ModelOption[] = [
-  { provider: 'OpenAI', model: 'gpt-4', label: 'GPT-4' },
-  { provider: 'OpenAI', model: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-  { provider: 'OpenAI', model: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-  { provider: 'Anthropic', model: 'claude-3-opus', label: 'Claude 3 Opus' },
-  { provider: 'Anthropic', model: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
-  { provider: 'Google', model: 'gemini-pro', label: 'Gemini Pro' },
-]
-
 const modelOptions = computed(() => {
-  // Use backend againData if available
+  console.log('🔍 Computing modelOptions:', {
+    hasAgainData: !!props.againData,
+    eligibleCount: props.againData?.eligible?.length || 0,
+    storeChatModelsCount: modelsStore.chatModels.length,
+    backendMessageId: props.backendMessageId
+  })
+  
+  // Priority 1: Use backend againData if available (best option - contains eligible models for this specific message)
   if (props.againData?.eligible && props.againData.eligible.length > 0) {
-    return props.againData.eligible.map(model => ({
+    const models = props.againData.eligible.map(model => ({
       provider: model.service,
       model: model.name,
       label: model.name,
       id: model.id
     }))
+    console.log('✅ Using backend againData models:', models)
+    return models
   }
   
-  // Fallback to store models or defaults
-  return modelsStore.chatModels.length > 0 
-    ? modelsStore.chatModels 
-    : defaultModelOptions
+  // Priority 2: Use models from store (loaded from backend config)
+  if (modelsStore.chatModels.length > 0) {
+    const models = modelsStore.chatModels.map(model => ({
+      ...model,
+      id: undefined // Store models don't have IDs yet
+    }))
+    console.log('⚠️ Fallback: Using store models (no againData):', models)
+    return models
+  }
+  
+  // Priority 3: If no models available, return empty array (disable again button)
+  console.warn('❌ No models available! Button will be hidden.')
+  return []
 })
 
 const selectedModel = computed(() => {
-  // Use predictedNext if available
+  // Priority 1: Use predictedNext from backend if available (AI prediction for best next model)
   if (props.againData?.predictedNext) {
     const predicted = props.againData.predictedNext
-    return {
+    const model = {
       provider: predicted.service,
       model: predicted.name,
       label: predicted.name,
       id: predicted.id
     }
+    console.log('🎯 Selected model (predicted):', model)
+    return model
   }
   
-  // Try to match current store selection
+  // Priority 2: Try to match current store selection
   const currentModel = modelOptions.value.find(
     (opt) => opt.model === modelsStore.selectedModel && opt.provider === modelsStore.selectedProvider
   )
   if (currentModel) {
+    console.log('🎯 Selected model (store match):', currentModel)
     return currentModel
   }
   
-  // Otherwise use the first available model
-  return modelOptions.value[0] || { provider: 'OpenAI', model: 'gpt-4', label: 'GPT-4' }
+  // Priority 3: Use the first available model (or null if none available)
+  const firstModel = modelOptions.value[0] || null
+  console.log('🎯 Selected model (first available):', firstModel)
+  return firstModel
 })
 
 const handleAgain = () => {
@@ -348,4 +378,32 @@ const vClickOutside = {
     }
   },
 }
+
+// File handling functions
+const getFileIcon = (fileType: string): string => {
+  const type = fileType.toLowerCase()
+  if (['pdf'].includes(type)) return 'mdi:file-pdf-box'
+  if (['doc', 'docx'].includes(type)) return 'mdi:file-word-box'
+  if (['xls', 'xlsx'].includes(type)) return 'mdi:file-excel-box'
+  if (['ppt', 'pptx'].includes(type)) return 'mdi:file-powerpoint-box'
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(type)) return 'mdi:file-image'
+  if (['mp3', 'wav', 'ogg', 'm4a', 'opus'].includes(type)) return 'mdi:file-music'
+  if (['mp4', 'avi', 'mov', 'webm'].includes(type)) return 'mdi:file-video'
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(type)) return 'mdi:folder-zip'
+  if (['txt', 'md'].includes(type)) return 'mdi:file-document-outline'
+  return 'mdi:file-outline'
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
+}
+
+const downloadFile = (file: MessageFile) => {
+  const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/uploads/${file.filePath}`
+  window.open(url, '_blank')
+}
+
 </script>

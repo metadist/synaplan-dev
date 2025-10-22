@@ -96,6 +96,215 @@
   "message": {
     "thinking": "Denkprozess",
     "reasoning": "KI-Überlegung"
+  },
+  "config": {
+    "inbound": {
+      "title": "Eingänge",
+      "description": "Sie können diese Plattform über verschiedene Kanäle erreichen."
+    },
+    "aiModels": {
+      "title": "KI-Modelle",
+      "description": "Konfigurieren und verwalten Sie Ihre KI-Modelle"
+    },
+    "taskPrompts": {
+      "title": "Prompt-Verwaltung",
+      "description": "Verwalten Sie Ihre Prompts"
+    },
+    "sortingPrompt": {
+      "title": "Preprocessor",
+      "description": "Der Preprocessor verarbeitet eingehende Nachrichten"
+    },
+    "apiKeys": {
+      "title": "API-Schlüssel",
+      "description": "Erstellen und verwalten Sie API-Schlüssel für den API-Zugriff.",
+      "createKey": "API-Schlüssel erstellen",
+      "namePlaceholder": "Name (z.B. Server A)",
+      "tableHeaders": {
+        "name": "Name",
+        "key": "Schlüssel",
+        "status": "Status",
+        "created": "Erstellt",
+        "lastUsed": "Zuletzt verwendet",
+        "actions": "Aktionen"
+      },
+      "status": {
+        "active": "Aktiv",
+        "inactive": "Inaktiv"
+      },
+      "actions": {
+        "copy": "Kopieren",
+        "copied": "Kopiert!",
+        "revoke": "Widerrufen",
+        "activate": "Aktivieren",
+        "delete": "Löschen"
+      },
+      "confirmRevokeTitle": "API-Schlüssel widerrufen",
+      "confirmRevoke": "Möchten Sie diesen API-Schlüssel wirklich widerrufen? Er kann dann nicht mehr auf die API zugreifen.",
+      "confirmDeleteTitle": "API-Schlüssel löschen",
+      "confirmDelete": "Möchten Sie diesen API-Schlüssel wirklich dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "keyCreated": "API-Schlüssel erfolgreich erstellt",
+      "keyCreatedSuccess": "API-Schlüssel erfolgreich erstellt",
+      "modal": {
+        "subtitle": "Ihr neuer API-Schlüssel wurde erstellt. Kopieren Sie ihn jetzt und speichern Sie ihn sicher.",
+        "yourKey": "Ihr API-Schlüssel",
+        "warningTitle": "Wichtig: Speichern Sie diesen Schlüssel jetzt!",
+        "warningText": "Aus Sicherheitsgründen wird dieser Schlüssel nur einmal angezeigt. Stellen Sie sicher, dass Sie ihn kopieren und an einem sicheren Ort speichern, bevor Sie dieses Fenster schließen.",
+        "autoClose": "Dieses Fenster schließt sich automatisch in {seconds} Sekunden"
+      },
+      "revokedSuccess": "API-Schlüssel erfolgreich widerrufen",
+      "activatedSuccess": "API-Schlüssel erfolgreich aktiviert",
+      "deletedSuccess": "API-Schlüssel erfolgreich gelöscht",
+      "errorCreating": "Fehler beim Erstellen des API-Schlüssels",
+      "errorCopying": "Fehler beim Kopieren in die Zwischenablage",
+      "errorRevoking": "Fehler beim Widerrufen des API-Schlüssels",
+      "errorActivating": "Fehler beim Aktivieren des API-Schlüssels",
+      "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
+      "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
+      "usageCount": "Anfragen"
+    },
+    "phoneVerification": {
+      "title": "Telefon-Verifizierung",
+      "description": "Verifizieren Sie Ihre Telefonnummer, um alle Funktionen freizuschalten und höhere Limits über WhatsApp zu erhalten.",
+      "phoneNumber": "Telefonnummer",
+      "phoneNumberPlaceholder": "+49 123 456789",
+      "phoneNumberHint": "Landesvorwahl angeben (z.B. +49 für Deutschland)",
+      "sendCode": "Verifizierungscode senden",
+      "codeSent": "Verifizierungscode an {phone} gesendet",
+      "codeSentSuccess": "Verifizierungscode an Ihre WhatsApp gesendet",
+      "verificationCode": "Verifizierungscode",
+      "codePlaceholder": "000000",
+      "verify": "Verifizieren",
+      "resendCode": "Code erneut senden",
+      "verified": "Telefonnummer verifiziert",
+      "verifiedAt": "Verifiziert am {date}",
+      "verifiedSuccess": "Telefonnummer erfolgreich verifiziert!",
+      "removePhone": "Telefonnummer entfernen",
+      "confirmRemoveTitle": "Telefon-Verifizierung entfernen",
+      "confirmRemove": "Möchten Sie Ihre Telefonnummer wirklich entfernen? Sie verlieren den Zugriff auf alle Funktionen.",
+      "removedSuccess": "Telefonnummer erfolgreich entfernt",
+      "errorLoading": "Fehler beim Laden des Verifizierungsstatus",
+      "errorSending": "Fehler beim Senden des Verifizierungscodes",
+      "errorVerifying": "Fehler beim Verifizieren des Codes",
+      "errorRemoving": "Fehler beim Entfernen der Telefonnummer"
+    },
+    "usage": {
+      "title": "Nutzungsstatistiken",
+      "description": "Verfolgen Sie Ihre API-Nutzung über alle Kanäle und Funktionen",
+      "export": "CSV Exportieren",
+      "exportSuccess": "Nutzungsdaten erfolgreich exportiert",
+      "errorLoading": "Fehler beim Laden der Nutzungsstatistiken",
+      "errorExporting": "Fehler beim Exportieren der Nutzungsdaten",
+      "subscription": "Abonnement",
+      "userLevel": "Benutzerebene",
+      "phoneVerified": "Telefon verifiziert",
+      "subscriptionActive": "Status",
+      "totalRequests": "Gesamtanfragen",
+      "usageByType": "Nutzung nach Typ",
+      "bySource": "Nach Quelle",
+      "byTime": "Nach Zeitraum",
+      "recentActivity": "Letzte Aktivitäten",
+      "lifetime": "lebenslang",
+      "remaining": "Verbleibend",
+      "resetsAt": "Zurücksetzen",
+      "actionTypes": "Aktionstypen",
+      "noData": "Keine Daten verfügbar",
+      "time": "Zeit",
+      "action": "Aktion",
+      "source": "Quelle",
+      "tokens": "Tokens",
+      "latency": "Latenz",
+      "noRecentActivity": "Keine aktuellen Aktivitäten",
+      "actions": {
+        "messages": "Nachrichten",
+        "images": "Bilder",
+        "videos": "Videos",
+        "audios": "Audiodateien",
+        "file_analysis": "Dateianalyse"
+      },
+      "sources": {
+        "whatsapp": "WhatsApp",
+        "email": "E-Mail",
+        "web": "Web"
+      },
+      "periods": {
+        "today": "Heute",
+        "this_week": "Diese Woche",
+        "this_month": "Diesen Monat"
+      }
+    }
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Kostenloses Limit Erreicht",
+      "description": "Sie haben alle {limit} {action} in Ihrem kostenlosen Plan verbraucht. Upgraden Sie, um fortzufahren!"
+    },
+    "hourly": {
+      "title": "Stündliches Limit Erreicht",
+      "description": "Sie haben Ihr stündliches Limit von {limit} {action} erreicht. Ihr Limit wird bald zurückgesetzt."
+    },
+    "monthly": {
+      "title": "Monatliches Limit Erreicht",
+      "description": "Sie haben alle {limit} {action} diesen Monat verbraucht. Upgraden Sie für mehr!"
+    },
+    "currentUsage": "Aktuelle Nutzung",
+    "remaining": "Verbleibend",
+    "resetsIn": "Zurücksetzen in",
+    "noReset": "Keine automatische Zurücksetzung",
+    "upgradesBenefits": "Upgrade-Vorteile:",
+    "benefits": {
+      "unlimited": "Unbegrenzt oder höhere Limits",
+      "allFeatures": "Zugriff auf alle Funktionen",
+      "priority": "Priorisierte Verarbeitung",
+      "support": "Premium-Support"
+    },
+    "upgradeNow": "Jetzt Upgraden",
+    "verifyPhone": "Telefonnummer Verifizieren",
+    "footerNote": "Fragen? Kontaktieren Sie unser Support-Team."
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "save": "Speichern",
+    "close": "Schließen",
+    "sending": "Sende...",
+    "yes": "Ja",
+    "no": "Nein",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "now": "Jetzt",
+    "justNow": "Gerade eben",
+    "minutesAgo": "vor {count} Minute | vor {count} Minuten",
+    "hoursAgo": "vor {count} Stunde | vor {count} Stunden",
+    "back": "Zurück",
+    "next": "Weiter",
+    "previous": "Zurück",
+    "loading": "Lädt...",
+    "error": "Fehler",
+    "success": "Erfolg",
+    "leave": "Verlassen",
+    "stay": "Bleiben"
+  },
+  "chatShare": {
+    "title": "Chat Teilen",
+    "chatId": "Chat-ID",
+    "notPublic": "Dieser Chat ist aktuell",
+    "private": "privat",
+    "makePublicDescription": "Machen Sie ihn öffentlich, um ihn mit anderen zu teilen und von Suchmaschinen indexieren zu lassen.",
+    "benefits": "Warum Ihren Chat teilen?",
+    "benefit1": "Jeder mit dem Link kann die Unterhaltung sehen",
+    "benefit2": "Durchsuchbar von Google und anderen Suchmaschinen",
+    "benefit3": "Perfekt zum Teilen von Wissen und Beispielen",
+    "generating": "Generiere Link...",
+    "makePublic": "Öffentlich Machen & Link Generieren",
+    "isPublic": "Chat ist öffentlich",
+    "publicLink": "Öffentlicher Link",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "seoTitle": "SEO-Optimierung Aktiv",
+    "seoDescription": "Dieser Chat wird jetzt von Suchmaschinen wie Google indexiert. Teilen Sie den Link in sozialen Medien oder betten Sie ihn auf Ihrer Website ein!",
+    "revoking": "Widerrufe...",
+    "revoke": "Öffentlichen Zugriff Widerrufen"
   }
 }
 

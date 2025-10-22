@@ -7,6 +7,7 @@ use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Entity\User;
 use App\Service\AgainService;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -24,6 +25,7 @@ class AgainHandler
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private AgainService $againService,
+        private ModelConfigService $modelConfigService,
         private LoggerInterface $logger
     ) {}
 
@@ -57,15 +59,37 @@ class AgainHandler
         
         $this->em->persist($incomingMessage);
         $this->em->flush();
+        
+        $this->logger->info('AgainHandler: Message persisted and flushed', [
+            'message_id' => $incomingMessage->getId(),
+            'has_id' => $incomingMessage->getId() !== null
+        ]);
 
         // Set metadata for skipping sorting
         $this->setMessageMetadata($incomingMessage, $promptId, $modelId);
+
+        // Resolve model_id to provider + model name
+        $provider = null;
+        $modelName = null;
+        if ($modelId) {
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+            
+            $this->logger->info('AgainHandler: Resolved model', [
+                'model_id' => $modelId,
+                'provider' => $provider,
+                'model' => $modelName
+            ]);
+        }
 
         // Process with AI
         $aiResponse = $this->aiFacade->chat(
             [['role' => 'user', 'content' => $incomingMessage->getText()]],
             $user->getId(),
-            ['model_id' => $modelId]
+            [
+                'provider' => $provider,
+                'model' => $modelName
+            ]
         );
 
         // Create outgoing message
@@ -135,25 +159,43 @@ class AgainHandler
      */
     private function setMessageMetadata(Message $message, ?string $promptId, ?int $modelId): void
     {
+        $this->logger->info('AgainHandler: setMessageMetadata called', [
+            'message_id' => $message->getId(),
+            'has_id' => $message->getId() !== null,
+            'prompt_id' => $promptId,
+            'model_id' => $modelId
+        ]);
+        
+        // Message must be flushed before creating MessageMeta (needs message ID)
+        if (!$message->getId()) {
+            $this->logger->error('AgainHandler: Message has no ID!', [
+                'message' => $message
+            ]);
+            throw new \LogicException('Message must be persisted and flushed before setting metadata');
+        }
+
         // Set PROMPTID in MessageMeta to skip sorting
         if ($promptId) {
             $meta = new MessageMeta();
-            $meta->setMessageId($message->getId());
-            $meta->setToken('PROMPTID');
-            $meta->setValue($promptId);
+            $meta->setMessage($message); // Use setMessage() instead of setMessageId()
+            $meta->setMetaKey('PROMPTID');
+            $meta->setMetaValue($promptId);
             $this->em->persist($meta);
+            $this->logger->info('AgainHandler: PROMPTID meta created');
         }
 
         // Set MODEL_ID in MessageMeta if specific model requested
         if ($modelId) {
             $meta = new MessageMeta();
-            $meta->setMessageId($message->getId());
-            $meta->setToken('MODEL_ID');
-            $meta->setValue((string) $modelId);
+            $meta->setMessage($message); // Use setMessage() instead of setMessageId()
+            $meta->setMetaKey('MODEL_ID');
+            $meta->setMetaValue((string) $modelId);
             $this->em->persist($meta);
+            $this->logger->info('AgainHandler: MODEL_ID meta created');
         }
 
         $this->em->flush();
+        $this->logger->info('AgainHandler: Metadata flushed');
     }
 
     /**

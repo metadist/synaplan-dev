@@ -57,7 +57,10 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find conversation history for context
+     * Find conversation history for context (legacy - uses trackingId)
+     * 
+     * Used as fallback when chatId is not available (backward compatibility).
+     * For new code with chatId, use findChatHistory() instead.
      */
     public function findConversationHistory(int $userId, string $trackingId, int $limit = 10): array
     {
@@ -70,6 +73,59 @@ class MessageRepository extends ServiceEntityRepository
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Find chat history from a specific chat window with intelligent limit
+     * 
+     * Retrieves the most recent messages from a chat, with adaptive limit
+     * based on message length to optimize context window usage.
+     * 
+     * @param int $userId User ID to filter by
+     * @param int $chatId Chat ID to get messages from
+     * @param int $maxMessages Maximum number of messages (default: 30)
+     * @param int $maxTotalChars Maximum total characters across all messages (default: 15000)
+     * @return array Array of Message entities, ordered oldest first
+     */
+    public function findChatHistory(
+        int $userId, 
+        int $chatId, 
+        int $maxMessages = 30,
+        int $maxTotalChars = 15000
+    ): array {
+        // Get recent messages from this chat
+        $messages = $this->createQueryBuilder('m')
+            ->where('m.userId = :userId')
+            ->andWhere('m.chatId = :chatId')
+            ->setParameter('userId', $userId)
+            ->setParameter('chatId', $chatId)
+            ->orderBy('m.unixTimestamp', 'DESC') // Newest first to apply limit
+            ->setMaxResults($maxMessages)
+            ->getQuery()
+            ->getResult();
+
+        // Apply character limit: keep newest messages that fit within total char limit
+        $result = [];
+        $totalChars = 0;
+
+        foreach ($messages as $message) {
+            $messageLength = strlen($message->getText());
+            if ($message->getFileText()) {
+                $messageLength += strlen($message->getFileText());
+            }
+
+            // Stop if adding this message would exceed char limit
+            // (but always include at least 1 message)
+            if (count($result) > 0 && ($totalChars + $messageLength) > $maxTotalChars) {
+                break;
+            }
+
+            $result[] = $message;
+            $totalChars += $messageLength;
+        }
+
+        // Reverse to get oldest first (for proper conversation order)
+        return array_reverse($result);
     }
 
     /**

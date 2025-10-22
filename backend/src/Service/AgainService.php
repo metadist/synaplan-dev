@@ -150,7 +150,7 @@ class AgainService
             'rating' => $model->getRating(),
             'priceIn' => $model->getPriceIn(),
             'priceOut' => $model->getPriceOut(),
-            'selectable' => $model->isSelectable(),
+            'selectable' => (bool) $model->getSelectable(),
         ];
     }
 }

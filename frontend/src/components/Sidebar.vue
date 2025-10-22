@@ -192,7 +192,6 @@ const navItems = computed(() => {
   }
 
   items.push({ path: '/statistics', label: 'Statistics', icon: ChartBarIcon })
-  items.push({ path: '/settings', label: 'Settings', icon: Cog6ToothIcon })
 
   return items
 })

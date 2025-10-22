@@ -88,9 +88,10 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 onMounted(() => {
-  if (modelsStore.chatModels.length === 0) {
-    modelsStore.setChatModels(defaultModelOptions)
-  }
+  // Don't set mockup data! Models should come from backend via againData
+  // if (modelsStore.chatModels.length === 0) {
+  //   modelsStore.setChatModels(defaultModelOptions)
+  // }
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 })
