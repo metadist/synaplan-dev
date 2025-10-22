@@ -14,6 +14,8 @@ AI-powered knowledge management with chat, document processing, and RAG (Retriev
 ```bash
 git clone <repository-url>
 cd synaplan-dev
+cd frontend; npm install
+cd ../backend/; composer install
 AUTO_DOWNLOAD_MODELS=true docker compose up -d
 ```
 
