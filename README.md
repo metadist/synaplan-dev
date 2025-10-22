@@ -14,18 +14,34 @@ AI-powered knowledge management with chat, document processing, and RAG (Retriev
 ```bash
 git clone <repository-url>
 cd synaplan-dev
+
+# Option 1: Quick start (models download on-demand, ready in ~20 seconds)
+docker compose up -d
+
+# Option 2: Pre-download AI models (ready immediately, takes ~5-10 minutes)
 AUTO_DOWNLOAD_MODELS=true docker compose up -d
 ```
 
-That's it! Docker Compose automatically:
+Docker Compose automatically:
+- ✅ Creates environment files from `.env.example` (if they don't exist)
 - ✅ Starts Backend (Symfony + PHP 8.3) on port 8000
 - ✅ Starts Frontend (Vue.js + Vite) on port 5173
-- ✅ Creates environment files (`backend/.env.local`, `frontend/.env.docker`)
 - ✅ Runs database migrations
 - ✅ Seeds test users and fixtures
-- ✅ Downloads AI models in background (if AUTO_DOWNLOAD_MODELS=true)
-- ✅ System ready in ~20 seconds (models continue downloading in background)
+- ✅ System ready in ~20 seconds!
 
+**AI Model Download Behavior:**
+- **Default** (`docker compose up -d`): Models are **NOT** downloaded automatically
+  - ⚡ Fast startup (~20 seconds)
+  - 📥 Models download automatically when first used
+  - 💡 Best for development
+  
+- **With AUTO_DOWNLOAD_MODELS=true**: Pre-downloads models in background
+  - 🔄 Backend starts immediately (~20 seconds)
+  - 📦 Models download in parallel (mistral:7b, bge-m3)
+  - ⏱️ Total download time: ~5-10 minutes
+  - ✅ Models ready immediately after download
+  
 **Check model download progress:**
 ```bash
 docker compose logs -f backend | grep -i "model\|background"

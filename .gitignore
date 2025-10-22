@@ -1,8 +1,10 @@
 # Environment files (auto-generated or local overrides)
+backend/.env
 backend/.env.docker
 backend/.env.local
 backend/.env.*.local
 backend/var/.fixtures_loaded
+frontend/.env
 frontend/.env.docker
 frontend/.env.local
 frontend/.env.*.local
