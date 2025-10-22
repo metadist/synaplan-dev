@@ -46,11 +46,32 @@ services:
     # AI Facade
     App\AI\Service\AiFacade: ~
 
+    # Whisper Service for Audio Transcription
+    App\Service\WhisperService:
+        arguments:
+            $whisperBinary: '%env(WHISPER_BINARY)%'
+            $whisperModelsPath: '%env(WHISPER_MODELS_PATH)%'
+            $defaultModel: '%env(WHISPER_DEFAULT_MODEL)%'
+            $ffmpegBinary: '%env(FFMPEG_BINARY)%'
+
+    # WhatsApp Business API Service
+    App\Service\WhatsAppService:
+        arguments:
+            $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
+            $whatsappPhoneNumberId: '%env(WHATSAPP_PHONE_NUMBER_ID)%'
+            $whatsappBusinessAccountId: '%env(WHATSAPP_BUSINESS_ACCOUNT_ID)%'
+            $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
+
+    # Webhook Controller - Bind WhatsApp Verify Token
+    App\Controller\WebhookController:
+        bind:
+            $whatsappWebhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
         arguments:
             $tikaBaseUrl: '%env(TIKA_BASE_URL)%'
-            $uploadsDir: '%kernel.project_dir%/public/up'
+            $uploadsDir: '%kernel.project_dir%/var/uploads'
     App\Service\Message\MessageSorter: ~
     App\Service\Message\MessageClassifier: ~
     App\Service\Message\InferenceRouter: ~

@@ -46,6 +46,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(name: 'BPAYMENTDETAILS', type: 'json')]
     private array $paymentDetails = [];
+    
+    // Subscription wird via BUSERLEVEL + BPAYMENTDETAILS JSON gesteuert
+    // BUSERLEVEL: NEW, PRO, TEAM, BUSINESS
+    // BPAYMENTDETAILS: {subscription_id, status, starts, ends, period, stripe_customer_id, stripe_subscription_id}
 
     public function getId(): ?int
     {
@@ -182,6 +186,81 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getPassword(): string
     {
         return $this->pw;
+    }
+
+    // Subscription helper methods (using BPAYMENTDETAILS JSON)
+    public function getSubscriptionData(): array
+    {
+        return $this->paymentDetails['subscription'] ?? [];
+    }
+
+    public function setSubscriptionData(array $data): self
+    {
+        $this->paymentDetails['subscription'] = $data;
+        return $this;
+    }
+
+    public function hasActiveSubscription(): bool
+    {
+        $sub = $this->getSubscriptionData();
+        return isset($sub['status']) 
+            && $sub['status'] === 'active' 
+            && isset($sub['ends']) 
+            && $sub['ends'] > time();
+    }
+
+    public function getSubscriptionEnds(): ?int
+    {
+        return $this->getSubscriptionData()['ends'] ?? null;
+    }
+
+    public function getStripeCustomerId(): ?string
+    {
+        return $this->getSubscriptionData()['stripe_customer_id'] ?? null;
+    }
+
+    /**
+     * Get effective rate limiting level
+     * 
+     * Logic:
+     * - ANONYMOUS: Only for non-logged-in users (widget, unlinked WhatsApp/Email)
+     * - NEW: Default for all logged-in users without active subscription
+     * - PRO/TEAM/BUSINESS: Users with active paid subscription
+     * 
+     * Note: Phone verification is NOT required for logged-in web users.
+     *       Phone verification only affects WhatsApp/Email channel linking.
+     */
+    public function getRateLimitLevel(): string
+    {
+        // If user is logged in via web (has email), they are at least NEW
+        // ANONYMOUS is only for widget/API users without authentication
+        
+        // Check if subscription is active
+        if ($this->hasActiveSubscription()) {
+            return $this->userLevel; // PRO, TEAM, BUSINESS
+        }
+        
+        // Default to NEW for all logged-in users
+        // (Phone verification is only for WhatsApp/Email linking, not for web users)
+        return 'NEW';
+    }
+
+    /**
+     * Check if user has verified phone number
+     */
+    public function hasVerifiedPhone(): bool
+    {
+        $details = $this->getUserDetails();
+        return !empty($details['phone_number']) && !empty($details['phone_verified_at']);
+    }
+
+    /**
+     * Get verified phone number
+     */
+    public function getPhoneNumber(): ?string
+    {
+        $details = $this->getUserDetails();
+        return $details['phone_number'] ?? null;
     }
 }
 

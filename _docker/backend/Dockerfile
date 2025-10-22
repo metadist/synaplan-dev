@@ -33,7 +33,7 @@ RUN cd /tmp && \
 RUN install-php-extensions \
     pdo_mysql mysqli \
     exif pcntl bcmath gd imagick zip sodium ffi \
-    redis grpc intl opcache
+    redis grpc intl opcache pcov
 
 # PHP Configuration
 RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \

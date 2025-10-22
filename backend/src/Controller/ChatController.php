@@ -246,6 +246,20 @@ class ChatController extends AbstractController
         $messages = array_reverse($messages);
 
         $messageData = array_map(function ($m) {
+            $filesData = [];
+            if ($m->hasFiles()) {
+                foreach ($m->getFiles() as $file) {
+                    $filesData[] = [
+                        'id' => $file->getId(),
+                        'filename' => $file->getFileName(),
+                        'fileType' => $file->getFileType(),
+                        'filePath' => $file->getFilePath(),
+                        'fileSize' => $file->getFileSize(),
+                        'fileMime' => $file->getFileMime(),
+                    ];
+                }
+            }
+            
             return [
                 'id' => $m->getId(),
                 'text' => $m->getText(),
@@ -255,6 +269,7 @@ class ChatController extends AbstractController
                 'topic' => $m->getTopic(),
                 'language' => $m->getLanguage(),
                 'createdAt' => $m->getDateTime(),
+                'files' => $filesData, // NEW: attached files
             ];
         }, $messages);
 

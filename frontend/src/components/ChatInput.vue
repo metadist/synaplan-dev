@@ -2,18 +2,24 @@
   <div class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]">
     <div class="max-w-4xl mx-auto px-4 py-4">
       <!-- Active Tools and Command Display (above input) -->
-      <div v-if="activeTools.length > 0 || activeCommand || attachments.length > 0" class="mb-3 flex flex-wrap gap-2">
-        <!-- Attachments -->
+      <div v-if="activeTools.length > 0 || activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
+        <!-- Uploaded Files -->
         <div
-          v-for="(attachment, index) in attachments"
-          :key="'att-' + index"
+          v-for="(file, index) in uploadedFiles"
+          :key="'file-' + index"
           class="flex items-center gap-2 px-3 py-2 surface-chip rounded-lg"
         >
-          <span class="text-sm txt-secondary">{{ attachment }}</span>
+          <Icon 
+            :icon="getFileIcon(file.file_type || file.name)" 
+            class="w-4 h-4" 
+          />
+          <span class="text-sm txt-secondary">{{ file.filename || file.name }}</span>
+          <span v-if="file.processing" class="text-xs txt-muted">(processing...)</span>
           <button
-            @click="removeAttachment(index)"
+            @click="removeFile(index)"
             class="icon-ghost p-0 min-w-0 w-auto h-auto"
-            aria-label="Remove attachment"
+            aria-label="Remove file"
+            :disabled="file.processing"
           >
             <XMarkIcon class="w-4 h-4" />
           </button>
@@ -94,8 +100,10 @@
             type="button"
             class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto"
             :aria-label="$t('chatInput.attach')"
+            :disabled="uploading"
           >
-            <PlusIcon class="w-5 h-5" />
+            <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+            <PlusIcon v-else class="w-5 h-5" />
           </button>
 
           <input
@@ -104,24 +112,33 @@
             multiple
             @change="handleFileSelect"
             class="hidden"
-            accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
           />
         </div>
 
         <!-- Fixed action buttons (positioned absolutely) -->
         <div class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none">
           <button
+            @click="toggleRecording"
             type="button"
-            class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto"
+            :class="[
+              'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto',
+              isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost'
+            ]"
             :aria-label="$t('chatInput.voice')"
           >
-            <MicrophoneIcon class="w-5 h-5" />
+            <Icon 
+              v-if="isRecording" 
+              icon="mdi:stop" 
+              class="w-5 h-5 text-white" 
+            />
+            <MicrophoneIcon v-else class="w-5 h-5" />
           </button>
 
           <button
             @click="isStreaming ? emit('stop') : sendMessage()"
             type="button"
-            :disabled="!isStreaming && !message.trim()"
+            :disabled="!isStreaming && !canSend"
             :class="[
               'h-[44px] min-w-[44px] flex items-center justify-center btn-primary pointer-events-auto transition-all',
               isStreaming ? 'rounded' : 'rounded-xl'
@@ -194,6 +211,14 @@ interface Tool {
   icon: string
 }
 
+interface UploadedFile {
+  file_id: number
+  filename: string
+  file_type: string
+  name?: string
+  processing: boolean
+}
+
 interface Props {
   isStreaming?: boolean
 }
@@ -202,7 +227,8 @@ defineProps<Props>()
 
 const message = ref('')
 const originalMessage = ref('')
-const attachments = ref<string[]>([])
+const uploadedFiles = ref<UploadedFile[]>([])
+const uploading = ref(false)
 const enhanceEnabled = ref(false)
 const enhanceLoading = ref(false)
 const thinkingEnabled = ref(false)
@@ -215,12 +241,15 @@ const activeTools = ref<Tool[]>([])
 const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
+const isRecording = ref(false)
+const mediaRecorder = ref<MediaRecorder | null>(null)
+const audioChunks = ref<Blob[]>([])
 
 const aiConfigStore = useAiConfigStore()
-const { warning, error: showError } = useNotification()
+const { warning, error: showError, success } = useNotification()
 
 const emit = defineEmits<{
-  send: [message: string, options?: { includeReasoning?: boolean; webSearch?: boolean }]
+  send: [message: string, options?: { includeReasoning?: boolean; webSearch?: boolean; fileIds?: number[] }]
   stop: []
 }>()
 
@@ -235,6 +264,13 @@ const commandIcon = computed(() => {
   if (!activeCommand.value) return 'mdi:help-circle'
   const cmd = commandsStore.commands.find(c => c.name === activeCommand.value)
   return cmd?.icon || 'mdi:help-circle'
+})
+
+const canSend = computed(() => {
+  const hasMessage = message.value.trim().length > 0
+  const hasFiles = uploadedFiles.value.length > 0
+  const filesReady = uploadedFiles.value.every(f => !f.processing)
+  return (hasMessage || hasFiles) && filesReady && !uploading.value
 })
 
 watch(message, (newValue) => {
@@ -253,15 +289,17 @@ watch(message, (newValue) => {
 }, { immediate: false })
 
 const sendMessage = () => {
-  if (message.value.trim()) {
+  if (canSend.value) {
     const hasWebSearch = activeTools.value.some(t => t.id === 'web-search')
     
     const options = {
       includeReasoning: thinkingEnabled.value,
-      webSearch: hasWebSearch
+      webSearch: hasWebSearch,
+      fileIds: uploadedFiles.value.filter(f => !f.processing).map(f => f.file_id)
     }
     emit('send', message.value, options)
     message.value = ''
+    uploadedFiles.value = []
     paletteVisible.value = false
     activeCommand.value = null
   }
@@ -309,21 +347,20 @@ const handleKeyDown = (e: KeyboardEvent) => {
   }
 }
 
-const removeAttachment = (index: number) => {
-  attachments.value.splice(index, 1)
+const removeFile = (index: number) => {
+  uploadedFiles.value.splice(index, 1)
 }
 
 const triggerFileUpload = () => {
+  if (uploading.value) return
   fileInputRef.value?.click()
 }
 
-const handleFileSelect = (event: Event) => {
+const handleFileSelect = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const files = target.files
-  if (files) {
-    for (let i = 0; i < files.length; i++) {
-      attachments.value.push(files[i].name)
-    }
+  if (files && files.length > 0) {
+    await uploadFiles(Array.from(files))
   }
   // Reset input
   target.value = ''
@@ -337,14 +374,208 @@ const handleDragLeave = () => {
   isDragging.value = false
 }
 
-const handleDrop = (event: DragEvent) => {
+const handleDrop = async (event: DragEvent) => {
   isDragging.value = false
   const files = event.dataTransfer?.files
-  if (files) {
-    for (let i = 0; i < files.length; i++) {
-      attachments.value.push(files[i].name)
+  if (files && files.length > 0) {
+    await uploadFiles(Array.from(files))
+  }
+}
+
+const uploadFiles = async (files: File[]) => {
+  uploading.value = true
+  
+  for (const file of files) {
+    // Add to UI immediately as "processing"
+    const tempFile: UploadedFile = {
+      file_id: 0,
+      filename: file.name,
+      file_type: file.name.split('.').pop() || 'unknown',
+      name: file.name,
+      processing: true
+    }
+    uploadedFiles.value.push(tempFile)
+    
+    try {
+      // Upload to backend (PreProcessor extracts content automatically)
+      const result = await chatApi.uploadChatFile(file)
+      
+      // Update with real file_id
+      const index = uploadedFiles.value.findIndex(f => f.name === file.name && f.processing)
+      if (index !== -1) {
+        uploadedFiles.value[index] = {
+          file_id: result.file_id,
+          filename: result.filename,
+          file_type: result.file_type,
+          processing: false
+        }
+      }
+      
+      console.log('✅ File uploaded and processed:', result)
+    } catch (err: any) {
+      console.error('❌ File upload failed:', err)
+      showError(`File upload failed: ${err.message}`)
+      
+      // Remove from list
+      const index = uploadedFiles.value.findIndex(f => f.name === file.name)
+      if (index !== -1) {
+        uploadedFiles.value.splice(index, 1)
+      }
     }
   }
+  
+  uploading.value = false
+}
+
+const toggleRecording = async () => {
+  if (isRecording.value) {
+    // Stop recording
+    mediaRecorder.value?.stop()
+    isRecording.value = false
+  } else {
+    // Start recording
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('Microphone not supported by your browser.')
+      return
+    }
+    
+    try {
+      console.log('🎤 Requesting microphone access...')
+      
+      // DIRECTLY request microphone access - this triggers permission prompt!
+      // Don't check devices first - that requires permission too!
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true // Start with simple constraints for better compatibility
+      })
+      
+      console.log('✅ Microphone access granted!', stream)
+      
+      // Check if MediaRecorder is supported
+      if (!window.MediaRecorder) {
+        showError('Recording not supported by your browser.')
+        stream.getTracks().forEach(track => track.stop())
+        return
+      }
+      
+      // Try different MIME types for compatibility
+      let mimeType = 'audio/webm;codecs=opus'
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm'
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'audio/ogg'
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = '' // Let browser choose
+          }
+        }
+      }
+      
+      console.log('🎙️ Using MIME type:', mimeType || 'default')
+      
+      mediaRecorder.value = new MediaRecorder(stream, {
+        mimeType: mimeType || undefined
+      })
+      
+      audioChunks.value = []
+      
+      mediaRecorder.value.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.value.push(event.data)
+        }
+      }
+      
+      mediaRecorder.value.onstop = async () => {
+        const audioBlob = new Blob(audioChunks.value, { type: mimeType || 'audio/webm' })
+        console.log('🎵 Audio recorded:', audioBlob.size, 'bytes')
+        await transcribeAudio(audioBlob)
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop())
+      }
+      
+      mediaRecorder.value.start()
+      isRecording.value = true
+      success('🎙️ Recording...')
+    } catch (err: any) {
+      console.error('Microphone access error:', err)
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        showError('🔒 Microphone permission denied. Please allow microphone access in your browser settings.')
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        showError('🎤 No microphone found. Please connect a microphone and try again.')
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        showError('⚠️ Microphone is already in use by another application.')
+      } else if (err.name === 'AbortError') {
+        showError('⚠️ Microphone access was aborted. Please try again.')
+      } else if (err.name === 'SecurityError') {
+        showError('🔒 Microphone access blocked by security settings. Please use HTTPS or allow microphone in browser settings.')
+      } else {
+        showError(`Microphone error: ${err.name || 'Unknown'} - ${err.message || 'Unknown error'}`)
+      }
+    }
+  }
+}
+
+const transcribeAudio = async (audioBlob: Blob) => {
+  uploading.value = true
+  
+  // Add to UI as "processing"
+  const tempFile: UploadedFile = {
+    file_id: 0,
+    filename: 'Audio Recording',
+    file_type: 'audio',
+    processing: true
+  }
+  uploadedFiles.value.push(tempFile)
+  
+  try {
+    // Upload for transcription (WhisperCPP on backend)
+    const result = await chatApi.transcribeAudio(audioBlob)
+    
+    // Update file entry
+    const index = uploadedFiles.value.findIndex(f => f.filename === 'Audio Recording' && f.processing)
+    if (index !== -1) {
+      uploadedFiles.value[index] = {
+        file_id: result.file_id,
+        filename: `Recording (${result.language})`,
+        file_type: 'audio',
+        processing: false
+      }
+    }
+    
+    // CRITICAL: Add transcribed text directly to message input!
+    if (result.text) {
+      message.value += (message.value ? ' ' : '') + result.text
+      success(`✅ Transcribed: "${result.text.substring(0, 50)}${result.text.length > 50 ? '...' : ''}"`)
+    }
+    
+    console.log('✅ Audio transcribed:', result)
+    success('Recording transcribed!')
+  } catch (err: any) {
+    console.error('❌ Transcription failed:', err)
+    showError(`Transcription failed: ${err.message}`)
+    
+    // Remove from list
+    const index = uploadedFiles.value.findIndex(f => f.filename === 'Audio Recording')
+    if (index !== -1) {
+      uploadedFiles.value.splice(index, 1)
+    }
+  } finally {
+    isRecording.value = false
+    uploading.value = false
+  }
+}
+
+const getFileIcon = (fileType: string): string => {
+  const ext = fileType.toLowerCase()
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'mdi:image'
+  if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) return 'mdi:video'
+  if (['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus'].includes(ext)) return 'mdi:microphone'
+  if (['pdf'].includes(ext)) return 'mdi:file-pdf'
+  if (['doc', 'docx'].includes(ext)) return 'mdi:file-word'
+  if (['xls', 'xlsx'].includes(ext)) return 'mdi:file-excel'
+  if (['ppt', 'pptx'].includes(ext)) return 'mdi:file-powerpoint'
+  if (['txt'].includes(ext)) return 'mdi:file-document'
+  return 'mdi:file'
 }
 
 const toggleTool = (toolId: string) => {

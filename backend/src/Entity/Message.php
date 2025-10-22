@@ -279,14 +279,85 @@ class Message
     #[ORM\OneToMany(targetEntity: MessageMeta::class, mappedBy: 'message', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $metadata;
 
+    // MessageFile Relation (NEW: Multiple files per message)
+    #[ORM\OneToMany(targetEntity: MessageFile::class, mappedBy: 'message', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $files;
+
     public function __construct()
     {
         $this->metadata = new ArrayCollection();
+        $this->files = new ArrayCollection();
     }
 
     public function getMetadata(): Collection
     {
         return $this->metadata;
+    }
+
+    /**
+     * Get all files attached to this message
+     * 
+     * @return Collection<int, MessageFile>
+     */
+    public function getFiles(): Collection
+    {
+        return $this->files;
+    }
+
+    /**
+     * Add file to message
+     */
+    public function addFile(MessageFile $file): self
+    {
+        if (!$this->files->contains($file)) {
+            $this->files->add($file);
+            $file->setMessage($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Remove file from message
+     */
+    public function removeFile(MessageFile $file): self
+    {
+        if ($this->files->removeElement($file)) {
+            // Set the owning side to null (unless already changed)
+            if ($file->getMessage() === $this) {
+                $file->setMessage(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Check if message has any files attached
+     */
+    public function hasFiles(): bool
+    {
+        return $this->files->count() > 0 || $this->file > 0;
+    }
+
+    /**
+     * Get concatenated text from all attached files
+     */
+    public function getAllFilesText(): string
+    {
+        $texts = [];
+        
+        // Legacy single file
+        if ($this->file > 0 && !empty($this->fileText)) {
+            $texts[] = $this->fileText;
+        }
+        
+        // New multiple files
+        foreach ($this->files as $file) {
+            if (!empty($file->getFileText())) {
+                $texts[] = $file->getFileText();
+            }
+        }
+        
+        return implode("\n\n---\n\n", $texts);
     }
 
     /**

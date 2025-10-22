@@ -158,6 +158,80 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  async function shareChat(chatId: number, enable: boolean = true) {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}/share`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ enable })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to share chat')
+      }
+
+      const data = await response.json()
+      
+      // Update chat in store
+      const chat = chats.value.find(c => c.id === chatId)
+      if (chat) {
+        chat.isShared = data.isShared
+      }
+      
+      return {
+        success: data.success,
+        shareToken: data.shareToken,
+        isShared: data.isShared,
+        shareUrl: data.shareUrl
+      }
+    } catch (err: any) {
+      error.value = err.message || 'Failed to share chat'
+      console.error('Error sharing chat:', err)
+      throw err
+    }
+  }
+
+  async function getShareInfo(chatId: number) {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get share info')
+      }
+
+      const data = await response.json()
+      return {
+        isShared: data.chat.isShared || false,
+        shareToken: data.chat.shareToken || null,
+        shareUrl: data.chat.shareToken 
+          ? `${API_BASE_URL}/shared/${data.chat.shareToken}`
+          : null
+      }
+    } catch (err: any) {
+      error.value = err.message || 'Failed to get share info'
+      console.error('Error getting share info:', err)
+      throw err
+    }
+  }
+
   function setActiveChat(chatId: number) {
     activeChatId.value = chatId
   }
@@ -179,6 +253,8 @@ export const useChatsStore = defineStore('chats', () => {
     createChat,
     updateChatTitle,
     deleteChat,
+    shareChat,
+    getShareInfo,
     setActiveChat,
     $reset
   }

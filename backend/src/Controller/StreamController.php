@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Message;
+use App\Entity\MessageFile;
 use App\Entity\User;
 use App\AI\Service\AiFacade;
 use App\Service\Message\MessageProcessor;
@@ -41,6 +42,14 @@ class StreamController extends AbstractController
         $chatId = $request->query->get('chatId', null);
         $includeReasoning = $request->query->get('reasoning', '0') === '1';
         $webSearch = $request->query->get('webSearch', '0') === '1';
+        $modelId = $request->query->get('modelId', null);
+        $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
+
+        // Parse fileIds (can be comma-separated string or single ID)
+        $fileIdArray = [];
+        if (!empty($fileIds)) {
+            $fileIdArray = array_map('intval', array_filter(explode(',', $fileIds)));
+        }
 
         if (empty($messageText)) {
             return $this->json(['error' => 'Message is required'], Response::HTTP_BAD_REQUEST);
@@ -49,6 +58,15 @@ class StreamController extends AbstractController
         if (!$chatId) {
             return $this->json(['error' => 'Chat ID is required'], Response::HTTP_BAD_REQUEST);
         }
+        
+        $this->logger->info('StreamController: Received request', [
+            'user_id' => $user->getId(),
+            'chat_id' => $chatId,
+            'has_model_id' => $modelId !== null,
+            'model_id' => $modelId,
+            'file_ids' => $fileIdArray,
+            'file_count' => count($fileIdArray)
+        ]);
 
         // StreamedResponse für SSE
         $response = new StreamedResponse();
@@ -57,7 +75,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -89,9 +107,74 @@ class StreamController extends AbstractController
                 $incomingMessage->setText($messageText);
                 $incomingMessage->setDirection('IN');
                 $incomingMessage->setStatus('processing');
-
+                
                 $this->em->persist($incomingMessage);
-                $this->em->flush();
+                $this->em->flush(); // Flush first so message has an ID
+                
+                // Attach multiple files if uploaded (NEW: MessageFile entities)
+                if (!empty($fileIdArray)) {
+                    $fileCount = 0;
+                    foreach ($fileIdArray as $fileId) {
+                        $messageFile = $this->em->getRepository(MessageFile::class)->find($fileId);
+                        if ($messageFile && $messageFile->getStatus() === 'uploaded') {
+                            // Associate file with message
+                            $messageFile->setMessage($incomingMessage);
+                            $this->em->persist($messageFile);
+                            $fileCount++;
+                            
+                            $this->logger->info('StreamController: File attached to message', [
+                                'message_id' => $incomingMessage->getId(),
+                                'file_id' => $fileId,
+                                'file_path' => $messageFile->getFilePath(),
+                                'file_type' => $messageFile->getFileType()
+                            ]);
+                        }
+                    }
+                    
+                    if ($fileCount > 0) {
+                        // Legacy: set file flag for compatibility
+                        $incomingMessage->setFile($fileCount);
+                        $this->em->flush();
+                        
+                        // CRITICAL: Force reload of the entity with files collection!
+                        // refresh() doesn't work reliably for collections, so we use clear() + find()
+                        $messageId = $incomingMessage->getId();
+                        $chatId = $incomingMessage->getChatId();
+                        
+                        $this->em->clear(); // Detach all entities
+                        
+                        // Reload message with files
+                        $incomingMessage = $this->em->getRepository(Message::class)->find($messageId);
+                        
+                        if (!$incomingMessage) {
+                            $this->logger->error('StreamController: Message not found after refresh!', [
+                                'message_id' => $messageId
+                            ]);
+                            $this->sendSSE('error', ['message' => 'Internal error: Message lost']);
+                            return;
+                        }
+                        
+                        // Reload chat to avoid cascade persist error
+                        if ($chatId) {
+                            $chat = $this->em->getRepository(\App\Entity\Chat::class)->find($chatId);
+                            if ($chat) {
+                                $incomingMessage->setChat($chat);
+                            }
+                        }
+                        
+                        $this->logger->info('StreamController: Files attached and entity reloaded', [
+                            'message_id' => $incomingMessage->getId(),
+                            'files_count' => $incomingMessage->getFiles()->count()
+                        ]);
+                        
+                        // Send preprocessing status to frontend
+                        $this->sendSSE('status', [
+                            'message' => "Processing $fileCount file(s)...",
+                            'stage' => 'preprocessing',
+                            'file_count' => $fileCount
+                        ]);
+                    }
+                }
 
                 // Process with REAL streaming (TEXT only, NO JSON!)
                 $responseText = '';
@@ -101,6 +184,14 @@ class StreamController extends AbstractController
                     'reasoning' => $includeReasoning,
                     'webSearch' => $webSearch,
                 ];
+                
+                // Add model_id if specified (for "Again" functionality)
+                if ($modelId) {
+                    $processingOptions['model_id'] = (int) $modelId;
+                    $this->logger->info('StreamController: Using specified model', [
+                        'model_id' => $modelId
+                    ]);
+                }
                 
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
@@ -297,7 +388,18 @@ class StreamController extends AbstractController
                 $this->em->flush();
 
                 // Get Again data
+                $this->logger->info('StreamController: Getting againData', [
+                    'topic' => $classification['topic'],
+                    'message_id' => $outgoingMessage->getId()
+                ]);
+                
                 $againData = $this->getAgainData($classification['topic'], null);
+                
+                $this->logger->info('StreamController: AgainData retrieved', [
+                    'eligible_count' => count($againData['eligible'] ?? []),
+                    'has_predicted' => isset($againData['predictedNext']),
+                    'tag' => $againData['tag'] ?? null
+                ]);
 
                 // Send complete event
                 $this->sendSSE('complete', [

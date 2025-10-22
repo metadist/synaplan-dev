@@ -16,6 +16,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         private LoggerInterface $logger,
         private string $baseUrl
     ) {
+        // Set timeout to 5 minutes for slow CPU-based models
+        ini_set('default_socket_timeout', 300);
         $this->client = Ollama::client($this->baseUrl);
     }
 

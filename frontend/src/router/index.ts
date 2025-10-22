@@ -48,6 +48,12 @@ const router = createRouter({
       component: () => import('../views/EmailVerifiedView.vue'),
       meta: { requiresAuth: false, public: true }
     },
+    {
+      path: '/shared/:token',
+      name: 'shared-chat',
+      component: () => import('../views/SharedChatView.vue'),
+      meta: { requiresAuth: false, public: true }
+    },
     
     // Error pages (always accessible)
     {

@@ -22,6 +22,7 @@ security:
             jwt: ~
             custom_authenticators:
                 - App\Security\QueryTokenAuthenticator
+                - App\Security\ApiKeyAuthenticator
 
         main:
             lazy: true
@@ -43,6 +44,12 @@ security:
         # Public test endpoints
         - { path: ^/api/health, roles: PUBLIC_ACCESS }
         - { path: ^/api/test, roles: PUBLIC_ACCESS }
+        
+        # Public shared chat endpoint (no auth required)
+        - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
+        
+        # Webhook endpoints (require API key authentication)
+        - { path: ^/api/v1/webhooks, roles: IS_AUTHENTICATED_FULLY }
         
         # All other API routes require authentication
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

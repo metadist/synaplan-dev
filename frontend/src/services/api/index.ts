@@ -14,6 +14,7 @@ export { chatApi } from './chatApi'
 export { legacyApi } from './legacyApi'
 export * from './configApi'
 export * from './messageApi'
+export * from './apiKeysApi'
 export { httpClient, API_BASE_URL } from './httpClient'
 
 // Re-export for backward compatibility

@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Message;
+use App\Entity\MessageFile;
 use App\Entity\User;
 use App\AI\Service\AiFacade;
 use App\Service\AgainService;
@@ -10,6 +11,10 @@ use App\Service\Message\AgainHandler;
 use App\Service\PromptService;
 use App\Service\ModelConfigService;
 use App\Service\MessageEnqueueService;
+use App\Service\RateLimitService;
+use App\Service\File\FileStorageService;
+use App\Service\File\FileProcessor;
+use App\Service\File\VectorizationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -30,6 +35,10 @@ class MessageController extends AbstractController
         private PromptService $promptService,
         private ModelConfigService $modelConfigService,
         private MessageEnqueueService $enqueueService,
+        private RateLimitService $rateLimitService,
+        private FileStorageService $fileStorageService,
+        private FileProcessor $fileProcessor,
+        private VectorizationService $vectorizationService,
         private LoggerInterface $logger
     ) {}
 
@@ -50,6 +59,17 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'Message is required'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Check rate limit
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
+        if (!$rateLimitCheck['allowed']) {
+            return $this->json([
+                'error' => 'Rate limit exceeded',
+                'limit' => $rateLimitCheck['limit'],
+                'used' => $rateLimitCheck['used'],
+                'reset_at' => $rateLimitCheck['reset_at'] ?? null
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         try {
             // Create incoming message
             $incomingMessage = new Message();
@@ -68,6 +88,9 @@ class MessageController extends AbstractController
 
             $this->em->persist($incomingMessage);
             $this->em->flush();
+
+            // Record usage
+            $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
             // Use AI Facade to get response
             $aiResponse = $this->aiFacade->chat(
@@ -288,7 +311,7 @@ class MessageController extends AbstractController
             $this->logger->warning('Enhancement provider error', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
-                'provider' => $e->getProvider(),
+                'provider' => $e->getProviderName(),
                 'context' => $e->getContext()
             ]);
 
@@ -296,7 +319,7 @@ class MessageController extends AbstractController
             return $this->json([
                 'error' => 'Enhancement temporarily unavailable',
                 'message' => $e->getMessage(),
-                'provider' => $e->getProvider(),
+                'provider' => $e->getProviderName(),
                 'context' => $e->getContext()
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
@@ -337,6 +360,114 @@ class MessageController extends AbstractController
             ]);
             return $this->json([
                 'error' => 'Again request failed: ' . $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Upload file for chat message (returns file ID for streaming)
+     * 
+     * POST /api/v1/messages/upload-file
+     * Form-Data: file (single file)
+     * 
+     * Response: { "success": true, "file_id": 123, "filename": "...", "size": 1024, "mime": "...", "file_type": "pdf" }
+     */
+    #[Route('/upload-file', name: 'upload_file', methods: ['POST'])]
+    public function uploadFileForChat(
+        Request $request,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $uploadedFile = $request->files->get('file');
+        if (!$uploadedFile) {
+            return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            // Store file using FileStorageService
+            $storageResult = $this->fileStorageService->storeUploadedFile($uploadedFile, $user->getId());
+            
+            if (!$storageResult['success']) {
+                return $this->json([
+                    'error' => 'File storage failed: ' . $storageResult['error']
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $relativePath = $storageResult['path'];
+            $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
+            
+            // Create MessageFile entity (NEW: separate entity for files)
+            $messageFile = new MessageFile();
+            $messageFile->setFilePath($relativePath);
+            $messageFile->setFileType($fileExtension);
+            $messageFile->setFileName($uploadedFile->getClientOriginalName());
+            $messageFile->setFileSize($storageResult['size']);
+            $messageFile->setFileMime($storageResult['mime']);
+            $messageFile->setStatus('uploaded');
+            
+            $this->em->persist($messageFile);
+            $this->em->flush();
+            
+            // CRITICAL: Extract text immediately using FileProcessor!
+            try {
+                [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
+                    $relativePath,
+                    $fileExtension,
+                    $user->getId()
+                );
+                
+                $messageFile->setFileText($extractedText);
+                $messageFile->setStatus('extracted');
+                $this->em->flush();
+                
+                $this->logger->info('Chat file extracted', [
+                    'user_id' => $user->getId(),
+                    'file_id' => $messageFile->getId(),
+                    'text_length' => strlen($extractedText),
+                    'strategy' => $extractMeta['strategy'] ?? 'unknown'
+                ]);
+                
+            } catch (\Throwable $e) {
+                $this->logger->error('Chat file extraction failed', [
+                    'user_id' => $user->getId(),
+                    'file_id' => $messageFile->getId(),
+                    'error' => $e->getMessage()
+                ]);
+                
+                $messageFile->setStatus('error');
+                $this->em->flush();
+            }
+
+            $this->logger->info('Chat file uploaded', [
+                'user_id' => $user->getId(),
+                'file_id' => $messageFile->getId(),
+                'filename' => $uploadedFile->getClientOriginalName(),
+                'size' => $storageResult['size'],
+                'status' => $messageFile->getStatus()
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'file_id' => $messageFile->getId(),
+                'filename' => $uploadedFile->getClientOriginalName(),
+                'size' => $storageResult['size'],
+                'mime' => $storageResult['mime'],
+                'file_type' => $fileExtension,
+                'extracted_text_length' => strlen($messageFile->getFileText()),
+                'status' => $messageFile->getStatus()
+            ], Response::HTTP_CREATED);
+
+        } catch (\Exception $e) {
+            $this->logger->error('Chat file upload failed', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->json([
+                'error' => 'File upload failed: ' . $e->getMessage()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

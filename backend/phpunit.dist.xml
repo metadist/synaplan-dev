@@ -45,4 +45,9 @@
 
     <extensions>
     </extensions>
+
+    <logging>
+        <testdoxHtml outputFile="var/phpunit/testdox.html"/>
+        <junit outputFile="var/phpunit/junit.xml"/>
+    </logging>
 </phpunit>

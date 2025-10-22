@@ -22,6 +22,15 @@ export interface Part {
   thinkingTime?: number  // Time in seconds for thinking process
 }
 
+export interface MessageFile {
+  id: number
+  filename: string
+  fileType: string
+  filePath: string
+  fileSize?: number
+  fileMime?: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -34,6 +43,7 @@ export interface Message {
   againData?: AgainData
   originalMessageId?: number
   backendMessageId?: number
+  files?: MessageFile[] // NEW: attached files
 }
 
 /**
@@ -183,6 +193,19 @@ export const useHistoryStore = defineStore('history', () => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
           const parts = parseContentWithThinking(m.text || '')
           
+          // Parse files from backend response
+          const files: MessageFile[] = []
+          if (m.files && Array.isArray(m.files)) {
+            files.push(...m.files.map((f: any) => ({
+              id: f.id,
+              filename: f.filename || f.fileName,
+              fileType: f.fileType || f.file_type,
+              filePath: f.filePath || f.file_path,
+              fileSize: f.fileSize || f.file_size,
+              fileMime: f.fileMime || f.file_mime
+            })))
+          }
+          
           return {
             id: `backend-${m.id}`,
             role,
@@ -190,7 +213,8 @@ export const useHistoryStore = defineStore('history', () => {
             timestamp: new Date(m.timestamp * 1000),
             provider: m.provider,
             modelLabel: m.provider || 'AI',
-            backendMessageId: m.id
+            backendMessageId: m.id,
+            files: files.length > 0 ? files : undefined
           }
         })
         

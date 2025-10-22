@@ -281,13 +281,19 @@ class ChatHandler implements MessageHandlerInterface
             $role = $msg->getDirection() === 'IN' ? 'user' : 'assistant';
             $content = $msg->getText();
             
-            // File Text inkludieren wenn vorhanden (wie altes System)
-            if ($msg->getFileText()) {
-                $content .= "\n\n\n---\n\n\nUser provided a file: " . 
-                           $msg->getFileType() . 
-                           ", saying: '" . 
-                           substr($msg->getFileText(), 0, 3000) . 
-                           "'\n\n";
+            // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
+            $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + MessageFile texts
+            if (!empty($allFilesText)) {
+                $fileInfo = '';
+                if ($msg->getFiles()->count() > 0) {
+                    $fileInfo = $msg->getFiles()->count() . ' file(s)';
+                } elseif ($msg->getFileType()) {
+                    $fileInfo = $msg->getFileType() . ' file';
+                }
+                
+                $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n" . 
+                           substr($allFilesText, 0, 10000) . // Increased limit for multiple files
+                           "\n\n";
             }
 
             $messages[] = [
@@ -298,12 +304,38 @@ class ChatHandler implements MessageHandlerInterface
 
         // Aktuelle Message
         $content = $currentMessage->getText();
-        if ($currentMessage->getFileText()) {
-            $content .= "\n\n\n---\n\n\nUser provided a file: " . 
-                       $currentMessage->getFileType() . 
-                       ", saying: '" . 
-                       substr($currentMessage->getFileText(), 0, 3000) . 
-                       "'\n\n";
+        $allFilesText = $currentMessage->getAllFilesText(); // NEW: combines all files
+        
+        $this->logger->info('🔍 ChatHandler: File text debug', [
+            'message_id' => $currentMessage->getId(),
+            'has_legacy_file' => $currentMessage->getFile() > 0,
+            'legacy_file_text_length' => strlen($currentMessage->getFileText() ?? ''),
+            'files_collection_count' => $currentMessage->getFiles()->count(),
+            'all_files_text_length' => strlen($allFilesText),
+            'all_files_text_preview' => substr($allFilesText, 0, 200)
+        ]);
+        
+        if (!empty($allFilesText)) {
+            $fileInfo = '';
+            if ($currentMessage->getFiles()->count() > 0) {
+                $fileInfo = $currentMessage->getFiles()->count() . ' file(s)';
+            } elseif ($currentMessage->getFileType()) {
+                $fileInfo = $currentMessage->getFileType() . ' file';
+            }
+            
+            $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n" . 
+                       substr($allFilesText, 0, 10000) . // Increased limit
+                       "\n\n";
+                       
+            $this->logger->info('✅ ChatHandler: File text added to prompt', [
+                'file_info' => $fileInfo,
+                'content_length' => strlen($content)
+            ]);
+        } else {
+            $this->logger->warning('⚠️ ChatHandler: No file text found!', [
+                'message_id' => $currentMessage->getId(),
+                'file_flag' => $currentMessage->getFile()
+            ]);
         }
 
         $messages[] = [

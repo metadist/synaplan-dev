@@ -35,16 +35,29 @@ export const chatApi = {
     chatId: number,
     onUpdate: (data: any) => void,
     includeReasoning: boolean = false,
-    webSearch: boolean = false
+    webSearch: boolean = false,
+    modelId?: number,
+    fileIds?: number[] // Changed: array of fileIds instead of single fileId
   ): () => void {
     const token = localStorage.getItem('auth_token')
-    const params = new URLSearchParams({
+    
+    // Build params object
+    const paramsObj: Record<string, string> = {
       message,
       chatId: chatId.toString(),
-      ...(trackId && { trackId: trackId.toString() }),
-      ...(includeReasoning && { reasoning: '1' }),
-      ...(webSearch && { webSearch: '1' })
-    })
+    }
+    
+    if (trackId) paramsObj.trackId = trackId.toString()
+    if (includeReasoning) paramsObj.reasoning = '1'
+    if (webSearch) paramsObj.webSearch = '1'
+    if (modelId) paramsObj.modelId = modelId.toString()
+    
+    // NEW: Multiple fileIds as comma-separated list
+    if (fileIds && fileIds.length > 0) {
+      paramsObj.fileIds = fileIds.join(',')
+    }
+    
+    const params = new URLSearchParams(paramsObj)
 
     // Build URL with token for authentication
     const url = `${API_BASE_URL}/api/v1/messages/stream?${params}&token=${token}`
@@ -141,6 +154,67 @@ export const chatApi = {
     return httpClient<any>(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
       method: 'GET'
     })
+  },
+
+  /**
+   * Upload file for chat message (File wird sofort hochgeladen und extrahiert)
+   */
+  async uploadChatFile(file: File): Promise<{
+    success: boolean
+    file_id: number
+    filename: string
+    size: number
+    mime: string
+    file_type: string
+  }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    // Use native fetch for FormData upload (httpClient auto-adds JSON Content-Type)
+    const token = localStorage.getItem('auth_token')
+    const response = await fetch(`${API_BASE_URL}/api/v1/messages/upload-file`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'File upload failed')
+    }
+
+    return response.json()
+  },
+
+  /**
+   * Upload audio for transcription with WhisperCPP
+   */
+  async transcribeAudio(audioBlob: Blob, filename = 'recording.webm'): Promise<{
+    success: boolean
+    file_id: number
+    text: string
+    language: string
+    duration: number
+  }> {
+    const formData = new FormData()
+    formData.append('file', audioBlob, filename)
+
+    const token = localStorage.getItem('auth_token')
+    const response = await fetch(`${API_BASE_URL}/api/v1/messages/upload-file`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Audio transcription failed')
+    }
+
+    return response.json()
   }
 }
-
