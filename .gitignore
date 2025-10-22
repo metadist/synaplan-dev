@@ -22,7 +22,9 @@ Thumbs.db
 
 # Docker volumes and data
 volumes/
-data/
+/data/
+# But allow frontend source data
+!frontend/src/data/
 
 # Logs
 *.log
