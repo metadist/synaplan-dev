@@ -1,0 +1,46 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Synaplan API
+            description: |
+                AI-powered chat and knowledge management API.
+                
+                ## Authentication
+                Most endpoints require JWT authentication via Bearer token in the Authorization header:
+                ```
+                Authorization: Bearer <your_jwt_token>
+                ```
+                
+                ## Rate Limiting
+                API requests are subject to rate limiting based on user subscription tier.
+            version: 1.0.0
+            contact:
+                name: Synaplan Team
+                email: support@synaplan.com
+        servers:
+            - url: http://localhost:8000
+              description: Local development server
+            - url: https://api.synaplan.com
+              description: Production server
+        components:
+            securitySchemes:
+                Bearer:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+                    description: JWT token obtained from /api/auth/login
+                ApiKey:
+                    type: apiKey
+                    in: header
+                    name: X-API-Key
+                    description: API Key for programmatic access
+        security:
+            - Bearer: []
+        
+    areas: # to filter documented areas
+        path_patterns:
+            - ^/api(?!/doc$) # Accepts all routes starting with /api except /api/doc
+        disable_default_routes: false
+        
+    models: { use_jms: false }
+

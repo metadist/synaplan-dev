@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -30,6 +31,38 @@ class ApiKeyController extends AbstractController
      * GET /api/v1/apikeys
      */
     #[Route('', name: 'list', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/apikeys',
+        summary: 'List all API keys for current user',
+        tags: ['API Keys'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of API keys',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'api_keys',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer'),
+                                    new OA\Property(property: 'name', type: 'string'),
+                                    new OA\Property(property: 'key_prefix', type: 'string', example: 'sk_1234...'),
+                                    new OA\Property(property: 'status', type: 'string', enum: ['active', 'revoked']),
+                                    new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'last_used', type: 'string', format: 'date-time', nullable: true),
+                                    new OA\Property(property: 'created', type: 'string', format: 'date-time')
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated')
+        ]
+    )]
     public function list(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -64,6 +97,51 @@ class ApiKeyController extends AbstractController
      * }
      */
     #[Route('', name: 'create', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/apikeys',
+        summary: 'Create a new API key',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', example: 'Email Integration'),
+                    new OA\Property(
+                        property: 'scopes',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        example: ['webhooks:email', 'webhooks:whatsapp']
+                    )
+                ]
+            )
+        ),
+        tags: ['API Keys'],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'API key created successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'api_key',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'name', type: 'string'),
+                                new OA\Property(property: 'key', type: 'string', description: 'Full API key - only shown once!'),
+                                new OA\Property(property: 'status', type: 'string'),
+                                new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string')),
+                                new OA\Property(property: 'created', type: 'string', format: 'date-time')
+                            ]
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated')
+        ]
+    )]
     public function create(
         Request $request,
         #[CurrentUser] ?User $user

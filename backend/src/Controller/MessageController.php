@@ -16,6 +16,7 @@ use App\Service\File\FileStorageService;
 use App\Service\File\FileProcessor;
 use App\Service\File\VectorizationService;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -43,6 +44,37 @@ class MessageController extends AbstractController
     ) {}
 
     #[Route('/send', name: 'send', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/messages/send',
+        summary: 'Send a message and receive AI response',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['message'],
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Hello, how are you?'),
+                    new OA\Property(property: 'trackId', type: 'integer', example: 1234567890)
+                ]
+            )
+        ),
+        tags: ['Messages'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Message processed successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'incomingMessage', type: 'object'),
+                        new OA\Property(property: 'outgoingMessage', type: 'object')
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 429, description: 'Rate limit exceeded')
+        ]
+    )]
     public function sendMessage(
         Request $request,
         #[CurrentUser] ?User $user

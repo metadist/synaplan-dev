@@ -18,23 +18,20 @@
         }
         .button:hover { background: #4338CA; }
         .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
-        .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 12px; margin: 20px 0; color: #92400E; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>{{ 'email.password_reset.title'|trans }}</h2>
-        <p>{{ 'email.password_reset.intro'|trans }}</p>
-        <p>{{ 'email.password_reset.instruction'|trans }}</p>
-        <a href="{{ resetUrl }}" class="button">{{ 'email.password_reset.button'|trans }}</a>
-        <p>{{ 'email.password_reset.or_copy'|trans }}</p>
-        <p style="word-break: break-all; color: #666;">{{ resetUrl }}</p>
-        <div class="warning">
-            <strong>{{ 'email.password_reset.security_notice.title'|trans }}</strong> {{ 'email.password_reset.security_notice.text'|trans }}
-        </div>
+        <h2>Verify Your Email Address</h2>
+        <p>Thank you for registering with Synaplan!</p>
+        <p>Please click the button below to verify your email address:</p>
+        <a href="{{ verificationUrl }}" class="button">Verify Email</a>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #666;">{{ verificationUrl }}</p>
+        <p>This link will expire in 24 hours.</p>
         <div class="footer">
-            <p>{{ 'email.footer.support'|trans }}</p>
-            <p>&copy; {{ "now"|date("Y") }} {{ 'email.footer.company'|trans }}. {{ 'email.footer.rights'|trans }}</p>
+            <p>If you didn't create an account with Synaplan, you can safely ignore this email.</p>
+            <p>&copy; {{ "now"|date("Y") }} Synaplan. All rights reserved.</p>
         </div>
     </div>
 </body>
