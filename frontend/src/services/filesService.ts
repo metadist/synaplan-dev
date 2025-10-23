@@ -1,4 +1,5 @@
 import { api } from './apiService'
+import { httpClient } from './api/httpClient'
 
 export interface UploadFileOptions {
   files: File[]
@@ -306,7 +307,19 @@ export async function getStorageStats(): Promise<{
     remaining_formatted: string
   }
 }> {
-  const response = await apiFetch('/api/v1/files/storage-stats')
+  const response = await httpClient<{
+    success: boolean
+    user_level: string
+    storage: {
+      limit: number
+      usage: number
+      remaining: number
+      percentage: number
+      limit_formatted: string
+      usage_formatted: string
+      remaining_formatted: string
+    }
+  }>('/api/v1/files/storage-stats')
   return response
 }
 
