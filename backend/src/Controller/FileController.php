@@ -433,42 +433,38 @@ class FileController extends AbstractController
         $limit = min(100, max(1, (int)$request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
 
-        // Build query
-        $qb = $this->messageRepository->createQueryBuilder('m')
-            ->where('m.userId = :userId')
-            ->andWhere('m.file = 1')
+        // Build query for MessageFiles
+        $qb = $this->messageFileRepository->createQueryBuilder('mf')
+            ->where('mf.userId = :userId')
             ->setParameter('userId', $user->getId())
-            ->orderBy('m.id', 'DESC');
-
-        if ($groupKey) {
-            $qb->andWhere('m.topic = :topic')
-               ->setParameter('topic', $groupKey);
-        }
+            ->orderBy('mf.createdAt', 'DESC');
 
         // Get total count
-        $totalCount = (clone $qb)->select('COUNT(m.id)')->getQuery()->getSingleScalarResult();
+        $totalCount = (clone $qb)->select('COUNT(mf.id)')->getQuery()->getSingleScalarResult();
 
-        // Get paginated results - DISTINCT to avoid duplicates
-        $messages = $qb->groupBy('m.filePath')
-                      ->setFirstResult($offset)
-                      ->setMaxResults($limit)
-                      ->getQuery()
-                      ->getResult();
+        // Get paginated results
+        $messageFiles = $qb->setFirstResult($offset)
+                          ->setMaxResults($limit)
+                          ->getQuery()
+                          ->getResult();
 
-        $files = array_map(fn(Message $m) => [
-            'id' => $m->getId(),
-            'filename' => $m->getText() ? str_replace('File uploaded: ', '', $m->getText()) : basename($m->getFilePath() ?? ''),
-            'path' => $m->getFilePath(),
-            'file_type' => $m->getFileType(),
-            'group_key' => $m->getTopic(),
-            'status' => $m->getStatus(),
-            'direction' => $m->getDirection(),
-            'text_preview' => mb_substr($m->getFileText() ?? '', 0, 200),
-            'uploaded_at' => $m->getUnixTimestamp(),
-            'uploaded_date' => date('Y-m-d H:i:s', $m->getUnixTimestamp())
-        ], $messages);
+        $files = array_map(fn(MessageFile $mf) => [
+            'id' => $mf->getId(),
+            'filename' => $mf->getFileName(),
+            'path' => $mf->getFilePath(),
+            'file_type' => $mf->getFileType(),
+            'file_size' => $mf->getFileSize(),
+            'mime' => $mf->getFileMime(),
+            'status' => $mf->getStatus(),
+            'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
+            'uploaded_at' => $mf->getCreatedAt(),
+            'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
+            'message_id' => $mf->getMessageId(), // null if standalone
+            'is_attached' => $mf->getMessageId() !== null
+        ], $messageFiles);
 
         return $this->json([
+            'success' => true,
             'files' => $files,
             'pagination' => [
                 'page' => $page,
