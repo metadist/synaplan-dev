@@ -33,7 +33,7 @@ RUN cd /tmp && \
 RUN install-php-extensions \
     pdo_mysql mysqli \
     exif pcntl bcmath gd imagick zip sodium ffi \
-    redis grpc intl opcache pcov
+    grpc intl opcache
 
 # PHP Configuration
 RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
@@ -48,13 +48,13 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copy application
 COPY backend/ .
 
-# Install dependencies (skip scripts during build)
-RUN composer install --prefer-dist --no-interaction --optimize-autoloader --no-scripts
+# Install dependencies including dev dependencies for first build
+RUN composer install --prefer-dist --no-interaction --optimize-autoloader --no-scripts --ignore-platform-req=ext-redis
 
-# Create required directories and set permissions
+# Set proper permissions for www-data (uid:gid = 33:33)
 RUN mkdir -p /var/www/html/var/cache /var/www/html/var/log /var/www/html/public/up && \
-    chmod -R 777 /var/www/html/public/up && \
-    chown -R www-data:www-data /var/www/html/var
+    chown -R www-data:www-data /var/www/html/var /var/www/html/vendor /var/www/html/public/up && \
+    chmod -R 775 /var/www/html/var /var/www/html/public/up
 
 # Copy and setup entrypoint scripts
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/

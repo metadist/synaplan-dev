@@ -23,7 +23,8 @@ AUTO_DOWNLOAD_MODELS=true docker compose up -d
 ```
 
 Docker Compose automatically:
-- ✅ Creates environment files from `.env.example` (if they don't exist)
+- ✅ Creates `.env` from `.env.example` (Docker config)
+- ✅ Creates `backend/.env` and `frontend/.env` (app configs)
 - ✅ Starts Backend (Symfony + PHP 8.3) on port 8000
 - ✅ Starts Frontend (Vue.js + Vite) on port 5173
 - ✅ Runs database migrations

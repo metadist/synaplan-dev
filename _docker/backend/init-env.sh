@@ -23,6 +23,15 @@ create_env_from_example() {
     return 0
 }
 
+# Root .env for Docker Compose (bind-mounted, accessible from container)
+ROOT_DIR="/var/www/html/.."
+ROOT_ENV="$ROOT_DIR/.env"
+ROOT_EXAMPLE="$ROOT_DIR/.env.example"
+
+if [ -f "$ROOT_EXAMPLE" ]; then
+    create_env_from_example "$ROOT_ENV" "$ROOT_EXAMPLE" 2>/dev/null || true
+fi
+
 # Backend .env
 BACKEND_DIR="/var/www/html"
 BACKEND_ENV="$BACKEND_DIR/.env"
