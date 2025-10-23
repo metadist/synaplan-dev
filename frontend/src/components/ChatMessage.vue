@@ -401,9 +401,13 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
-const downloadFile = (file: MessageFile) => {
-  const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/uploads/${file.filePath}`
-  window.open(url, '_blank')
+const downloadFile = async (file: MessageFile) => {
+  try {
+    const filesService = await import('@/services/filesService')
+    await filesService.downloadFile(file.id, file.filename)
+  } catch (error) {
+    console.error('Download failed:', error)
+  }
 }
 
 </script>

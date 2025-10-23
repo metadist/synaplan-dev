@@ -29,6 +29,9 @@ class MessageFile
     #[ORM\JoinColumn(name: 'BMESSAGEID', referencedColumnName: 'BID', nullable: true, onDelete: 'CASCADE')]
     private ?Message $message = null;
 
+    #[ORM\Column(name: 'BUSERID', type: 'bigint')]
+    private int $userId;
+
     #[ORM\Column(name: 'BFILEPATH', length: 255)]
     private string $filePath = '';
 
@@ -85,6 +88,17 @@ class MessageFile
     {
         $this->message = $message;
         $this->messageId = $message?->getId();
+        return $this;
+    }
+
+    public function getUserId(): int
+    {
+        return $this->userId;
+    }
+
+    public function setUserId(int $userId): self
+    {
+        $this->userId = $userId;
         return $this;
     }
 

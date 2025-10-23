@@ -124,7 +124,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const { showSuccess, showError } = useNotification()
+const { success, error: showError } = useNotification()
 
 const loading = ref(false)
 const error = ref<string | null>(null)

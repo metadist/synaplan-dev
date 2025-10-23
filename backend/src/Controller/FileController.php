@@ -3,11 +3,14 @@
 namespace App\Controller;
 
 use App\Entity\Message;
+use App\Entity\MessageFile;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Repository\MessageFileRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,9 +29,12 @@ class FileController extends AbstractController
         private FileStorageService $storageService,
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
+        private StorageQuotaService $storageQuotaService,
         private MessageRepository $messageRepository,
+        private MessageFileRepository $messageFileRepository,
         private EntityManagerInterface $em,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private string $uploadDir
     ) {}
 
     /**
@@ -148,6 +154,18 @@ class FileController extends AbstractController
         string $groupKey,
         string $processLevel
     ): array {
+        // Step 0: Check storage quota BEFORE uploading
+        $fileSize = $uploadedFile->getSize();
+        try {
+            $this->storageQuotaService->checkStorageLimit($user, $fileSize);
+        } catch (\RuntimeException $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'storage_exceeded' => true
+            ];
+        }
+        
         // Step 1: Store file
         $storageResult = $this->storageService->storeUploadedFile($uploadedFile, $user->getId());
         
@@ -161,29 +179,22 @@ class FileController extends AbstractController
         $relativePath = $storageResult['path'];
         $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
         
-        // Create Message entity to track the file
-        $message = new Message();
-        $message->setUserId($user->getId());
-        $message->setTrackingId(time());
-        $message->setProviderIndex('WEB');
-        $message->setUnixTimestamp(time());
-        $message->setDateTime(date('YmdHis'));
-        $message->setMessageType('FILE');
-        $message->setFile(1);
-        $message->setFilePath($relativePath);
-        $message->setFileType($fileExtension);
-        $message->setText('File uploaded: ' . $uploadedFile->getClientOriginalName());
-        $message->setDirection('IN');
-        $message->setTopic($groupKey);
-        $message->setLanguage('en');
-        $message->setStatus('uploaded');
+        // Create MessageFile entity (standalone, not attached to a message yet)
+        $messageFile = new MessageFile();
+        $messageFile->setUserId($user->getId());
+        $messageFile->setFilePath($relativePath);
+        $messageFile->setFileType($fileExtension);
+        $messageFile->setFileName($uploadedFile->getClientOriginalName());
+        $messageFile->setFileSize($storageResult['size']);
+        $messageFile->setFileMime($storageResult['mime']);
+        $messageFile->setStatus('uploaded');
         
-        $this->em->persist($message);
+        $this->em->persist($messageFile);
         $this->em->flush();
 
         $result = [
             'success' => true,
-            'id' => $message->getId(),
+            'id' => $messageFile->getId(),
             'filename' => $uploadedFile->getClientOriginalName(),
             'size' => $storageResult['size'],
             'mime' => $storageResult['mime'],
@@ -199,8 +210,8 @@ class FileController extends AbstractController
                 $user->getId()
             );
 
-            $message->setFileText($extractedText);
-            $message->setStatus('extracted');
+            $messageFile->setFileText($extractedText);
+            $messageFile->setStatus('extracted');
             $this->em->flush();
 
             $result['extracted_text_length'] = strlen($extractedText);
@@ -213,7 +224,7 @@ class FileController extends AbstractController
 
         } catch (\Throwable $e) {
             $this->logger->error('FileController: Text extraction failed', [
-                'message_id' => $message->getId(),
+                'file_id' => $messageFile->getId(),
                 'error' => $e->getMessage()
             ]);
             
@@ -229,20 +240,20 @@ class FileController extends AbstractController
                 $vectorResult = $this->vectorizationService->vectorizeAndStore(
                     $extractedText,
                     $user->getId(),
-                    $message->getId(),
+                    $messageFile->getId(),
                     $groupKey,
                     $this->getFileTypeCode($fileExtension)
                 );
 
                 if ($vectorResult['success']) {
-                    $message->setStatus('vectorized');
+                    $messageFile->setStatus('vectorized');
                     $this->em->flush();
 
                     $result['chunks_created'] = $vectorResult['chunks_created'];
                     $result['vectorized'] = true;
                 } else {
                     $this->logger->warning('FileController: Vectorization failed', [
-                        'message_id' => $message->getId(),
+                        'file_id' => $messageFile->getId(),
                         'error' => $vectorResult['error']
                     ]);
                     
@@ -252,7 +263,7 @@ class FileController extends AbstractController
 
             } catch (\Throwable $e) {
                 $this->logger->error('FileController: Vectorization exception', [
-                    'message_id' => $message->getId(),
+                    'file_id' => $messageFile->getId(),
                     'error' => $e->getMessage()
                 ]);
                 
@@ -303,36 +314,24 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Get the message entity WITH metadata (EAGER load)
-        $message = $this->messageRepository->createQueryBuilder('m')
-            ->leftJoin('m.metadata', 'meta')
-            ->addSelect('meta')
-            ->where('m.id = :id')
-            ->andWhere('m.file = 1')
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult();
+        // Get the MessageFile entity
+        $messageFile = $this->messageFileRepository->find($id);
 
-        if (!$message) {
+        if (!$messageFile) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Security check: Owner can always download, others only if public
-        $isOwner = $message->getUserId() === $user->getId();
-        $isPublicAndValid = $message->isPublic() && !$message->isShareExpired();
-
-        if (!$isOwner && !$isPublicAndValid) {
+        // Security check: Only owner can download
+        if ($messageFile->getUserId() !== $user->getId()) {
             $this->logger->warning('FileController: Unauthorized download attempt', [
                 'file_id' => $id,
                 'user_id' => $user->getId(),
-                'owner_id' => $message->getUserId(),
-                'is_public' => $message->isPublic(),
-                'is_expired' => $message->isShareExpired()
+                'owner_id' => $messageFile->getUserId()
             ]);
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        $filePath = $message->getFilePath();
+        $filePath = $messageFile->getFilePath();
         if (!$filePath) {
             return $this->json(['error' => 'File path not found'], Response::HTTP_NOT_FOUND);
         }
@@ -341,22 +340,17 @@ class FileController extends AbstractController
 
         if (!file_exists($absolutePath)) {
             $this->logger->error('FileController: File not found on disk', [
-                'message_id' => $id,
+                'file_id' => $id,
                 'path' => $absolutePath
             ]);
             return $this->json(['error' => 'File not found on disk'], Response::HTTP_NOT_FOUND);
         }
 
-        // Get original filename from Message text or path
-        $filename = $message->getText() 
-            ? str_replace('File uploaded: ', '', $message->getText())
-            : basename($filePath);
-
         // Return file as download
         $response = new BinaryFileResponse($absolutePath);
         $response->setContentDisposition(
             ResponseHeaderBag::DISPOSITION_ATTACHMENT,
-            $filename
+            $messageFile->getFileName()
         );
         
         return $response;
@@ -376,41 +370,31 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Get the message entity WITH metadata (EAGER load)
-        $message = $this->messageRepository->createQueryBuilder('m')
-            ->leftJoin('m.metadata', 'meta')
-            ->addSelect('meta')
-            ->where('m.id = :id')
-            ->andWhere('m.file = 1')
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult();
+        // Get the MessageFile entity
+        $messageFile = $this->messageFileRepository->find($id);
 
-        if (!$message) {
+        if (!$messageFile) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Security check: Owner can always view, others only if public
-        $isOwner = $message->getUserId() === $user->getId();
-        $isPublicAndValid = $message->isPublic() && !$message->isShareExpired();
-
-        if (!$isOwner && !$isPublicAndValid) {
+        // Security check: Only owner can view
+        if ($messageFile->getUserId() !== $user->getId()) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        $filename = $message->getText() 
-            ? str_replace('File uploaded: ', '', $message->getText())
-            : basename($message->getFilePath() ?? '');
-
         return $this->json([
-            'id' => $message->getId(),
-            'filename' => $filename,
-            'file_path' => $message->getFilePath(),
-            'file_type' => $message->getFileType(),
-            'extracted_text' => $message->getFileText() ?? '',
-            'status' => $message->getStatus(),
-            'uploaded_at' => $message->getUnixTimestamp(),
-            'uploaded_date' => date('Y-m-d H:i:s', $message->getUnixTimestamp())
+            'id' => $messageFile->getId(),
+            'filename' => $messageFile->getFileName(),
+            'file_path' => $messageFile->getFilePath(),
+            'file_type' => $messageFile->getFileType(),
+            'file_size' => $messageFile->getFileSize(),
+            'mime' => $messageFile->getFileMime(),
+            'extracted_text' => $messageFile->getFileText() ?? '',
+            'status' => $messageFile->getStatus(),
+            'message_id' => $messageFile->getMessageId(),
+            'is_attached' => $messageFile->getMessageId() !== null,
+            'uploaded_at' => $messageFile->getCreatedAt(),
+            'uploaded_date' => date('Y-m-d H:i:s', $messageFile->getCreatedAt())
         ]);
     }
 
@@ -437,42 +421,38 @@ class FileController extends AbstractController
         $limit = min(100, max(1, (int)$request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
 
-        // Build query
-        $qb = $this->messageRepository->createQueryBuilder('m')
-            ->where('m.userId = :userId')
-            ->andWhere('m.file = 1')
+        // Build query for MessageFiles
+        $qb = $this->messageFileRepository->createQueryBuilder('mf')
+            ->where('mf.userId = :userId')
             ->setParameter('userId', $user->getId())
-            ->orderBy('m.id', 'DESC');
-
-        if ($groupKey) {
-            $qb->andWhere('m.topic = :topic')
-               ->setParameter('topic', $groupKey);
-        }
+            ->orderBy('mf.createdAt', 'DESC');
 
         // Get total count
-        $totalCount = (clone $qb)->select('COUNT(m.id)')->getQuery()->getSingleScalarResult();
+        $totalCount = (clone $qb)->select('COUNT(mf.id)')->getQuery()->getSingleScalarResult();
 
-        // Get paginated results - DISTINCT to avoid duplicates
-        $messages = $qb->groupBy('m.filePath')
-                      ->setFirstResult($offset)
-                      ->setMaxResults($limit)
-                      ->getQuery()
-                      ->getResult();
+        // Get paginated results
+        $messageFiles = $qb->setFirstResult($offset)
+                          ->setMaxResults($limit)
+                          ->getQuery()
+                          ->getResult();
 
-        $files = array_map(fn(Message $m) => [
-            'id' => $m->getId(),
-            'filename' => $m->getText() ? str_replace('File uploaded: ', '', $m->getText()) : basename($m->getFilePath() ?? ''),
-            'path' => $m->getFilePath(),
-            'file_type' => $m->getFileType(),
-            'group_key' => $m->getTopic(),
-            'status' => $m->getStatus(),
-            'direction' => $m->getDirection(),
-            'text_preview' => mb_substr($m->getFileText() ?? '', 0, 200),
-            'uploaded_at' => $m->getUnixTimestamp(),
-            'uploaded_date' => date('Y-m-d H:i:s', $m->getUnixTimestamp())
-        ], $messages);
+        $files = array_map(fn(MessageFile $mf) => [
+            'id' => $mf->getId(),
+            'filename' => $mf->getFileName(),
+            'path' => $mf->getFilePath(),
+            'file_type' => $mf->getFileType(),
+            'file_size' => $mf->getFileSize(),
+            'mime' => $mf->getFileMime(),
+            'status' => $mf->getStatus(),
+            'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
+            'uploaded_at' => $mf->getCreatedAt(),
+            'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
+            'message_id' => $mf->getMessageId(), // null if standalone
+            'is_attached' => $mf->getMessageId() !== null
+        ], $messageFiles);
 
         return $this->json([
+            'success' => true,
             'files' => $files,
             'pagination' => [
                 'page' => $page,
@@ -497,19 +477,19 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $message = $this->messageRepository->find($id);
+        $messageFile = $this->messageFileRepository->find($id);
         
-        if (!$message || $message->getUserId() !== $user->getId()) {
+        if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
         // Delete physical file
-        if ($message->getFilePath()) {
-            $this->storageService->deleteFile($message->getFilePath());
+        if ($messageFile->getFilePath()) {
+            $this->storageService->deleteFile($messageFile->getFilePath());
         }
 
-        // Delete message entity
-        $this->em->remove($message);
+        // Delete MessageFile entity
+        $this->em->remove($messageFile);
         $this->em->flush();
 
         return $this->json([
@@ -642,6 +622,28 @@ class FileController extends AbstractController
             'share_token' => $message->getShareToken(),
             'expires_at' => $message->getShareExpires(),
             'is_expired' => $message->isShareExpired()
+        ]);
+    }
+
+    /**
+     * Get storage quota statistics for current user
+     * 
+     * GET /api/v1/files/storage-stats
+     */
+    #[Route('/storage-stats', name: 'storage_stats', methods: ['GET'])]
+    public function getStorageStats(
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $stats = $this->storageQuotaService->getStorageStats($user);
+
+        return $this->json([
+            'success' => true,
+            'user_level' => $user->getRateLimitLevel(),
+            'storage' => $stats
         ]);
     }
 }

@@ -188,6 +188,13 @@
         </button>
       </div>
     </div>
+
+    <!-- File Selection Modal -->
+    <FileSelectionModal
+      :visible="fileSelectionModalVisible"
+      @close="fileSelectionModalVisible = false"
+      @select="handleFilesSelected"
+    />
   </div>
 </template>
 
@@ -199,11 +206,14 @@ import Textarea from './Textarea.vue'
 import ModelSelect from './ModelSelect.vue'
 import CommandPalette from './CommandPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
+import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
 import { useCommandsStore, type Command } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api/chatApi'
+import type { FileItem } from '@/services/filesService'
+import { AudioRecorder } from '@/services/audioRecorder'
 
 interface Tool {
   id: string
@@ -242,8 +252,8 @@ const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
 const isRecording = ref(false)
-const mediaRecorder = ref<MediaRecorder | null>(null)
-const audioChunks = ref<Blob[]>([])
+const audioRecorder = ref<AudioRecorder | null>(null)
+const fileSelectionModalVisible = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const { warning, error: showError, success } = useNotification()
@@ -353,7 +363,21 @@ const removeFile = (index: number) => {
 
 const triggerFileUpload = () => {
   if (uploading.value) return
-  fileInputRef.value?.click()
+  // Open file selection modal to choose from existing files
+  fileSelectionModalVisible.value = true
+}
+
+const handleFilesSelected = async (selectedFiles: FileItem[]) => {
+  // Add selected files to uploadedFiles
+  selectedFiles.forEach(file => {
+    uploadedFiles.value.push({
+      file_id: file.id,
+      filename: file.filename,
+      file_type: file.file_type,
+      processing: false
+    })
+  })
+  success(`${selectedFiles.length} file(s) attached`)
 }
 
 const handleFileSelect = async (event: Event) => {
@@ -428,89 +452,48 @@ const uploadFiles = async (files: File[]) => {
 }
 
 const toggleRecording = async () => {
-  if (isRecording.value) {
+  if (isRecording.value && audioRecorder.value) {
     // Stop recording
-    mediaRecorder.value?.stop()
+    audioRecorder.value.stopRecording()
     isRecording.value = false
   } else {
     // Start recording
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showError('Microphone not supported by your browser.')
-      return
-    }
-    
     try {
-      console.log('🎤 Requesting microphone access...')
-      
-      // DIRECTLY request microphone access - this triggers permission prompt!
-      // Don't check devices first - that requires permission too!
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: true // Start with simple constraints for better compatibility
+      // Create new recorder instance
+      audioRecorder.value = new AudioRecorder({
+        onStart: () => {
+          isRecording.value = true
+          success('🎙️ Recording started...')
+        },
+        onStop: () => {
+          isRecording.value = false
+        },
+        onDataAvailable: async (audioBlob: Blob) => {
+          console.log('🎵 Audio recorded:', audioBlob.size, 'bytes')
+          await transcribeAudio(audioBlob)
+        },
+        onError: (error) => {
+          console.error('❌ Recording error:', error)
+          showError(error.userMessage)
+          isRecording.value = false
+        }
       })
-      
-      console.log('✅ Microphone access granted!', stream)
-      
-      // Check if MediaRecorder is supported
-      if (!window.MediaRecorder) {
-        showError('Recording not supported by your browser.')
-        stream.getTracks().forEach(track => track.stop())
+
+      // Check support first (with detailed diagnostics)
+      const support = await audioRecorder.value.checkSupport()
+      if (!support.supported || !support.hasDevices) {
+        if (support.error) {
+          showError(support.error.userMessage)
+        }
         return
       }
-      
-      // Try different MIME types for compatibility
-      let mimeType = 'audio/webm;codecs=opus'
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/webm'
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'audio/ogg'
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = '' // Let browser choose
-          }
-        }
-      }
-      
-      console.log('🎙️ Using MIME type:', mimeType || 'default')
-      
-      mediaRecorder.value = new MediaRecorder(stream, {
-        mimeType: mimeType || undefined
-      })
-      
-      audioChunks.value = []
-      
-      mediaRecorder.value.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.value.push(event.data)
-        }
-      }
-      
-      mediaRecorder.value.onstop = async () => {
-        const audioBlob = new Blob(audioChunks.value, { type: mimeType || 'audio/webm' })
-        console.log('🎵 Audio recorded:', audioBlob.size, 'bytes')
-        await transcribeAudio(audioBlob)
-        
-        // Stop all tracks to release microphone
-        stream.getTracks().forEach(track => track.stop())
-      }
-      
-      mediaRecorder.value.start()
-      isRecording.value = true
-      success('🎙️ Recording...')
+
+      // Start recording
+      await audioRecorder.value.startRecording()
     } catch (err: any) {
-      console.error('Microphone access error:', err)
-      
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        showError('🔒 Microphone permission denied. Please allow microphone access in your browser settings.')
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        showError('🎤 No microphone found. Please connect a microphone and try again.')
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        showError('⚠️ Microphone is already in use by another application.')
-      } else if (err.name === 'AbortError') {
-        showError('⚠️ Microphone access was aborted. Please try again.')
-      } else if (err.name === 'SecurityError') {
-        showError('🔒 Microphone access blocked by security settings. Please use HTTPS or allow microphone in browser settings.')
-      } else {
-        showError(`Microphone error: ${err.name || 'Unknown'} - ${err.message || 'Unknown error'}`)
-      }
+      console.error('❌ Failed to start recording:', err)
+      showError(err.userMessage || `Recording failed: ${err.message || 'Unknown error'}`)
+      isRecording.value = false
     }
   }
 }

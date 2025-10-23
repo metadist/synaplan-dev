@@ -115,6 +115,10 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
     
+    App\Controller\FileController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+    
     App\Controller\FileServeController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'

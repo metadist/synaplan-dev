@@ -116,9 +116,10 @@ class StreamController extends AbstractController
                     $fileCount = 0;
                     foreach ($fileIdArray as $fileId) {
                         $messageFile = $this->em->getRepository(MessageFile::class)->find($fileId);
-                        if ($messageFile && $messageFile->getStatus() === 'uploaded') {
+                        // Accept files in any status (uploaded, extracted, vectorized)
+                        if ($messageFile && $messageFile->getUserId() === $user->getId()) {
                             // Associate file with message
-                            $messageFile->setMessage($incomingMessage);
+                            $messageFile->setMessageId($incomingMessage->getId());
                             $this->em->persist($messageFile);
                             $fileCount++;
                             
@@ -126,7 +127,8 @@ class StreamController extends AbstractController
                                 'message_id' => $incomingMessage->getId(),
                                 'file_id' => $fileId,
                                 'file_path' => $messageFile->getFilePath(),
-                                'file_type' => $messageFile->getFileType()
+                                'file_type' => $messageFile->getFileType(),
+                                'file_status' => $messageFile->getStatus()
                             ]);
                         }
                     }
@@ -288,7 +290,7 @@ class StreamController extends AbstractController
                     $outgoingMessage->setUserId($user->getId());
                     $outgoingMessage->setChat($chat);
                     $outgoingMessage->setTrackingId($trackId);
-                    $outgoingMessage->setProviderIndex($result['provider'] ?? 'system');
+                    $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex()); // Use same channel as incoming
                     $outgoingMessage->setUnixTimestamp(time());
                     $outgoingMessage->setDateTime(date('YmdHis'));
                     $outgoingMessage->setMessageType('WEB');
@@ -300,6 +302,12 @@ class StreamController extends AbstractController
                     $outgoingMessage->setStatus('complete');
                     
                     $this->em->persist($outgoingMessage);
+                    $this->em->flush(); // Flush to get message ID for metadata
+                    
+                    // Store error details in metadata
+                    $outgoingMessage->setMeta('ai_provider', $result['provider'] ?? 'system');
+                    $outgoingMessage->setMeta('ai_model', 'error');
+                    $outgoingMessage->setMeta('error_type', $result['error'] ?? 'unknown');
                     
                     // Update incoming message
                     $incomingMessage->setTopic('ERROR');
@@ -363,7 +371,7 @@ class StreamController extends AbstractController
                 $outgoingMessage->setUserId($user->getId());
                 $outgoingMessage->setChat($chat);
                 $outgoingMessage->setTrackingId($trackId);
-                $outgoingMessage->setProviderIndex($response['metadata']['provider'] ?? 'test');
+                $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex()); // Use same channel as incoming
                 $outgoingMessage->setUnixTimestamp(time());
                 $outgoingMessage->setDateTime(date('YmdHis'));
                 $outgoingMessage->setMessageType('WEB');
@@ -377,6 +385,14 @@ class StreamController extends AbstractController
                 $outgoingMessage->setStatus('complete');
 
                 $this->em->persist($outgoingMessage);
+                $this->em->flush(); // Flush to get message ID for metadata
+                
+                // Store detailed provider and model information in MessageMeta
+                $outgoingMessage->setMeta('ai_provider', $response['metadata']['provider'] ?? 'unknown');
+                $outgoingMessage->setMeta('ai_model', $response['metadata']['model'] ?? 'unknown');
+                if (!empty($response['metadata']['usage'])) {
+                    $outgoingMessage->setMeta('ai_usage', json_encode($response['metadata']['usage']));
+                }
                 
                 // Update incoming message
                 $incomingMessage->setTopic($classification['topic']);

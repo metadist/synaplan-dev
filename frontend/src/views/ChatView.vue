@@ -46,6 +46,7 @@
               :backend-message-id="message.backendMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
               :processing-metadata="message.isStreaming ? processingMetadata : undefined"
+              :files="message.files"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
             />
@@ -227,8 +228,35 @@ watch(() => historyStore.messages, () => {
 const handleSendMessage = async (content: string, options?: { includeReasoning?: boolean, modelId?: number, fileIds?: number[] }) => {
   autoScroll.value = true
 
-  // Add user message
-  historyStore.addMessage('user', [{ type: 'text', content }])
+  // Prepare files info if fileIds are provided
+  let files: any[] | undefined = undefined
+  if (options?.fileIds && options.fileIds.length > 0) {
+    // Import filesService dynamically
+    const { default: filesService } = await import('@/services/filesService')
+    
+    // Fetch file details for each fileId
+    files = []
+    for (const fileId of options.fileIds) {
+      try {
+        const response = await filesService.getFileContent(fileId)
+        if (response) {
+          files.push({
+            id: response.id,
+            filename: response.filename,
+            fileType: response.file_type,
+            filePath: response.file_path,
+            fileSize: response.file_size,
+            fileMime: response.mime
+          })
+        }
+      } catch (error) {
+        console.error('Failed to fetch file details:', fileId, error)
+      }
+    }
+  }
+
+  // Add user message with files
+  historyStore.addMessage('user', [{ type: 'text', content }], files)
 
   // Commands have no streaming (e.g. /pic, /search)
   const parts = await executeCommand(content)
@@ -237,7 +265,7 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
   const hasNonTextParts = parts.some(p => p.type !== 'text')
   
   if (hasNonTextParts) {
-    historyStore.addMessage('assistant', parts)
+    historyStore.addMessage('assistant', parts, undefined)
   } else {
     // Stream the response
     await streamAIResponse(content, options)
@@ -653,7 +681,7 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
       const hasNonTextParts = parts.some(p => p.type !== 'text')
       
       if (hasNonTextParts) {
-        historyStore.addMessage('assistant', parts)
+        historyStore.addMessage('assistant', parts, undefined)
         streamingAbortController = null
       } else {
         try {
