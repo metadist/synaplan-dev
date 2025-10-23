@@ -2,6 +2,9 @@
   <MainLayout>
     <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
       <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Storage Quota Widget -->
+        <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
+        
         <div class="surface-card p-6">
           <h1 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
             <CloudArrowUpIcon class="w-6 h-6 text-[var(--brand)]" />
@@ -234,9 +237,9 @@
                   </th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.fileId') }}</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.name') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.direction') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.group') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.details') }}</th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.size') }}</th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.status') }}</th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.attachment') }}</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.uploaded') }}</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.action') }}</th>
                 </tr>
@@ -257,24 +260,36 @@
                   </td>
                   <td class="py-3 px-3 txt-primary text-sm">{{ file.id }}</td>
                   <td class="py-3 px-3 txt-primary text-sm max-w-xs truncate">{{ file.filename }}</td>
+                  <td class="py-3 px-3 txt-secondary text-xs">
+                    {{ formatFileSize(file.file_size) }}
+                  </td>
                   <td class="py-3 px-3">
                     <span
-                      :class="file.direction === 'IN' ? 'text-blue-500' : 'text-gray-500'"
-                      class="text-sm font-medium"
+                      :class="{
+                        'pill pill--success': file.status === 'vectorized',
+                        'pill pill--warning': file.status === 'extracted',
+                        'pill pill--default': file.status === 'uploaded'
+                      }"
+                      class="text-xs"
                     >
-                      {{ file.direction }}
+                      {{ $t(`files.status_${file.status}`) }}
                     </span>
                   </td>
                   <td class="py-3 px-3">
                     <span
-                      v-if="file.group_key"
+                      v-if="file.is_attached"
                       class="pill pill--active text-xs"
+                      :title="$t('files.attachedToMessage')"
                     >
-                      {{ file.group_key }}
+                      {{ $t('files.attached') }}
                     </span>
-                  </td>
-                  <td class="py-3 px-3 txt-secondary text-xs max-w-md truncate">
-                    {{ file.text_preview || 'No preview available' }}
+                    <span
+                      v-else
+                      class="pill text-xs"
+                      :title="$t('files.standaloneFile')"
+                    >
+                      {{ $t('files.standalone') }}
+                    </span>
                   </td>
                   <td class="py-3 px-3 txt-secondary text-xs">{{ file.uploaded_date }}</td>
                 <td class="py-3 px-3">
@@ -296,15 +311,7 @@
                     >
                       <ArrowDownTrayIcon class="w-4 h-4" />
                     </button>
-                    <button
-                      @click="openShareModal(file.id, file.filename)"
-                      class="p-2 rounded hover:bg-purple-500/10 text-purple-500 transition-colors"
-                      title="Share file"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                    </button>
+                    <!-- Share button removed - MessageFile doesn't support public sharing -->
                     <button
                       @click="deleteFile(file.id)"
                       class="p-2 rounded hover:bg-red-500/10 text-red-500 transition-colors"
@@ -379,6 +386,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
 import {
   CloudArrowUpIcon,
   TrashIcon,
@@ -388,6 +396,8 @@ import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
+
+const storageWidget = ref<InstanceType<typeof StorageQuotaWidget> | null>(null)
 
 const groupKeyword = ref('')
 const selectedGroup = ref('')
@@ -467,9 +477,12 @@ const uploadFiles = async () => {
       groupKeyword.value = ''
       selectedGroup.value = ''
 
-      // Reload files list
+      // Reload files list AND storage widget
       await loadFiles()
       await loadFileGroups()
+      if (storageWidget.value) {
+        await storageWidget.value.refresh()
+      }
     } else {
       // Show errors
       result.errors.forEach(error => {
@@ -482,6 +495,11 @@ const uploadFiles = async () => {
   } finally {
     isUploading.value = false
   }
+}
+
+const handleUpgrade = () => {
+  // Navigate to pricing/subscription page
+  showInfo('Upgrade functionality coming soon! Contact support@synaplan.com for premium plans.')
 }
 
 const loadFiles = async (page = currentPage.value) => {
@@ -667,6 +685,13 @@ const previousPage = () => {
   if (currentPage.value > 1) {
     loadFiles(currentPage.value - 1)
   }
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
 // Load initial data

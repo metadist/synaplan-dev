@@ -235,9 +235,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         // If user is logged in via web (has email), they are at least NEW
         // ANONYMOUS is only for widget/API users without authentication
         
+        // If userLevel is set to PRO, TEAM, or BUSINESS directly (e.g., via fixtures or admin panel)
+        // use that level even without active subscription
+        if (in_array($this->userLevel, ['PRO', 'TEAM', 'BUSINESS'])) {
+            return $this->userLevel;
+        }
+        
         // Check if subscription is active
         if ($this->hasActiveSubscription()) {
-            return $this->userLevel; // PRO, TEAM, BUSINESS
+            return $this->userLevel; // PRO, TEAM, BUSINESS from subscription
         }
         
         // Default to NEW for all logged-in users

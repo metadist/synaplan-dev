@@ -36,15 +36,18 @@ export interface FileItem {
   filename: string
   path: string
   file_type: string
-  group_key: string
+  file_size: number
+  mime: string
   status: string
-  direction: string
   text_preview: string
   uploaded_at: number
   uploaded_date: string
+  message_id: number | null
+  is_attached: boolean
 }
 
 export interface FileListResponse {
+  success: boolean
   files: FileItem[]
   pagination: {
     page: number
@@ -287,6 +290,26 @@ export const getShareInfo = async (
   return response.data
 }
 
+/**
+ * Get storage quota statistics
+ */
+export async function getStorageStats(): Promise<{
+  success: boolean
+  user_level: string
+  storage: {
+    limit: number
+    usage: number
+    remaining: number
+    percentage: number
+    limit_formatted: string
+    usage_formatted: string
+    remaining_formatted: string
+  }
+}> {
+  const response = await apiFetch('/api/v1/files/storage-stats')
+  return response
+}
+
 export default {
   uploadFiles,
   listFiles,
@@ -297,6 +320,7 @@ export default {
   downloadFile,
   shareFile,
   unshareFile,
-  getShareInfo
+  getShareInfo,
+  getStorageStats
 }
 

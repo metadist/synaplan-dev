@@ -101,6 +101,7 @@ export const useHistoryStore = defineStore('history', () => {
   const addMessage = (
     role: 'user' | 'assistant', 
     parts: Part[], 
+    files?: MessageFile[],
     provider?: string, 
     modelLabel?: string,
     againData?: AgainData,
@@ -112,6 +113,7 @@ export const useHistoryStore = defineStore('history', () => {
       role,
       parts,
       timestamp: new Date(),
+      files,
       provider,
       modelLabel,
       againData,

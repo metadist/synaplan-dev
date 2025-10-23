@@ -217,8 +217,8 @@
     "groupKeywordHelp": "Enter a keyword to group related files together for RAG search",
     "orSelectExisting": "Or select existing...",
     "selectFiles": "Select Files:",
-    "selectFilesButton": "Dateien auswählen",
-    "noFileSelected": "Keine ausgewählt",
+    "selectFilesButton": "Select files",
+    "noFileSelected": "None selected",
     "supportedFormats": "Select one or more files (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
     "uploadAndProcess": "Upload and Process Files",
     "yourFiles": "Your Files",
@@ -228,11 +228,18 @@
     "filterHelp": "Choose a file group to filter the results. Upload new files above to create new groups.",
     "fileId": "FILE ID",
     "name": "NAME",
-    "direction": "DIRECTION",
-    "group": "GROUP",
-    "details": "DETAILS",
+    "size": "SIZE",
+    "status": "STATUS",
+    "attachment": "ATTACHMENT",
     "uploaded": "UPLOADED",
     "action": "ACTION",
+    "status_uploaded": "Uploaded",
+    "status_extracted": "Extracted",
+    "status_vectorized": "Vectorized",
+    "attached": "Attached",
+    "standalone": "Standalone",
+    "attachedToMessage": "This file is attached to a message",
+    "standaloneFile": "This file is standalone (not attached to any message)",
     "deleteSelected": "Delete Selected",
     "noFiles": "No files uploaded yet",
     "page": "Page",
@@ -241,10 +248,18 @@
     "next": "Next",
     "previous": "Previous",
     "delete": "Delete",
-    "download": "Download",
-    "in": "IN",
-    "out": "OUT",
-    "default": "DEFAULT"
+    "download": "Download"
+  },
+  "fileSelection": {
+    "title": "Select or Upload Files",
+    "searchPlaceholder": "Search files...",
+    "allStatuses": "All statuses",
+    "selectedCount": "{count} file(s) selected",
+    "attachFiles": "Attach Files",
+    "uploadNew": "Upload New Files",
+    "uploading": "Uploading {current} of {total}...",
+    "orDragDrop": "or drag & drop files here",
+    "dropHere": "Drop files here to upload"
   },
   "config": {
     "inbound": {
@@ -742,6 +757,15 @@
     "seoDescription": "This chat is now indexed by search engines like Google. Share the link on social media or embed it on your website!",
     "revoking": "Revoking...",
     "revoke": "Revoke Public Access"
+  },
+  "storage": {
+    "title": "Storage Quota",
+    "plan": "Plan",
+    "remaining": "Remaining",
+    "used": "Used",
+    "limitReached": "Storage limit reached! Please delete some files or upgrade your plan.",
+    "almostFull": "Storage almost full! Only {remaining} remaining.",
+    "upgradePlan": "Upgrade Plan"
   }
 }
 

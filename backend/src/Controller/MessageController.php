@@ -86,6 +86,7 @@ class MessageController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $messageText = $data['message'] ?? '';
         $trackId = $data['trackId'] ?? time();
+        $fileIds = $data['fileIds'] ?? [];
 
         if (empty($messageText)) {
             return $this->json(['error' => 'Message is required'], Response::HTTP_BAD_REQUEST);
@@ -121,14 +122,55 @@ class MessageController extends AbstractController
             $this->em->persist($incomingMessage);
             $this->em->flush();
 
+            // Link attached files to this message
+            if (!empty($fileIds)) {
+                $messageFileRepo = $this->em->getRepository(MessageFile::class);
+                foreach ($fileIds as $fileId) {
+                    $messageFile = $messageFileRepo->find($fileId);
+                    if ($messageFile && $messageFile->getUserId() === $user->getId()) {
+                        // Set message ID to link file to this message
+                        $messageFile->setMessageId($incomingMessage->getId());
+                        $this->em->persist($messageFile);
+                    }
+                }
+                $this->em->flush();
+            }
+
             // Record usage
             $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
+            // Prepare context with file contents
+            $contextMessages = [];
+            
+            // Add file contents as context if files are attached
+            if (!empty($fileIds)) {
+                $messageFileRepo = $this->em->getRepository(MessageFile::class);
+                $fileContents = [];
+                
+                foreach ($fileIds as $fileId) {
+                    $messageFile = $messageFileRepo->find($fileId);
+                    if ($messageFile && $messageFile->getUserId() === $user->getId()) {
+                        $extractedText = $messageFile->getFileText();
+                        if ($extractedText) {
+                            $fileContents[] = "File: {$messageFile->getFileName()}\n\n{$extractedText}";
+                        }
+                    }
+                }
+                
+                if (!empty($fileContents)) {
+                    $contextMessages[] = [
+                        'role' => 'system',
+                        'content' => "The user has attached the following files:\n\n" . implode("\n\n---\n\n", $fileContents)
+                    ];
+                }
+            }
+            
+            // Add user message
+            $contextMessages[] = ['role' => 'user', 'content' => $messageText];
+
             // Use AI Facade to get response
             $aiResponse = $this->aiFacade->chat(
-                [
-                    ['role' => 'user', 'content' => $messageText]
-                ],
+                $contextMessages,
                 $user->getId()
             );
 
@@ -157,7 +199,7 @@ class MessageController extends AbstractController
             $outgoingMessage = new Message();
             $outgoingMessage->setUserId($user->getId());
             $outgoingMessage->setTrackingId($trackId);
-            $outgoingMessage->setProviderIndex($aiResponse['provider'] ?? 'test');
+            $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex()); // Use same channel as incoming
             $outgoingMessage->setUnixTimestamp(time());
             $outgoingMessage->setDateTime(date('YmdHis'));
             $outgoingMessage->setMessageType('WEB');
@@ -171,6 +213,14 @@ class MessageController extends AbstractController
             $outgoingMessage->setStatus('complete');
 
             $this->em->persist($outgoingMessage);
+            $this->em->flush(); // Flush to get message ID for metadata
+            
+            // Store detailed provider and model information in MessageMeta
+            $outgoingMessage->setMeta('ai_provider', $aiResponse['provider'] ?? 'unknown');
+            $outgoingMessage->setMeta('ai_model', $aiResponse['model'] ?? 'unknown');
+            if (!empty($aiResponse['usage'])) {
+                $outgoingMessage->setMeta('ai_usage', json_encode($aiResponse['usage']));
+            }
             
             // Update incoming message status
             $incomingMessage->setStatus('complete');
