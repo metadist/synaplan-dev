@@ -72,6 +72,30 @@ GROQ_API_KEY=
 GOOGLE_GEMINI_API_KEY=
 ###< External AI API Keys ###
 
+###> Tika Service (Document Text Extraction) ###
+TIKA_TIMEOUT_MS=30000
+TIKA_RETRIES=2
+TIKA_RETRY_BACKOFF_MS=1000
+TIKA_HTTP_USER=
+TIKA_HTTP_PASS=
+TIKA_MIN_LENGTH=10
+TIKA_MIN_ENTROPY=3.0
+###< Tika Service ###
+
+###> PDF Rasterizer (for scanned PDFs and OCR) ###
+RASTERIZE_DPI=150
+RASTERIZE_PAGE_CAP=10
+RASTERIZE_TIMEOUT_MS=30000
+###< PDF Rasterizer ###
+
+###> Whisper Service (Audio Transcription) ###
+WHISPER_BINARY=/usr/local/bin/whisper
+WHISPER_MODELS_PATH=/var/www/html/var/whisper
+WHISPER_DEFAULT_MODEL=base
+WHISPER_ENABLED=true
+FFMPEG_BINARY=/usr/bin/ffmpeg
+###< Whisper Service ###
+
 ###> lexik/jwt-authentication-bundle ###
 JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
 JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem

@@ -30,6 +30,7 @@
         "phpoffice/phppresentation": "^1.2",
         "phpoffice/phpword": "^1.4",
         "phpstan/phpdoc-parser": "^2.3",
+        "predis/predis": "^3.2",
         "smalot/pdfparser": "^2.12",
         "symfony/asset": "7.3.*",
         "symfony/console": "7.3.*",
