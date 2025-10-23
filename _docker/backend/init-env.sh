@@ -3,12 +3,44 @@ set -e
 
 echo "🔧 Checking environment files..."
 
-# Backend .env.local (Symfony prefers .env.local over .env in dev/prod)
-BACKEND_ENV_LOCAL="/var/www/html/.env.local"
+# Function to create .env from .env.example if it doesn't exist
+create_env_from_example() {
+    local ENV_FILE=$1
+    local EXAMPLE_FILE=$2
+    
+    if [ ! -f "$ENV_FILE" ]; then
+        if [ -f "$EXAMPLE_FILE" ]; then
+            echo "📝 Creating $ENV_FILE from $EXAMPLE_FILE..."
+            cp "$EXAMPLE_FILE" "$ENV_FILE"
+            echo "✅ $ENV_FILE created from example"
+        else
+            echo "⚠️  Warning: $EXAMPLE_FILE not found, skipping"
+            return 1
+        fi
+    else
+        echo "✅ $ENV_FILE already exists"
+    fi
+    return 0
+}
 
-if [ ! -f "$BACKEND_ENV_LOCAL" ]; then
-    echo "📝 Creating backend/.env.local with Docker configuration..."
-    cat > "$BACKEND_ENV_LOCAL" << 'EOF'
+# Root .env for Docker Compose (bind-mounted, accessible from container)
+ROOT_DIR="/var/www/html/.."
+ROOT_ENV="$ROOT_DIR/.env"
+ROOT_EXAMPLE="$ROOT_DIR/.env.example"
+
+if [ -f "$ROOT_EXAMPLE" ]; then
+    create_env_from_example "$ROOT_ENV" "$ROOT_EXAMPLE" 2>/dev/null || true
+fi
+
+# Backend .env
+BACKEND_DIR="/var/www/html"
+BACKEND_ENV="$BACKEND_DIR/.env"
+BACKEND_EXAMPLE="$BACKEND_DIR/.env.example"
+
+# Try to create .env from .env.example if it doesn't exist
+if ! create_env_from_example "$BACKEND_ENV" "$BACKEND_EXAMPLE"; then
+    echo "📝 Creating default .env for backend..."
+    cat > "$BACKEND_ENV" << 'EOF'
 ###> symfony/framework-bundle ###
 APP_ENV=dev
 APP_SECRET=change_me_in_production_12345678901234567890
@@ -33,22 +65,6 @@ TIKA_BASE_URL=http://tika:9998
 AI_DEFAULT_PROVIDER=ollama
 ###< AI Providers ###
 
-###> Tika Configuration ###
-TIKA_TIMEOUT_MS=30000
-TIKA_RETRIES=3
-TIKA_RETRY_BACKOFF_MS=1000
-TIKA_HTTP_USER=
-TIKA_HTTP_PASS=
-TIKA_MIN_LENGTH=10
-TIKA_MIN_ENTROPY=2.0
-###< Tika Configuration ###
-
-###> PDF Rasterizer Configuration ###
-RASTERIZE_DPI=150
-RASTERIZE_PAGE_CAP=10
-RASTERIZE_TIMEOUT_MS=30000
-###< PDF Rasterizer Configuration ###
-
 ###> External AI API Keys (optional) ###
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
@@ -61,11 +77,16 @@ JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
 JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
 JWT_PASSPHRASE=change_me_in_production
 ###< lexik/jwt-authentication-bundle ###
+
+###> CORS ###
+CORS_ALLOW_ORIGIN=^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$
+###< CORS ###
+
+###> Mailer ###
+MAILER_DSN=null://null
+###< Mailer ###
 EOF
-    echo "✅ backend/.env.local created (overrides .env)"
-else
-    echo "✅ backend/.env.local already exists (not overwriting)"
+    echo "✅ Default backend/.env created"
 fi
 
 echo "✅ Environment check completed!"
-

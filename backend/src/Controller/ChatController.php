@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,6 +27,37 @@ class ChatController extends AbstractController
     ) {}
 
     #[Route('', name: 'list', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats',
+        summary: 'List all chats for authenticated user',
+        tags: ['Chats'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of user chats',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'chats',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 1),
+                                    new OA\Property(property: 'title', type: 'string', example: 'My Chat'),
+                                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                                    new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
+                                    new OA\Property(property: 'messageCount', type: 'integer', example: 5),
+                                    new OA\Property(property: 'isShared', type: 'boolean', example: false)
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated')
+        ]
+    )]
     public function list(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -49,6 +81,41 @@ class ChatController extends AbstractController
     }
 
     #[Route('', name: 'create', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/chats',
+        summary: 'Create a new chat',
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'title', type: 'string', example: 'New Discussion', nullable: true)
+                ]
+            )
+        ),
+        tags: ['Chats'],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Chat created successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'chat',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 1),
+                                new OA\Property(property: 'title', type: 'string', example: 'New Chat'),
+                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time')
+                            ]
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated')
+        ]
+    )]
     public function create(
         Request $request,
         #[CurrentUser] ?User $user
@@ -87,6 +154,39 @@ class ChatController extends AbstractController
     }
 
     #[Route('/{id}', name: 'get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/{id}',
+        summary: 'Get a specific chat by ID',
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Chat details',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'chat',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'title', type: 'string'),
+                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'isShared', type: 'boolean'),
+                                new OA\Property(property: 'shareToken', type: 'string', nullable: true)
+                            ]
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Chat not found')
+        ]
+    )]
     public function get(
         int $id,
         #[CurrentUser] ?User $user
@@ -115,6 +215,26 @@ class ChatController extends AbstractController
     }
 
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
+    #[OA\Patch(
+        path: '/api/v1/chats/{id}',
+        summary: 'Update chat title',
+        requestBody: new OA\RequestBody(
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'title', type: 'string', example: 'Updated Title')
+                ]
+            )
+        ),
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Chat updated successfully'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Chat not found')
+        ]
+    )]
     public function update(
         int $id,
         Request $request,
@@ -150,6 +270,19 @@ class ChatController extends AbstractController
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/chats/{id}',
+        summary: 'Delete a chat',
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Chat deleted successfully'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Chat not found')
+        ]
+    )]
     public function delete(
         int $id,
         #[CurrentUser] ?User $user
@@ -176,6 +309,37 @@ class ChatController extends AbstractController
     }
 
     #[Route('/{id}/share', name: 'share', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/chats/{id}/share',
+        summary: 'Enable/disable chat sharing',
+        requestBody: new OA\RequestBody(
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'enable', type: 'boolean', example: true)
+                ]
+            )
+        ),
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Share settings updated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'shareToken', type: 'string', nullable: true),
+                        new OA\Property(property: 'isShared', type: 'boolean'),
+                        new OA\Property(property: 'shareUrl', type: 'string', nullable: true)
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Chat not found')
+        ]
+    )]
     public function share(
         int $id,
         Request $request,
@@ -216,6 +380,40 @@ class ChatController extends AbstractController
     }
 
     #[Route('/{id}/messages', name: 'messages', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/{id}/messages',
+        summary: 'Get messages for a chat',
+        tags: ['Chats', 'Messages'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50, maximum: 100)),
+            new OA\Parameter(name: 'offset', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 0))
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of messages with pagination',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items()),
+                        new OA\Property(
+                            property: 'pagination',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'offset', type: 'integer'),
+                                new OA\Property(property: 'limit', type: 'integer'),
+                                new OA\Property(property: 'total', type: 'integer'),
+                                new OA\Property(property: 'hasMore', type: 'boolean')
+                            ]
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Chat not found')
+        ]
+    )]
     public function getMessages(
         int $id,
         Request $request,
@@ -293,6 +491,36 @@ class ChatController extends AbstractController
     }
 
     #[Route('/shared/{token}', name: 'shared', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/shared/{token}',
+        summary: 'Get a publicly shared chat by token',
+        security: [],
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'token', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Shared chat with messages',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'chat',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'title', type: 'string'),
+                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time')
+                            ]
+                        ),
+                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items())
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Chat not found or not shared')
+        ]
+    )]
     public function getShared(string $token): JsonResponse
     {
         $chat = $this->chatRepository->findPublicByShareToken($token);

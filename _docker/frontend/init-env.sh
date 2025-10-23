@@ -1,29 +1,51 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
-echo "🔧 Checking frontend environment..."
+echo "🔧 Checking frontend environment files..."
 
-# Frontend .env.docker
-if [ ! -f ".env.docker" ]; then
-    echo "📝 Creating .env.docker..."
-    cat > .env.docker << 'EOF'
-# Synaplan Frontend - Docker Environment
-# This file is auto-generated. Use .env.local for local overrides.
+# Function to create .env from .env.example if it doesn't exist
+create_env_from_example() {
+    local ENV_FILE=$1
+    local EXAMPLE_FILE=$2
+    
+    if [ ! -f "$ENV_FILE" ]; then
+        if [ -f "$EXAMPLE_FILE" ]; then
+            echo "📝 Creating $ENV_FILE from $EXAMPLE_FILE..."
+            cp "$EXAMPLE_FILE" "$ENV_FILE"
+            echo "✅ $ENV_FILE created from example"
+        else
+            echo "⚠️  Warning: $EXAMPLE_FILE not found, creating default"
+            return 1
+        fi
+    else
+        echo "✅ $ENV_FILE already exists"
+    fi
+    return 0
+}
 
-# API Backend URL
+# Frontend .env
+FRONTEND_DIR="/app"
+FRONTEND_ENV="$FRONTEND_DIR/.env"
+FRONTEND_EXAMPLE="$FRONTEND_DIR/.env.example"
+
+# Try to create .env from .env.example if it doesn't exist
+if ! create_env_from_example "$FRONTEND_ENV" "$FRONTEND_EXAMPLE"; then
+    echo "📝 Creating default .env for frontend..."
+    cat > "$FRONTEND_ENV" << 'EOF'
+# Frontend Environment Variables
+
+# API Configuration
 VITE_API_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000
 
-# Development settings
-VITE_DEV_MODE=true
+# Environment
+VITE_APP_ENV=development
+
+# Feature Flags
+VITE_ENABLE_ANALYTICS=false
+VITE_ENABLE_DEBUG=true
 EOF
-    echo "✅ .env.docker created"
-else
-    echo "✅ .env.docker already exists"
+    echo "✅ Default frontend/.env created"
 fi
 
-# Check which env file to use
-if [ -f ".env.local" ]; then
-    echo "🎯 Using .env.local (local overrides)"
-else
-    echo "🎯 Using .env.docker (default)"
-fi
+echo "✅ Frontend environment check completed!"

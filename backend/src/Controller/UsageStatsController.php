@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Service\UsageStatsService;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -37,6 +38,28 @@ class UsageStatsController extends AbstractController
      * - Recent usage history
      */
     #[Route('/stats', name: 'stats', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/usage/stats',
+        summary: 'Get comprehensive usage statistics',
+        tags: ['Usage Statistics'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Usage statistics',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'data',
+                            type: 'object',
+                            description: 'Detailed usage statistics including limits, breakdowns by source and time period'
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated')
+        ]
+    )]
     public function getStats(
         #[CurrentUser] ?User $user
     ): JsonResponse {

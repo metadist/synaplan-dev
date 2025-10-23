@@ -14,22 +14,65 @@ AI-powered knowledge management with chat, document processing, and RAG (Retriev
 ```bash
 git clone <repository-url>
 cd synaplan-dev
+
+# Quick start (models download on-demand)
+docker compose up -d
+
+# Or: Pre-download AI models during startup
 AUTO_DOWNLOAD_MODELS=true docker compose up -d
 ```
 
-That's it! Docker Compose automatically:
-- ✅ Starts Backend (Symfony + PHP 8.3) on port 8000
-- ✅ Starts Frontend (Vue.js + Vite) on port 5173
-- ✅ Creates environment files (`backend/.env.local`, `frontend/.env.docker`)
-- ✅ Runs database migrations
-- ✅ Seeds test users and fixtures
-- ✅ Downloads AI models in background (if AUTO_DOWNLOAD_MODELS=true)
-- ✅ System ready in ~20 seconds (models continue downloading in background)
+**What happens automatically:**
+- ✅ Creates `.env` from `.env.example` (Docker Compose variables)
+- ✅ Creates `backend/.env` and `frontend/.env` (app-specific configs)
+- ✅ Installs dependencies (Composer, npm)
+- ✅ Generates JWT keypair for authentication
+- ✅ Creates database schema (migrations)
+- ✅ Loads test users and fixtures (if database is empty)
+- ✅ Starts all services
+- ✅ **System ready in ~40 seconds!**
 
-**Check model download progress:**
+**First startup takes ~40 seconds** because:
+- Database initialization: ~5s
+- Schema creation: ~2s
+- Fixtures loading: ~3s
+- Cache warming: ~2s
+- Total: ~40s (one-time setup)
+
+**Subsequent restarts take ~15 seconds** (no fixtures needed).
+
+**AI Model Download Behavior:**
+
+By default, AI models are **NOT** downloaded automatically. They download on-demand when first used.
+
+**Option 1: Quick Start (Recommended for Development)**
+```bash
+docker compose up -d
+```
+- ⚡ **Fast startup**: ~40 seconds (first run), ~15s (subsequent)
+- 📥 **Models**: Download automatically when you first send a chat message (~2-3 minutes)
+- 💡 **Best for**: Development, testing, quick demos
+- 🎯 **System is immediately usable** for login, file uploads, user management
+
+**Option 2: Pre-download Models**
+```bash
+AUTO_DOWNLOAD_MODELS=true docker compose up -d
+```
+- 🔄 **Backend ready**: Still ~40 seconds
+- 📦 **Models download in background**: `mistral:7b` (4.1GB) + `bge-m3` (670MB)
+- ⏱️ **Total download time**: ~5-10 minutes (depends on internet speed)
+- ✅ **AI chat ready immediately** after models finish downloading
+- 💡 **Best for**: Production, demos where AI must work immediately
+
+**Check download progress:**
 ```bash
 docker compose logs -f backend | grep -i "model\|background"
 ```
+
+**When to use which option:**
+- **Development/Testing**: Use default (on-demand download)
+- **Production/Demos**: Use `AUTO_DOWNLOAD_MODELS=true`
+- **CI/CD**: Build a custom image with pre-downloaded models
 
 ## 🌐 Access
 

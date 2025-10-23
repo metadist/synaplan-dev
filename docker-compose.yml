@@ -30,6 +30,8 @@ services:
     environment:
       APP_ENV: dev
       APP_SECRET: change_me_in_production_12345678901234567890
+      APP_URL: http://localhost:8000
+      FRONTEND_URL: http://localhost:5173
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       REDIS_URL: redis://redis:6379
@@ -37,6 +39,13 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
+      # JWT Configuration
+      JWT_SECRET_KEY: '%kernel.project_dir%/config/jwt/private.pem'
+      JWT_PUBLIC_KEY: '%kernel.project_dir%/config/jwt/public.pem'
+      JWT_PASSPHRASE: 'change_me_in_production'
+      # Mailer
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      # External API Keys (optional)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
