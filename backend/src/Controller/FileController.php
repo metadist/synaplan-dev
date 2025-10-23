@@ -3,8 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\Message;
+use App\Entity\MessageFile;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Repository\MessageFileRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -27,6 +29,7 @@ class FileController extends AbstractController
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
         private MessageRepository $messageRepository,
+        private MessageFileRepository $messageFileRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger
     ) {}
@@ -161,29 +164,22 @@ class FileController extends AbstractController
         $relativePath = $storageResult['path'];
         $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
         
-        // Create Message entity to track the file
-        $message = new Message();
-        $message->setUserId($user->getId());
-        $message->setTrackingId(time());
-        $message->setProviderIndex('WEB');
-        $message->setUnixTimestamp(time());
-        $message->setDateTime(date('YmdHis'));
-        $message->setMessageType('FILE');
-        $message->setFile(1);
-        $message->setFilePath($relativePath);
-        $message->setFileType($fileExtension);
-        $message->setText('File uploaded: ' . $uploadedFile->getClientOriginalName());
-        $message->setDirection('IN');
-        $message->setTopic($groupKey);
-        $message->setLanguage('en');
-        $message->setStatus('uploaded');
+        // Create MessageFile entity (standalone, not attached to a message yet)
+        $messageFile = new MessageFile();
+        $messageFile->setUserId($user->getId());
+        $messageFile->setFilePath($relativePath);
+        $messageFile->setFileType($fileExtension);
+        $messageFile->setFileName($uploadedFile->getClientOriginalName());
+        $messageFile->setFileSize($storageResult['size']);
+        $messageFile->setFileMime($storageResult['mime']);
+        $messageFile->setStatus('uploaded');
         
-        $this->em->persist($message);
+        $this->em->persist($messageFile);
         $this->em->flush();
 
         $result = [
             'success' => true,
-            'id' => $message->getId(),
+            'id' => $messageFile->getId(),
             'filename' => $uploadedFile->getClientOriginalName(),
             'size' => $storageResult['size'],
             'mime' => $storageResult['mime'],
@@ -199,8 +195,8 @@ class FileController extends AbstractController
                 $user->getId()
             );
 
-            $message->setFileText($extractedText);
-            $message->setStatus('extracted');
+            $messageFile->setFileText($extractedText);
+            $messageFile->setStatus('extracted');
             $this->em->flush();
 
             $result['extracted_text_length'] = strlen($extractedText);
@@ -213,7 +209,7 @@ class FileController extends AbstractController
 
         } catch (\Throwable $e) {
             $this->logger->error('FileController: Text extraction failed', [
-                'message_id' => $message->getId(),
+                'file_id' => $messageFile->getId(),
                 'error' => $e->getMessage()
             ]);
             
@@ -229,20 +225,20 @@ class FileController extends AbstractController
                 $vectorResult = $this->vectorizationService->vectorizeAndStore(
                     $extractedText,
                     $user->getId(),
-                    $message->getId(),
+                    $messageFile->getId(),
                     $groupKey,
                     $this->getFileTypeCode($fileExtension)
                 );
 
                 if ($vectorResult['success']) {
-                    $message->setStatus('vectorized');
+                    $messageFile->setStatus('vectorized');
                     $this->em->flush();
 
                     $result['chunks_created'] = $vectorResult['chunks_created'];
                     $result['vectorized'] = true;
                 } else {
                     $this->logger->warning('FileController: Vectorization failed', [
-                        'message_id' => $message->getId(),
+                        'file_id' => $messageFile->getId(),
                         'error' => $vectorResult['error']
                     ]);
                     
@@ -252,7 +248,7 @@ class FileController extends AbstractController
 
             } catch (\Throwable $e) {
                 $this->logger->error('FileController: Vectorization exception', [
-                    'message_id' => $message->getId(),
+                    'file_id' => $messageFile->getId(),
                     'error' => $e->getMessage()
                 ]);
                 
