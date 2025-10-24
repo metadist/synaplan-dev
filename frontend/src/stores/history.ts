@@ -43,7 +43,32 @@ export interface Message {
   againData?: AgainData
   originalMessageId?: number
   backendMessageId?: number
-  files?: MessageFile[] // NEW: attached files
+  files?: MessageFile[] // Attached files
+  searchResults?: Array<{
+    title: string
+    url: string
+    description?: string
+    published?: string
+    source?: string
+    thumbnail?: string
+  }> | null // Web search results
+  aiModels?: {
+    chat?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+    sorting?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+  } | null // AI model metadata
+  webSearch?: {
+    enabled?: boolean
+    query?: string
+    resultsCount?: number
+  } | null // Web search metadata
 }
 
 /**
@@ -106,7 +131,8 @@ export const useHistoryStore = defineStore('history', () => {
     modelLabel?: string,
     againData?: AgainData,
     backendMessageId?: number,
-    originalMessageId?: number
+    originalMessageId?: number,
+    webSearch?: { enabled?: boolean; query?: string; resultsCount?: number } | null
   ) => {
     messages.value.push({
       id: crypto.randomUUID(),
@@ -118,7 +144,8 @@ export const useHistoryStore = defineStore('history', () => {
       modelLabel,
       againData,
       backendMessageId,
-      originalMessageId
+      originalMessageId,
+      webSearch
     })
   }
 
@@ -216,7 +243,10 @@ export const useHistoryStore = defineStore('history', () => {
             provider: m.provider,
             modelLabel: m.provider || 'AI',
             backendMessageId: m.id,
-            files: files.length > 0 ? files : undefined
+            files: files.length > 0 ? files : undefined,
+            aiModels: m.aiModels || null, // Parse AI model metadata from backend
+            webSearch: m.webSearch || null, // Parse web search metadata from backend
+            searchResults: m.searchResults || null // Parse actual search results from backend
           }
         })
         

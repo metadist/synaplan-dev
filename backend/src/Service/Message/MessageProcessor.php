@@ -4,10 +4,12 @@ namespace App\Service\Message;
 
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Repository\SearchResultRepository;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
+use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -16,7 +18,8 @@ use Psr\Log\LoggerInterface;
  * Orchestrates the complete message processing pipeline:
  * 1. Preprocessing (file download, parsing)
  * 2. Classification (sorting, topic detection)
- * 3. Inference (AI response generation)
+ * 3. Web Search (if needed)
+ * 4. Inference (AI response generation)
  * 
  * Provides status callbacks for frontend feedback
  */
@@ -24,10 +27,12 @@ class MessageProcessor
 {
     public function __construct(
         private MessageRepository $messageRepository,
+        private ?SearchResultRepository $searchResultRepository,
         private MessagePreProcessor $preProcessor,
         private MessageClassifier $classifier,
         private InferenceRouter $router,
         private ModelConfigService $modelConfigService,
+        private BraveSearchService $braveSearchService,
         private LoggerInterface $logger
     ) {}
 
@@ -55,21 +60,46 @@ class MessageProcessor
                 $this->notify($statusCallback, 'preprocessing', 'File processed and text extracted');
             }
 
-            // Step 2: Classification (Sorting)
-            // Get sorting model info to display during classification
-            $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+            // Check if this is "Again" functionality (model explicitly specified)
+            // If so, skip classification to save time and API calls
+            $isAgainRequest = isset($options['model_id']) && $options['model_id'];
+
+            // Step 2: Classification (Sorting) - skip if "Again"
+            $sortingModelId = null;
             $sortingProvider = null;
             $sortingModelName = null;
-            if ($sortingModelId) {
-                $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
-            }
+            $conversationHistory = [];
             
-            $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                'model_id' => $sortingModelId,
-                'provider' => $sortingProvider,
-                'model_name' => $sortingModelName
-            ]);
+            if ($isAgainRequest) {
+                // Skip classification for "Again" - use specified model directly
+                $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
+                    'specified_model_id' => $options['model_id']
+                ]);
+                
+                $this->notify($statusCallback, 'classified', 'Using previously selected model (skipped classification)');
+                
+                // Minimal classification with specified model
+                $classification = [
+                    'topic' => 'chat',
+                    'language' => 'en',
+                    'source' => 'chat',
+                    'model_id' => $options['model_id'] // This goes to ChatHandler
+                ];
+            } else {
+                // Normal flow: Run classification
+                // Get sorting model info to display during classification
+                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+                if ($sortingModelId) {
+                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
+                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
+                }
+                
+                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
+                    'model_id' => $sortingModelId,
+                    'provider' => $sortingProvider,
+                    'model_name' => $sortingModelName
+                ]);
+            }
             
             // Get conversation history for context - STREAMING VERSION
             // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
@@ -97,30 +127,101 @@ class MessageProcessor
                 ]);
             }
 
-            $classification = $this->classifier->classify($message, $conversationHistory);
-            
-            // Override model_id if explicitly provided (e.g., from "Again" functionality)
-            if (isset($options['model_id']) && $options['model_id']) {
-                $classification['model_id'] = $options['model_id'];
-                $this->logger->info('MessageProcessor: Overriding classification model with user selection', [
-                    'original_model_id' => $classification['model_id'] ?? null,
-                    'new_model_id' => $options['model_id']
+            if (!$isAgainRequest) {
+                // Run classification
+                $classification = $this->classifier->classify($message, $conversationHistory);
+                
+                // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler!)
+                $sortingModelId = $classification['model_id'] ?? null;
+                $sortingProvider = $classification['provider'] ?? null;
+                $sortingModelName = $classification['model_name'] ?? null;
+                
+                // Remove sorting model info from classification
+                unset($classification['model_id']);
+                unset($classification['provider']);
+                unset($classification['model_name']);
+                
+                $this->notify($statusCallback, 'classified', sprintf(
+                    'Topic: %s, Language: %s, Source: %s',
+                    $classification['topic'],
+                    $classification['language'],
+                    $classification['source']
+                ), [
+                    'topic' => $classification['topic'],
+                    'language' => $classification['language'],
+                    'source' => $classification['source'],
+                    'sorting_model_id' => $sortingModelId,
+                    'sorting_provider' => $sortingProvider,
+                    'sorting_model_name' => $sortingModelName
                 ]);
             }
+
+            // Step 2.5: Web Search (if requested or classified)
+            $searchResults = null;
+            $shouldSearch = $options['web_search'] ?? false;
             
-            $this->notify($statusCallback, 'classified', sprintf(
-                'Topic: %s, Language: %s, Source: %s',
-                $classification['topic'],
-                $classification['language'],
-                $classification['source']
-            ), [
-                'topic' => $classification['topic'],
-                'language' => $classification['language'],
-                'source' => $classification['source'],
-                'model_id' => $classification['model_id'] ?? null,
-                'provider' => $classification['provider'] ?? null,
-                'model_name' => $classification['model_name'] ?? null
-            ]);
+            // Also check if classifier detected search intent
+            if (!$shouldSearch && isset($classification['source'])) {
+                $source = $classification['source'];
+                $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
+            }
+            
+            if ($shouldSearch && $this->braveSearchService->isEnabled()) {
+                $this->notify($statusCallback, 'searching', 'Searching the web...');
+                
+                try {
+                    // Extract search query from message content
+                    $searchQuery = $this->extractSearchQuery($message->getText());
+                    
+                    // Get language from classification (e.g., "de", "en", "fr")
+                    // Use it directly as both search_lang and country (ISO 639-1 codes)
+                    $language = $classification['language'] ?? 'en';
+                    
+                    // Use language code as country code (most languages match their country code)
+                    // Brave Search will handle it gracefully and fall back if needed
+                    $country = strtolower($language);
+                    
+                    $this->logger->info('🔍 Performing web search', [
+                        'query' => $searchQuery,
+                        'language' => $language,
+                        'country' => $country,
+                        'message_id' => $message->getId()
+                    ]);
+                    
+                    // Pass language and country to search service
+                    $searchResults = $this->braveSearchService->search($searchQuery, [
+                        'country' => $country,
+                        'search_lang' => $language
+                    ]);
+                    
+                    // Save search results to database
+                    if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
+                        $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
+                        
+                        $this->notify($statusCallback, 'search_complete', sprintf(
+                            'Found %d web results',
+                            count($searchResults['results'])
+                        ), [
+                            'results_count' => count($searchResults['results'])
+                        ]);
+                    } else {
+                        $this->logger->warning('No search results found or repository not available', [
+                            'query' => $searchQuery,
+                            'has_repository' => $this->searchResultRepository !== null
+                        ]);
+                        $searchResults = null; // Reset to null if no results
+                    }
+                    
+                } catch (\Exception $e) {
+                    $this->logger->error('Web search failed', [
+                        'error' => $e->getMessage(),
+                        'message_id' => $message->getId()
+                    ]);
+                    
+                    // Continue processing even if search fails
+                    $this->notify($statusCallback, 'search_failed', 'Web search failed, continuing without results');
+                }
+            }
 
             // Step 3: Inference (AI Response) mit STREAMING
             // Get chat model info to display during generation
@@ -139,7 +240,17 @@ class MessageProcessor
             ]);
             
             // Use routeStream instead of route, pass options through
+            // Include search results if available
+            if ($searchResults) {
+                $options['search_results'] = $searchResults;
+            }
+            
             $response = $this->router->routeStream($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
+            
+            // Re-add sorting model info to result (for StreamController to save)
+            $classification['sorting_model_id'] = $sortingModelId;
+            $classification['sorting_provider'] = $sortingProvider;
+            $classification['sorting_model_name'] = $sortingModelName;
             
             // Note: content is streamed, not returned
             return [
@@ -147,6 +258,7 @@ class MessageProcessor
                 'classification' => $classification,
                 'response' => $response,
                 'preprocessed' => $preprocessed,
+                'search_results' => $searchResults, // Include search results in return
             ];
         } catch (\App\AI\Exception\ProviderException $e) {
             // Handle ProviderException specially to preserve context (install instructions, etc.)
@@ -360,6 +472,27 @@ class MessageProcessor
             'message' => $message,
             'metadata' => $metadata
         ]);
+    }
+
+    /**
+     * Extract search query from message text
+     * Removes command prefixes like /search or /web if present
+     * Removes surrounding quotes if present
+     */
+    private function extractSearchQuery(string $text): string
+    {
+        // Remove common search command prefixes
+        $text = preg_replace('/^\/(search|web|google|find)\s+/i', '', $text);
+        
+        // Trim whitespace
+        $text = trim($text);
+        
+        // Remove surrounding quotes (single or double)
+        if (preg_match('/^(["\'])(.+)\1$/', $text, $matches)) {
+            $text = $matches[2];
+        }
+        
+        return $text;
     }
 }
 

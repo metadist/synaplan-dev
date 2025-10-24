@@ -19,6 +19,13 @@
         <env name="SYMFONY_DEPRECATIONS_HELPER" value="weak" />
         <env name="MAILER_DSN" value="null://null" />
         <env name="AI_DEFAULT_PROVIDER" value="test" />
+        <!-- Brave Search API (defaults for testing) -->
+        <env name="BRAVE_SEARCH_API_KEY" value="" />
+        <env name="BRAVE_SEARCH_API_URL" value="https://api.search.brave.com/res/v1" />
+        <env name="BRAVE_SEARCH_ENABLED" value="false" />
+        <env name="BRAVE_SEARCH_COUNT" value="10" />
+        <env name="BRAVE_SEARCH_COUNTRY" value="us" />
+        <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />
     </php>
 
     <testsuites>

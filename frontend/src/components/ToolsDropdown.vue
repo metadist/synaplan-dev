@@ -13,7 +13,7 @@
     </button>
     <div
       v-if="isOpen"
-      class="dropdown-up left-0 sm:left-auto max-h-[60vh] overflow-y-auto scroll-thin"
+      class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin"
       @keydown.escape="closeDropdown"
     >
       <!-- Web Search Tool -->
@@ -21,7 +21,8 @@
         ref="itemRefs"
         :class="[
           'dropdown-item',
-          isToolActive('web-search') && 'dropdown-item--active'
+          isToolActive('web-search') && 'dropdown-item--active',
+          isToolDisabled('web-search') && 'opacity-60'
         ]"
         @click="selectTool('web-search')"
         @keydown.down.prevent="focusNext"
@@ -30,8 +31,24 @@
       >
         <Icon icon="mdi:web" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium">{{ $t('chatInput.tools.webSearch') }}</div>
-          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.webSearchDesc') }}</div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">{{ $t('chatInput.tools.webSearch') }}</span>
+            <span 
+              v-if="isToolDisabled('web-search')" 
+              class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
+            >
+              Setup Required
+            </span>
+            <span 
+              v-else-if="!isLoadingFeatures" 
+              class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+            >
+              Ready
+            </span>
+          </div>
+          <div class="text-xs txt-secondary">
+            {{ isToolDisabled('web-search') ? getToolMessage('web-search') : $t('chatInput.tools.webSearchDesc') }}
+          </div>
         </div>
       </button>
 
@@ -40,7 +57,8 @@
         ref="itemRefs"
         :class="[
           'dropdown-item',
-          isToolActive('image-gen') && 'dropdown-item--active'
+          isToolActive('image-gen') && 'dropdown-item--active',
+          isToolDisabled('image-gen') && 'opacity-60'
         ]"
         @click="selectTool('image-gen')"
         @keydown.down.prevent="focusNext"
@@ -49,8 +67,24 @@
       >
         <Icon icon="mdi:image" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium">{{ $t('chatInput.tools.imageGen') }}</div>
-          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.imageGenDesc') }}</div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">{{ $t('chatInput.tools.imageGen') }}</span>
+            <span 
+              v-if="isToolDisabled('image-gen')" 
+              class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
+            >
+              Setup Required
+            </span>
+            <span 
+              v-else-if="!isLoadingFeatures" 
+              class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+            >
+              Ready
+            </span>
+          </div>
+          <div class="text-xs txt-secondary">
+            {{ isToolDisabled('image-gen') ? getToolMessage('image-gen') : $t('chatInput.tools.imageGenDesc') }}
+          </div>
         </div>
       </button>
 
@@ -98,6 +132,8 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { WrenchScrewdriverIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { commandsData as commands, type Command } from '@/stores/commands'
+import { getFeaturesStatus, type Feature } from '@/services/featuresService'
+import { useRouter } from 'vue-router'
 
 interface Tool {
   id: string
@@ -116,8 +152,11 @@ const emit = defineEmits<{
   remove: [toolId: string]
 }>()
 
+const router = useRouter()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
+const featuresStatus = ref<Record<string, Feature>>({})
+const isLoadingFeatures = ref(true)
 
 // Filter commands to show only the most useful ones for the tools menu
 const availableCommands = computed(() => {
@@ -131,8 +170,33 @@ const isToolActive = (toolId: string): boolean => {
   return props.activeTools?.some(t => t.id === toolId) ?? false
 }
 
+const isToolDisabled = (toolId: string): boolean => {
+  const feature = featuresStatus.value[toolId]
+  return feature ? !feature.enabled : false
+}
+
+const getToolMessage = (toolId: string): string => {
+  const feature = featuresStatus.value[toolId]
+  return feature?.message || ''
+}
+
+const loadFeaturesStatus = async () => {
+  try {
+    isLoadingFeatures.value = true
+    const status = await getFeaturesStatus()
+    featuresStatus.value = status.features
+  } catch (error) {
+    console.error('Failed to load features status:', error)
+  } finally {
+    isLoadingFeatures.value = false
+  }
+}
+
 const toggleOpen = () => {
   isOpen.value = !isOpen.value
+  if (isOpen.value && Object.keys(featuresStatus.value).length === 0) {
+    loadFeaturesStatus()
+  }
 }
 
 const closeDropdown = () => {
@@ -140,8 +204,23 @@ const closeDropdown = () => {
 }
 
 const selectTool = (toolId: string) => {
+  const feature = featuresStatus.value[toolId]
+  
+  // If feature is disabled, navigate to setup instructions instead
+  if (feature && !feature.enabled && feature.setup_required) {
+    router.push({ 
+      path: '/settings', 
+      query: { tab: 'features', feature: toolId } 
+    })
+    closeDropdown()
+    return
+  }
+  
+  // Emit select event (toggle tool on/off)
   emit('select', toolId)
-  closeDropdown()
+  
+  // Don't close dropdown - allow multi-select
+  // closeDropdown()
 }
 
 const selectCommand = (cmd: Command) => {

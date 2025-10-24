@@ -1,5 +1,3 @@
-parameters:
-
 services:
     _defaults:
         autowire: true
@@ -53,6 +51,16 @@ services:
             $whisperModelsPath: '%env(WHISPER_MODELS_PATH)%'
             $defaultModel: '%env(WHISPER_DEFAULT_MODEL)%'
             $ffmpegBinary: '%env(FFMPEG_BINARY)%'
+
+    # Brave Search API Service
+    App\Service\Search\BraveSearchService:
+        arguments:
+            $braveSearchApiKey: '%env(BRAVE_SEARCH_API_KEY)%'
+            $braveSearchApiUrl: '%env(BRAVE_SEARCH_API_URL)%'
+            $braveSearchEnabled: '%env(bool:BRAVE_SEARCH_ENABLED)%'
+            $braveSearchCount: '%env(int:BRAVE_SEARCH_COUNT)%'
+            $braveSearchCountry: '%env(BRAVE_SEARCH_COUNTRY)%'
+            $braveSearchLang: '%env(BRAVE_SEARCH_SEARCH_LANG)%'
 
     # WhatsApp Business API Service
     App\Service\WhatsAppService:

@@ -184,7 +184,7 @@ class StreamController extends AbstractController
                 
                 $processingOptions = [
                     'reasoning' => $includeReasoning,
-                    'webSearch' => $webSearch,
+                    'web_search' => $webSearch, // Use snake_case for consistency with backend
                 ];
                 
                 // Add model_id if specified (for "Again" functionality)
@@ -387,11 +387,71 @@ class StreamController extends AbstractController
                 $this->em->persist($outgoingMessage);
                 $this->em->flush(); // Flush to get message ID for metadata
                 
-                // Store detailed provider and model information in MessageMeta
-                $outgoingMessage->setMeta('ai_provider', $response['metadata']['provider'] ?? 'unknown');
-                $outgoingMessage->setMeta('ai_model', $response['metadata']['model'] ?? 'unknown');
+                // DEBUG: Log what we're about to save
+                error_log('🔍 CHAT MODEL: ' . ($response['metadata']['provider'] ?? 'unknown') . ' / ' . ($response['metadata']['model'] ?? 'unknown'));
+                error_log('🔍 SORTING MODEL: ' . ($classification['sorting_provider'] ?? 'null') . ' / ' . ($classification['sorting_model_name'] ?? 'null') . ' (ID: ' . ($classification['sorting_model_id'] ?? 'null') . ')');
+                
+                $this->logger->info('🔍 StreamController: Saving model metadata', [
+                    'chat_provider' => $response['metadata']['provider'] ?? 'unknown',
+                    'chat_model' => $response['metadata']['model'] ?? 'unknown',
+                    'sorting_provider' => $classification['sorting_provider'] ?? null,
+                    'sorting_model' => $classification['sorting_model_name'] ?? null,
+                    'sorting_model_id' => $classification['sorting_model_id'] ?? null
+                ]);
+                
+                // Store CHAT model information in MessageMeta
+                $outgoingMessage->setMeta('ai_chat_provider', $response['metadata']['provider'] ?? 'unknown');
+                $outgoingMessage->setMeta('ai_chat_model', $response['metadata']['model'] ?? 'unknown');
+                
+                // Store CHAT model_id if available (from user selection or resolved by ChatHandler)
+                if (!empty($modelId)) {
+                    $outgoingMessage->setMeta('ai_chat_model_id', (string)$modelId);
+                    $this->logger->info('StreamController: Storing chat model ID from user selection', [
+                        'model_id' => $modelId
+                    ]);
+                } elseif (!empty($response['metadata']['model_id'])) {
+                    $outgoingMessage->setMeta('ai_chat_model_id', (string)$response['metadata']['model_id']);
+                    $this->logger->info('StreamController: Storing chat model ID from response', [
+                        'model_id' => $response['metadata']['model_id']
+                    ]);
+                }
+                
                 if (!empty($response['metadata']['usage'])) {
-                    $outgoingMessage->setMeta('ai_usage', json_encode($response['metadata']['usage']));
+                    $outgoingMessage->setMeta('ai_chat_usage', json_encode($response['metadata']['usage']));
+                }
+                
+                // Store SORTING model information in MessageMeta (from classification)
+                if (!empty($classification['sorting_provider'])) {
+                    $outgoingMessage->setMeta('ai_sorting_provider', $classification['sorting_provider']);
+                }
+                if (!empty($classification['sorting_model_name'])) {
+                    $outgoingMessage->setMeta('ai_sorting_model', $classification['sorting_model_name']);
+                }
+                if (!empty($classification['sorting_model_id'])) {
+                    $outgoingMessage->setMeta('ai_sorting_model_id', (string)$classification['sorting_model_id']);
+                }
+                
+                // Store Web Search metadata if web search was used
+                if ($webSearch) {
+                    $incomingMessage->setMeta('web_search_enabled', 'true');
+                    $this->logger->info('StreamController: Web search was enabled for this message');
+                }
+                
+                // Store if search results were found (will be processed below)
+                $hasSearchResults = isset($result['search_results']) && !empty($result['search_results']['results']);
+                if ($hasSearchResults) {
+                    $searchQuery = $result['search_results']['query'] ?? '';
+                    $searchCount = count($result['search_results']['results']);
+                    
+                    $incomingMessage->setMeta('web_search_query', $searchQuery);
+                    $incomingMessage->setMeta('web_search_results_count', (string)$searchCount);
+                    $outgoingMessage->setMeta('web_search_query', $searchQuery);
+                    $outgoingMessage->setMeta('web_search_results_count', (string)$searchCount);
+                    
+                    $this->logger->info('StreamController: Stored search results metadata', [
+                        'query' => $searchQuery,
+                        'results_count' => $searchCount
+                    ]);
                 }
                 
                 // Update incoming message
@@ -403,19 +463,40 @@ class StreamController extends AbstractController
                 
                 $this->em->flush();
 
-                // Get Again data
+                // Get Again data with message ID to determine current model
                 $this->logger->info('StreamController: Getting againData', [
                     'topic' => $classification['topic'],
                     'message_id' => $outgoingMessage->getId()
                 ]);
                 
-                $againData = $this->getAgainData($classification['topic'], null);
+                $againData = $this->getAgainData($classification['topic'], $outgoingMessage->getId());
                 
                 $this->logger->info('StreamController: AgainData retrieved', [
                     'eligible_count' => count($againData['eligible'] ?? []),
                     'has_predicted' => isset($againData['predictedNext']),
+                    'current_model_id' => $againData['current_model_id'] ?? null,
                     'tag' => $againData['tag'] ?? null
                 ]);
+
+                // Get search results if available
+                $searchResults = null;
+                if (isset($result['search_results']) && !empty($result['search_results']['results'])) {
+                    $searchResults = array_map(function($result) {
+                        return [
+                            'title' => $result['title'] ?? '',
+                            'url' => $result['url'] ?? '',
+                            'description' => $result['description'] ?? '',
+                            'published' => $result['age'] ?? null,
+                            'source' => $result['profile']['name'] ?? null,
+                            'thumbnail' => $result['thumbnail'] ?? null,
+                        ];
+                    }, $result['search_results']['results']);
+                    
+                    $this->logger->info('StreamController: Including search results', [
+                        'results_count' => count($searchResults),
+                        'query' => $result['search_results']['query']
+                    ]);
+                }
 
                 // Send complete event
                 $this->sendSSE('complete', [
@@ -426,6 +507,7 @@ class StreamController extends AbstractController
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'again' => $againData,
+                    'searchResults' => $searchResults, // Include search results
                 ]);
                 
                 usleep(100000);
@@ -491,15 +573,29 @@ class StreamController extends AbstractController
         flush();
     }
 
-    private function getAgainData(string $topic, ?int $currentModelId): array
+    private function getAgainData(string $topic, ?int $messageId): array
     {
         $tag = $this->againService->resolveTagFromTopic($topic);
         $eligibleModels = $this->againService->getEligibleModels($tag);
+        
+        // Get current model ID from message metadata
+        $currentModelId = null;
+        if ($messageId) {
+            $message = $this->em->getRepository(Message::class)->find($messageId);
+            if ($message) {
+                $currentModelId = $message->getMeta('ai_chat_model_id');
+                if ($currentModelId) {
+                    $currentModelId = (int)$currentModelId;
+                }
+            }
+        }
+        
         $predictedNext = $this->againService->getPredictedNext($eligibleModels, $currentModelId);
 
         return [
             'eligible' => $eligibleModels,
             'predictedNext' => $predictedNext,
+            'current_model_id' => $currentModelId,
             'tag' => $tag,
         ];
     }

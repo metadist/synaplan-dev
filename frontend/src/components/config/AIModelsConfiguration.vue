@@ -15,7 +15,9 @@
         <div
           v-for="(label, capability) in purposeLabels"
           :key="capability"
-          class="space-y-2"
+          :ref="(el: any) => { if (el) capabilityRefs[capability as Capability] = el as HTMLElement }"
+          class="space-y-2 transition-all duration-300"
+          :class="(highlightedCapability === capability || highlightedCapability === 'ALL') ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5' : ''"
         >
           <label class="flex items-center gap-2 text-sm font-semibold txt-primary">
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
@@ -176,7 +178,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   CpuChipIcon,
   CheckIcon,
@@ -198,6 +201,7 @@ interface ModelsData {
   [key: string]: ModelInfo[]
 }
 
+const route = useRoute()
 const purposeLabels: Record<Capability, string> = {
   SORT: 'Message Sorting',
   CHAT: 'Chat / General AI',
@@ -224,15 +228,114 @@ const defaultConfig = ref<Record<Capability, number | null>>({
 })
 const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig.value })
 const selectedPurpose = ref<Capability | null>(null)
+const highlightedCapability = ref<Capability | 'ALL' | null>(null)
+const capabilityRefs = ref<Record<Capability, HTMLElement | null>>({} as Record<Capability, HTMLElement | null>)
 
 const { success, error: showError, warning, info } = useNotification()
 
 // Check if we're in development mode
 const isDev = import.meta.env.DEV
 
+// Map URL parameter to actual capability name
+const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
+  // Direct match
+  if (highlight === 'ALL') return 'ALL'
+  if (highlight in purposeLabels) return highlight as Capability
+  
+  // Alias mapping (URL-friendly names to actual capability names)
+  const aliasMap: Record<string, Capability> = {
+    'SORTING': 'SORT',
+    'CHAT': 'CHAT',
+    'EMBEDDING': 'VECTORIZE',
+    'VECTORIZATION': 'VECTORIZE',
+    'VISION': 'PIC2TEXT',
+    'IMAGE': 'TEXT2PIC',
+    'TRANSCRIPTION': 'SOUND2TEXT',
+    'TTS': 'TEXT2SOUND',
+    'VOICE': 'TEXT2SOUND',
+    'ANALYSIS': 'ANALYZE'
+  }
+  
+  return aliasMap[highlight] || null
+}
+
 onMounted(async () => {
   await loadData()
+  
+  // Check for highlight query parameter
+  const highlightParam = route.query.highlight as string | undefined
+  if (!highlightParam) return
+  
+  const highlight = normalizeHighlight(highlightParam)
+  if (!highlight) return
+  
+  if (highlight === 'ALL') {
+    // Highlight all model dropdowns
+    highlightedCapability.value = 'ALL'
+    
+    // Scroll to the top of the config section
+    await nextTick()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    
+    // Remove highlight after 4 seconds (longer for multiple items)
+    setTimeout(() => {
+      highlightedCapability.value = null
+    }, 4000)
+  } else {
+    // Highlight specific capability
+    selectedPurpose.value = highlight
+    highlightedCapability.value = highlight
+    
+    // Wait for DOM update and scroll to the highlighted field
+    await nextTick()
+    scrollToCapability(highlight)
+  }
 })
+
+// Watch for route changes to handle highlight parameter
+watch(() => route.query.highlight, async (newHighlightParam: string | string[] | undefined) => {
+  if (!newHighlightParam || typeof newHighlightParam !== 'string') return
+  
+  const newHighlight = normalizeHighlight(newHighlightParam)
+  if (!newHighlight) return
+  
+  if (newHighlight === 'ALL') {
+    // Highlight all model dropdowns
+    highlightedCapability.value = 'ALL'
+    
+    await nextTick()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    
+    setTimeout(() => {
+      highlightedCapability.value = null
+    }, 4000)
+  } else {
+    // Highlight specific capability
+    selectedPurpose.value = newHighlight
+    highlightedCapability.value = newHighlight
+    
+    await nextTick()
+    scrollToCapability(newHighlight)
+  }
+})
+
+const scrollToCapability = (capability: Capability) => {
+  // Use ref to find the container element
+  const element = capabilityRefs.value[capability]
+  
+  if (element) {
+    // Scroll to the container element
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    
+    // Set highlighted state (will trigger visual highlight via :class)
+    highlightedCapability.value = capability
+    
+    // Remove highlight after 3 seconds
+    setTimeout(() => {
+      highlightedCapability.value = null
+    }, 3000)
+  }
+}
 
 const loadData = async () => {
   loading.value = true
