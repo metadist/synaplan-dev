@@ -6,6 +6,7 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
+use App\Repository\SearchResultRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -23,6 +24,7 @@ class ChatController extends AbstractController
         private EntityManagerInterface $em,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
+        private SearchResultRepository $searchResultRepository,
         private LoggerInterface $logger
     ) {}
 
@@ -458,6 +460,83 @@ class ChatController extends AbstractController
                 }
             }
             
+            // Get AI model metadata for assistant messages
+            $aiModels = [];
+            $webSearchData = null;
+            $searchResultsData = [];
+            
+            if ($m->getDirection() === 'OUT') {
+                // Chat model (used for generating the response)
+                $chatProvider = $m->getMeta('ai_chat_provider');
+                $chatModel = $m->getMeta('ai_chat_model');
+                if ($chatProvider || $chatModel) {
+                    $aiModels['chat'] = [
+                        'provider' => $chatProvider,
+                        'model' => $chatModel,
+                        'model_id' => null, // Chat model ID is not stored (selected from config)
+                    ];
+                }
+                
+                // Sorting model (used for classification/routing)
+                $sortingProvider = $m->getMeta('ai_sorting_provider');
+                $sortingModel = $m->getMeta('ai_sorting_model');
+                $sortingModelId = $m->getMeta('ai_sorting_model_id');
+                if ($sortingProvider || $sortingModel) {
+                    $aiModels['sorting'] = [
+                        'provider' => $sortingProvider,
+                        'model' => $sortingModel,
+                        'model_id' => $sortingModelId ? (int)$sortingModelId : null,
+                    ];
+                }
+                
+                // Web Search metadata
+                $searchQuery = $m->getMeta('web_search_query');
+                $searchResultsCount = $m->getMeta('web_search_results_count');
+                if ($searchQuery || $searchResultsCount) {
+                    $webSearchData = [
+                        'query' => $searchQuery,
+                        'resultsCount' => $searchResultsCount ? (int)$searchResultsCount : 0
+                    ];
+                    
+                    // Load actual search results from DB
+                    // Search results are stored on the INCOMING (user) message, but we need to display them
+                    // on the OUTGOING (AI) message. So we need to find the previous incoming message.
+                    $incomingMessage = $this->messageRepository->createQueryBuilder('prev')
+                        ->where('prev.chatId = :chatId')
+                        ->andWhere('prev.direction = :direction')
+                        ->andWhere('prev.unixTimestamp < :timestamp')
+                        ->setParameter('chatId', $m->getChatId())
+                        ->setParameter('direction', 'IN')
+                        ->setParameter('timestamp', $m->getUnixTimestamp())
+                        ->orderBy('prev.unixTimestamp', 'DESC')
+                        ->setMaxResults(1)
+                        ->getQuery()
+                        ->getOneOrNullResult();
+                    
+                    if ($incomingMessage) {
+                        $searchResults = $this->searchResultRepository->findByMessage($incomingMessage);
+                        foreach ($searchResults as $sr) {
+                            $searchResultsData[] = [
+                                'title' => $sr->getTitle(),
+                                'url' => $sr->getUrl(),
+                                'description' => $sr->getDescription(),
+                                'published' => $sr->getPublished(),
+                                'source' => $sr->getSource(),
+                                'thumbnail' => $sr->getThumbnail(),
+                            ];
+                        }
+                    }
+                }
+            } else if ($m->getDirection() === 'IN') {
+                // Check if web search was enabled for incoming message
+                $webSearchEnabled = $m->getMeta('web_search_enabled');
+                if ($webSearchEnabled === 'true') {
+                    $webSearchData = [
+                        'enabled' => true
+                    ];
+                }
+            }
+            
             return [
                 'id' => $m->getId(),
                 'text' => $m->getText(),
@@ -467,7 +546,10 @@ class ChatController extends AbstractController
                 'topic' => $m->getTopic(),
                 'language' => $m->getLanguage(),
                 'createdAt' => $m->getDateTime(),
-                'files' => $filesData, // NEW: attached files
+                'files' => $filesData, // Attached files
+                'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
+                'webSearch' => $webSearchData, // Web search metadata
+                'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
             ];
         }, $messages);
 

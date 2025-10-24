@@ -153,7 +153,6 @@
 
       <!-- Main controls - always visible below input -->
       <div class="mt-3 flex items-center gap-2">
-        <ModelSelect class="flex-shrink-0" />
         <ToolsDropdown 
           :active-tools="activeTools" 
           @select="toggleTool" 
@@ -200,10 +199,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { PaperAirplaneIcon, XMarkIcon, SparklesIcon, MicrophoneIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import Textarea from './Textarea.vue'
-import ModelSelect from './ModelSelect.vue'
 import CommandPalette from './CommandPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
 import FileSelectionModal from './FileSelectionModal.vue'

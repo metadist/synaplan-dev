@@ -93,7 +93,13 @@
                 class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 active-class="txt-primary font-medium bg-black/5 dark:bg-white/5"
               >
-                {{ child.label }}
+                <span class="flex-1">{{ child.label }}</span>
+                <span 
+                  v-if="child.badge"
+                  class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
+                >
+                  {{ child.badge }}
+                </span>
               </router-link>
             </div>
           </div>
@@ -122,6 +128,7 @@ import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
 import { useAppModeStore } from '../stores/appMode'
 import { useTheme } from '../composables/useTheme'
+import { getFeaturesStatus } from '../services/featuresService'
 import SidebarChatList from './SidebarChatList.vue'
 import UserMenu from './UserMenu.vue'
 
@@ -131,6 +138,44 @@ const appModeStore = useAppModeStore()
 const { theme } = useTheme()
 const route = useRoute()
 const expandedMenus = ref<string[]>([])
+
+// Feature Status
+const disabledFeaturesCount = ref(0)
+const hasDisabledFeatures = computed(() => disabledFeaturesCount.value > 0)
+
+// Load feature status (only in development)
+const loadFeatureStatus = async () => {
+  try {
+    // Only load in development mode
+    const isDevelopment = import.meta.env.DEV
+    if (!isDevelopment) {
+      return
+    }
+    
+    // Only load if user is authenticated
+    if (!authStore.user || !authStore.isAuthenticated) {
+      return
+    }
+    
+    const status = await getFeaturesStatus()
+    // Check if status and features exist
+    if (status && status.features) {
+      disabledFeaturesCount.value = Object.values(status.features).filter(f => !f.enabled).length
+    } else {
+      disabledFeaturesCount.value = 0
+    }
+  } catch (error) {
+    console.error('Failed to load feature status:', error)
+    // Silent fail - feature status is optional
+    disabledFeaturesCount.value = 0
+  }
+}
+
+// Load on mount
+onMounted(() => {
+  loadFeatureStatus()
+  findParentMenu(route.path)
+})
 
 const isDark = computed(() => {
   if (theme.value === 'dark') return true
@@ -147,16 +192,28 @@ const navItems = computed(() => {
 
   // Tools: nur in Advanced Mode
   if (appModeStore.isAdvancedMode) {
+    const toolsChildren = [
+      { path: '/tools/introduction', label: 'Introduction' },
+      { path: '/tools/chat-widget', label: 'Chat Widget' },
+      { path: '/tools/doc-summary', label: 'Doc Summary' },
+      { path: '/tools/mail-handler', label: 'Mail Handler' },
+    ]
+    
+    // Feature Status: nur in Development Mode
+    const isDevelopment = import.meta.env.DEV
+    if (isDevelopment) {
+      toolsChildren.push({
+        path: '/settings?tab=features', 
+        label: 'Feature Status',
+        badge: disabledFeaturesCount.value > 0 ? disabledFeaturesCount.value : undefined
+      })
+    }
+    
     items.push({ 
       path: '/tools', 
       label: 'Tools', 
       icon: WrenchScrewdriverIcon,
-      children: [
-        { path: '/tools/introduction', label: 'Introduction' },
-        { path: '/tools/chat-widget', label: 'Chat Widget' },
-        { path: '/tools/doc-summary', label: 'Doc Summary' },
-        { path: '/tools/mail-handler', label: 'Mail Handler' },
-      ]
+      children: toolsChildren
     })
   }
 
@@ -207,11 +264,6 @@ const findParentMenu = (currentPath: string) => {
     }
   }
 }
-
-// Beim Mounten die aktuelle Route prüfen und das entsprechende Menü öffnen
-onMounted(() => {
-  findParentMenu(route.path)
-})
 
 // Bei Routenänderungen das entsprechende Menü öffnen
 watch(() => route.path, (newPath) => {

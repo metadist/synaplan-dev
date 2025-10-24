@@ -50,15 +50,19 @@ class MessageAgainController extends AbstractController
         $topic = $message->getTopic();
         $capability = $this->mapTopicToCapability($topic);
 
-        // Get all active models with this capability
+        // Get all active models with this capability, sorted by quality and rating (DESC)
         $models = $this->modelRepository->createQueryBuilder('m')
             ->where('m.active = 1')
             ->andWhere('m.tag = :capability')
             ->setParameter('capability', $capability)
-            ->orderBy('m.quality', 'DESC')
-            ->addOrderBy('m.rating', 'DESC')
+            ->orderBy('m.quality', 'DESC')  // Higher quality first
+            ->addOrderBy('m.rating', 'DESC') // Then higher rating
+            ->addOrderBy('m.name', 'ASC')    // Finally alphabetically for consistency
             ->getQuery()
             ->getResult();
+
+        // Get current model ID to exclude it from the list
+        $currentModelId = $this->getCurrentModelId($message);
 
         // Format models for frontend
         $eligibleModels = [];
@@ -76,8 +80,7 @@ class MessageAgainController extends AbstractController
             ];
         }
 
-        // Predicted next: highest ranked model that's different from current
-        $currentModelId = $this->getCurrentModelId($message);
+        // Predicted next: highest ranked model that's DIFFERENT from current (Round-Robin)
         $predictedNext = null;
         
         foreach ($eligibleModels as $model) {
@@ -87,7 +90,7 @@ class MessageAgainController extends AbstractController
             }
         }
 
-        // If no different model, use first
+        // If no different model found (e.g., only one model available), use first
         if (!$predictedNext && count($eligibleModels) > 0) {
             $predictedNext = $eligibleModels[0];
         }
@@ -124,9 +127,14 @@ class MessageAgainController extends AbstractController
 
     private function getCurrentModelId($message): ?int
     {
-        // Try to get from message metadata (if stored)
-        // For now, return null as we don't have this info stored yet
-        // TODO: Store used model_id in BMESSAGEMETA
+        // Try to get from message metadata (newly stored)
+        $modelId = $message->getMeta('ai_chat_model_id');
+        
+        if ($modelId) {
+            return (int)$modelId;
+        }
+        
+        // Fallback: null if not stored
         return null;
     }
 }

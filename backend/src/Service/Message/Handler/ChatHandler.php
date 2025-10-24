@@ -142,7 +142,9 @@ class ChatHandler implements MessageHandlerInterface
 
         return [
             'content' => $content,
-            'metadata' => $metadata,
+            'metadata' => array_merge($metadata, [
+                'model_id' => $modelId // Include resolved model_id for storage
+            ]),
         ];
     }
 
@@ -163,7 +165,7 @@ class ChatHandler implements MessageHandlerInterface
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
 
         // Conversation History bauen (TEXT only for streaming)
-        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message);
+        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
 
         // Get model - Priority: User-selected (Again) > Classification override > DB default
         $modelId = null;
@@ -200,6 +202,8 @@ class ChatHandler implements MessageHandlerInterface
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
             
+            error_log('🟢 ChatHandler RESOLVED CHAT MODEL: ' . $provider . ' / ' . $modelName . ' (ID: ' . $modelId . ')');
+            
             $this->logger->info('ChatHandler: Resolved model for streaming', [
                 'model_id' => $modelId,
                 'provider' => $provider,
@@ -235,6 +239,7 @@ class ChatHandler implements MessageHandlerInterface
             'metadata' => [
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
+                'model_id' => $modelId, // Include resolved model_id for storage
                 'tokens' => $metadata['usage'] ?? [],
             ],
         ];
@@ -270,7 +275,7 @@ class ChatHandler implements MessageHandlerInterface
      * Build messages for streaming (TEXT only, no JSON)
      * Like old system: topicPrompt with $stream = true
      */
-    private function buildStreamingMessages(string $systemPrompt, array $thread, Message $currentMessage): array
+    private function buildStreamingMessages(string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
     {
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt]
@@ -335,6 +340,17 @@ class ChatHandler implements MessageHandlerInterface
             $this->logger->warning('⚠️ ChatHandler: No file text found!', [
                 'message_id' => $currentMessage->getId(),
                 'file_flag' => $currentMessage->getFile()
+            ]);
+        }
+
+        // Add web search results if available
+        if (isset($options['search_results']) && !empty($options['search_results']['results'])) {
+            $searchContext = $this->formatSearchResultsForPrompt($options['search_results']);
+            $content .= "\n\n" . $searchContext;
+            
+            $this->logger->info('✅ ChatHandler: Web search results added to prompt', [
+                'results_count' => count($options['search_results']['results']),
+                'query' => $options['search_results']['query']
             ]);
         }
 
@@ -421,6 +437,48 @@ class ChatHandler implements MessageHandlerInterface
         }
         
         return 'file';
+    }
+
+    /**
+     * Format web search results for AI prompt
+     */
+    private function formatSearchResultsForPrompt(array $searchResults): string
+    {
+        if (empty($searchResults['results'])) {
+            return '';
+        }
+
+        $formatted = "\n\n---\n\n\n";
+        $formatted .= "🌐 Web Search Results (Query: \"{$searchResults['query']}\")\n\n";
+        $formatted .= "I found the following information from recent web searches:\n\n";
+
+        foreach ($searchResults['results'] as $index => $result) {
+            $num = $index + 1;
+            $formatted .= "[{$num}] **{$result['title']}**\n";
+            $formatted .= "Source: {$result['url']}\n";
+            
+            if (!empty($result['description'])) {
+                $formatted .= "Summary: {$result['description']}\n";
+            }
+            
+            if (!empty($result['age'])) {
+                $formatted .= "Published: {$result['age']}\n";
+            }
+
+            // Add extra snippets for more context
+            if (!empty($result['extra_snippets'])) {
+                $formatted .= "Additional context:\n";
+                foreach (array_slice($result['extra_snippets'], 0, 2) as $snippet) {
+                    $formatted .= "  • " . strip_tags($snippet) . "\n";
+                }
+            }
+            
+            $formatted .= "\n";
+        }
+
+        $formatted .= "\nPlease use this information to answer the user's question. Cite sources using [1], [2], etc. when referencing specific information.\n\n";
+
+        return $formatted;
     }
 }
 

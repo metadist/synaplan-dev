@@ -5,7 +5,7 @@
       v-if="role === 'assistant'"
       class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 surface-card"
     >
-      <Icon :icon="getProviderIcon(provider || 'OpenAI')" class="w-6 h-6" />
+      <Icon :icon="getProviderIcon(displayProvider)" class="w-6 h-6" />
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
@@ -85,25 +85,190 @@
       
         <!-- Bubble content (only non-thinking parts) -->
         <div class="px-4 py-3 overflow-hidden space-y-3">
-          <!-- Attached Files (NEW) -->
-          <div v-if="files && files.length > 0" class="flex flex-wrap gap-2 mb-3">
-            <div
-              v-for="file in files"
-              :key="file.id"
-              class="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors cursor-pointer text-sm"
-              @click="downloadFile(file)"
-            >
-              <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
-              <span class="font-medium truncate max-w-[200px]">{{ file.filename }}</span>
-              <span v-if="file.fileSize" class="text-xs opacity-60">{{ formatFileSize(file.fileSize) }}</span>
+          <!-- Combined Badges: Files + Web Search (NEW) -->
+          <div v-if="(files && files.length > 0) || webSearch" class="space-y-2">
+            <!-- Show badges with smart collapsing -->
+            <div class="flex flex-wrap gap-2">
+              <!-- Files (show based on collapse state) -->
+              <template v-if="files && files.length > 0">
+                <div
+                  v-for="file in showAllBadges ? files : files.slice(0, totalBadgesCount > 3 ? 2 : files.length)"
+                  :key="file.id"
+                  class="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors cursor-pointer text-sm"
+                  @click="downloadFile(file)"
+                >
+                  <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
+                  <span class="font-medium truncate max-w-[200px]">{{ file.filename }}</span>
+                  <span v-if="file.fileSize" class="text-xs opacity-60">{{ formatFileSize(file.fileSize) }}</span>
+                </div>
+              </template>
+
+              <!-- Web Search Badge -->
+              <div v-if="webSearch" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm">
+                <Icon icon="mdi:web" class="w-4 h-4 flex-shrink-0" />
+                <span class="font-medium">Web Search</span>
+                <span v-if="webSearch.query && showAllBadges" class="text-xs opacity-80 hidden sm:inline truncate max-w-[150px]">· {{ webSearch.query }}</span>
+                <span v-if="webSearch.resultsCount" class="text-xs opacity-80 font-semibold">
+                  · {{ webSearch.resultsCount }}
+                </span>
+              </div>
+
+              <!-- Show More/Less Button -->
+              <button
+                v-if="totalBadgesCount > 3"
+                @click="showAllBadges = !showAllBadges"
+                class="flex items-center gap-1 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
+              >
+                <span v-if="!showAllBadges">+{{ totalBadgesCount - (webSearch ? 3 : 2) }}</span>
+                <Icon :icon="showAllBadges ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="w-4 h-4" />
+              </button>
             </div>
           </div>
           
+          <!-- Message Content -->
           <MessagePart
             v-for="(part, index) in contentParts"
             :key="index"
             :part="part"
           />
+
+          <!-- Web Search Results Carousel (AFTER content) -->
+          <div v-if="searchResults && searchResults.length > 0 && role === 'assistant'" class="mt-4 pt-3 border-t border-light-border/20 dark:border-dark-border/20 space-y-3">
+            <!-- Header with Expand/Collapse Button -->
+            <div class="flex items-center justify-between gap-2">
+              <button
+                @click="sourcesExpanded = !sourcesExpanded"
+                class="flex items-center gap-2 text-sm font-medium txt-tertiary hover:txt-primary transition-colors"
+              >
+                <Icon icon="mdi:web" class="w-4 h-4" />
+                <span class="hidden sm:inline">{{ $t('search.sources') }}</span>
+                <span class="text-xs txt-muted">({{ searchResults.length }})</span>
+                <Icon 
+                  :icon="sourcesExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'" 
+                  class="w-4 h-4 transition-transform"
+                />
+              </button>
+              
+              <!-- Carousel Navigation (only when expanded) -->
+              <div 
+                v-if="sourcesExpanded && ((searchResults.length > 1) || (searchResults.length > 3))" 
+                class="flex items-center gap-1"
+              >
+                <button
+                  @click="previousSource"
+                  :disabled="carouselPage === 0"
+                  class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  :title="'Previous'"
+                >
+                  <Icon icon="mdi:chevron-left" class="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+                <span class="text-xs txt-muted min-w-[2.5rem] sm:min-w-[3rem] text-center">
+                  <span class="hidden sm:inline">{{ carouselPage * 3 + 1 }}-{{ Math.min((carouselPage + 1) * 3, searchResults.length) }} / </span>
+                  <span class="sm:hidden">{{ carouselPage + 1 }} / {{ Math.ceil(searchResults.length / 3) }}</span>
+                  <span class="hidden sm:inline">{{ searchResults.length }}</span>
+                </span>
+                <button
+                  @click="nextSource"
+                  :disabled="carouselPage >= Math.ceil(searchResults.length / 3) - 1"
+                  class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  :title="'Next'"
+                >
+                  <Icon icon="mdi:chevron-right" class="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
+            </div>
+            
+            <!-- Carousel Container (collapsible) -->
+            <div v-show="sourcesExpanded" class="py-2 px-3">
+              <div class="relative overflow-x-hidden">
+                <div 
+                  class="flex gap-2 transition-transform duration-300"
+                  :style="{ 
+                    transform: `translateX(calc(-${carouselPage * 100}%))` 
+                  }"
+                >
+                  <div
+                    v-for="(result, index) in searchResults"
+                    :key="index"
+                    :ref="el => sourceRefs[index] = el"
+                    :class="[
+                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0',
+                      'w-full sm:w-[calc(33.333%-0.5rem)]',
+                      'bg-[var(--bg-chip)] border shadow-sm',
+                      highlightedSource === index
+                        ? '!border-[var(--brand)] border-2 bg-[var(--brand-alpha-light)] shadow-lg'
+                        : 'border-[var(--border-light)]'
+                    ]"
+                    @click="focusSource(index)"
+                  >
+                  <!-- Header: Badge + Source Name + Open Button (Mobile) -->
+                  <div class="flex items-center gap-2">
+                    <!-- Badge Number (clickable) -->
+                    <button
+                      @click.stop="focusSource(index)"
+                      :class="[
+                        'inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold flex-shrink-0 transition-all',
+                        'hover:scale-110 active:scale-95',
+                        highlightedSource === index
+                          ? 'bg-[var(--brand)] text-white shadow-md'
+                          : 'bg-[var(--brand-alpha-light)] text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white'
+                      ]"
+                      :title="`Highlight source ${index + 1}`"
+                    >
+                      {{ index + 1 }}
+                    </button>
+                    
+                    <!-- Source Name -->
+                    <span class="text-xs txt-muted truncate flex-1">{{ result.source }}</span>
+                    
+                    <!-- Open Link Button (visible when highlighted) -->
+                    <button
+                      v-if="highlightedSource === index"
+                      @click.stop="openSource(result.url)"
+                      class="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--brand)] text-white text-xs font-medium hover:opacity-90 transition-opacity"
+                      title="Open link"
+                    >
+                      <Icon icon="mdi:open-in-new" class="w-3.5 h-3.5" />
+                      <span class="hidden sm:inline">Open</span>
+                    </button>
+                  </div>
+                  
+                  <!-- Thumbnail (clickable to open) -->
+                  <div
+                    v-if="result.thumbnail"
+                    @click.stop="openSource(result.url)"
+                    class="w-full aspect-video rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    <img
+                      :src="result.thumbnail"
+                      :alt="result.title"
+                      class="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                  
+                  <!-- Content -->
+                  <div class="flex-1 min-w-0 space-y-1">
+                    <!-- Title (clickable to open) -->
+                    <div
+                      @click.stop="openSource(result.url)"
+                      class="text-sm font-medium line-clamp-2 group-hover:text-[var(--brand)] transition-colors hover:underline cursor-pointer"
+                    >
+                      {{ result.title }}
+                    </div>
+                    
+                    <div v-if="result.description" class="text-xs txt-tertiary line-clamp-2">
+                      {{ result.description }}
+                    </div>
+                    <div v-if="result.published" class="text-xs txt-muted opacity-60">
+                      {{ result.published }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
         </div>
 
       <!-- Footer with separator line and responsive layout -->
@@ -115,32 +280,64 @@
             : 'border-light-border/30 dark:border-dark-border/20'
         ]"
       >
-        <!-- Left: Model info + timestamp -->
-        <div class="flex items-center gap-2 min-w-0">
+        <!-- Left: AI Model Badges + timestamp -->
+        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+          <!-- AI Model Badges (assistant only) -->
+          <template v-if="role === 'assistant' && aiModels">
+            <!-- Chat Model Badge -->
+            <button
+              v-if="aiModels.chat"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
+              :title="$t('config.aiModels.chatGeneration')"
+              @click="showModelDetails('chat')"
+            >
+              <Icon icon="mdi:chat" class="w-3.5 h-3.5" />
+              <span class="hidden sm:inline">{{ $t('config.aiModels.chat') }}:</span>
+              <span class="font-semibold">{{ aiModels.chat.model }}</span>
+            </button>
+            
+            <!-- Sorting Model Badge -->
+            <button
+              v-if="aiModels.sorting"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+              :title="$t('config.aiModels.messageClassification')"
+              @click="showModelDetails('sorting')"
+            >
+              <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
+              <span class="hidden sm:inline">{{ $t('config.aiModels.sorting') }}:</span>
+              <span class="font-semibold">{{ aiModels.sorting.model }}</span>
+            </button>
+            
+            <span v-if="aiModels.chat || aiModels.sorting" class="mx-1 opacity-50 hidden md:inline">·</span>
+          </template>
+          
           <div :class="['text-xs truncate', role === 'user' ? 'text-white/80' : 'txt-secondary']">
-            <template v-if="role === 'assistant' && modelLabel && provider">
+            <template v-if="role === 'assistant' && modelLabel && provider && !aiModels">
               <span class="font-medium hidden md:inline">{{ modelLabel }}</span>
               <span class="mx-1.5 opacity-50 hidden md:inline">·</span>
               <span class="hidden md:inline">{{ provider }}</span>
               <span class="mx-1.5 opacity-50 hidden md:inline">·</span>
             </template>
             <span>{{ formattedTime }}</span>
-            <template v-if="role === 'assistant' && modelLabel">
+            <template v-if="role === 'assistant' && modelLabel && !aiModels">
               <span class="mx-1.5 opacity-50 md:hidden">·</span>
               <span class="md:hidden">{{ modelLabel }}</span>
             </template>
           </div>
         </div>
 
-        <!-- Right: Actions (assistant only, hidden during streaming, only show if we have models) -->
-        <div v-if="role === 'assistant' && !isStreaming && (againData || backendMessageId) && modelOptions.length > 0" class="flex items-center gap-2 flex-shrink-0">
+        <!-- Right: Actions (assistant only, hidden during streaming) -->
+        <!-- Show if: has againData OR has backend message ID (can fetch models) -->
+        <div v-if="role === 'assistant' && !isStreaming && backendMessageId" class="flex items-center gap-2 flex-shrink-0">
           <button
             @click="handleAgain"
             type="button"
-            :disabled="isSuperseded || !selectedModel"
+            :disabled="isSuperseded || !selectedModel || !hasModels"
             :class="[
               'pill text-xs whitespace-nowrap',
-              (isSuperseded || !selectedModel) ? 'opacity-50 cursor-not-allowed' : ''
+              (isSuperseded || !selectedModel || !hasModels) ? 'opacity-50 cursor-not-allowed' : ''
             ]"
             :aria-label="$t('chatMessage.again')"
           >
@@ -216,10 +413,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { useModelsStore } from '@/stores/models'
+import { useModelSelection } from '@/composables/useModelSelection'
 import { getProviderIcon } from '@/utils/providerIcons'
 import MessagePart from './MessagePart.vue'
 import type { Part, MessageFile } from '@/stores/history'
@@ -237,7 +435,32 @@ interface Props {
   backendMessageId?: number
   processingStatus?: string
   processingMetadata?: any
-  files?: MessageFile[] // NEW: attached files
+  files?: MessageFile[] // Attached files
+  searchResults?: Array<{
+    title: string
+    url: string
+    description?: string
+    published?: string
+    source?: string
+    thumbnail?: string
+  }> | null // Web search results
+  aiModels?: {
+    chat?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+    sorting?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+  } | null // AI model metadata
+  webSearch?: {
+    enabled?: boolean
+    query?: string
+    resultsCount?: number
+  } | null // Web search metadata
 }
 
 interface ModelOption {
@@ -248,9 +471,106 @@ interface ModelOption {
 
 const props = defineProps<Props>()
 
+// Badge collapse state
+const showAllBadges = ref(false)
+
+// Sources expand/collapse state
+const sourcesExpanded = ref(false)
+
+// Carousel state for search results
+const carouselPage = ref(0) // Which "page" we're on (0-based)
+const highlightedSource = ref<number | null>(null)
+const sourceRefs = ref<any[]>([])
+
+// Calculate total badges count (files + webSearch)
+const totalBadgesCount = computed(() => {
+  let count = 0
+  if (props.files) count += props.files.length
+  if (props.webSearch) count += 1
+  return count
+})
+
+// Carousel navigation
+const nextSource = () => {
+  if (props.searchResults) {
+    const maxPage = Math.ceil(props.searchResults.length / 3) - 1
+    if (carouselPage.value < maxPage) {
+      carouselPage.value += 1
+    }
+  }
+}
+
+const previousSource = () => {
+  if (carouselPage.value > 0) {
+    carouselPage.value -= 1
+  }
+}
+
+// Focus and highlight a source (without opening URL)
+const focusSource = (index: number) => {
+  highlightedSource.value = index
+  
+  // Expand sources if collapsed
+  if (!sourcesExpanded.value) {
+    sourcesExpanded.value = true
+  }
+  
+  // Navigate to carousel page containing this source
+  if (props.searchResults) {
+    // Calculate which "page" this source is on (groups of 3 on desktop)
+    const page = Math.floor(index / 3)
+    carouselPage.value = page
+  }
+}
+
+// Open source URL (separate action)
+const openSource = (url: string) => {
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 // Separate thinking blocks from content
 const thinkingParts = computed(() => props.parts.filter(p => p.type === 'thinking'))
-const contentParts = computed(() => props.parts.filter(p => p.type !== 'thinking'))
+
+// Process content parts to make reference numbers [1], [2], etc. clickable
+const contentParts = computed(() => {
+  const parts = props.parts.filter(p => p.type !== 'thinking')
+  
+  // If no search results, return parts as-is
+  if (!props.searchResults || props.searchResults.length === 0) {
+    return parts
+  }
+  
+  // Process text parts to add clickable references
+  return parts.map(part => {
+    if (part.type === 'text' && part.content) {
+      // Replace [1], [2], etc. with clickable spans
+      const processedContent = part.content.replace(
+        /\[(\d+)\]/g,
+        (match, num) => {
+          const index = parseInt(num) - 1
+          if (index >= 0 && index < props.searchResults!.length) {
+            return `<a href="#" class="source-ref inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-bold hover:bg-[var(--brand)] hover:text-white transition-all mx-0.5 no-underline" data-source-index="${index}" onclick="event.preventDefault()">${num}</a>`
+          }
+          return match
+        }
+      )
+      
+      return {
+        ...part,
+        content: processedContent
+      }
+    }
+    return part
+  })
+})
+
+// Get provider for avatar icon (prefer aiModels.chat, fallback to legacy provider prop)
+const displayProvider = computed(() => {
+  if (props.aiModels?.chat?.provider) {
+    return props.aiModels.chat.provider
+  }
+  return props.provider || 'OpenAI'
+})
 
 const formattedTime = computed(() => {
   const date = props.timestamp
@@ -264,80 +584,37 @@ const emit = defineEmits<{
   again: [backendMessageId: number, modelId?: number]
 }>()
 
-const modelsStore = useModelsStore()
+const router = useRouter()
 const modelDropdownOpen = ref(false)
 
-const modelOptions = computed(() => {
-  console.log('🔍 Computing modelOptions:', {
-    hasAgainData: !!props.againData,
-    eligibleCount: props.againData?.eligible?.length || 0,
-    storeChatModelsCount: modelsStore.chatModels.length,
-    backendMessageId: props.backendMessageId
-  })
-  
-  // Priority 1: Use backend againData if available (best option - contains eligible models for this specific message)
-  if (props.againData?.eligible && props.againData.eligible.length > 0) {
-    const models = props.againData.eligible.map(model => ({
-      provider: model.service,
-      model: model.name,
-      label: model.name,
-      id: model.id
-    }))
-    console.log('✅ Using backend againData models:', models)
-    return models
-  }
-  
-  // Priority 2: Use models from store (loaded from backend config)
-  if (modelsStore.chatModels.length > 0) {
-    const models = modelsStore.chatModels.map(model => ({
-      ...model,
-      id: undefined // Store models don't have IDs yet
-    }))
-    console.log('⚠️ Fallback: Using store models (no againData):', models)
-    return models
-  }
-  
-  // Priority 3: If no models available, return empty array (disable again button)
-  console.warn('❌ No models available! Button will be hidden.')
-  return []
-})
+// Use model selection composable
+const againDataComputed = computed(() => props.againData)
+const { modelOptions, predictedModel, hasModels } = useModelSelection(againDataComputed)
 
-const selectedModel = computed(() => {
-  // Priority 1: Use predictedNext from backend if available (AI prediction for best next model)
-  if (props.againData?.predictedNext) {
-    const predicted = props.againData.predictedNext
-    const model = {
-      provider: predicted.service,
-      model: predicted.name,
-      label: predicted.name,
-      id: predicted.id
+// Selected model: use predicted or first available
+const selectedModel = computed(() => predictedModel.value)
+
+// Navigate to AI models configuration with highlight
+const showModelDetails = (modelType?: 'chat' | 'sorting') => {
+  if (modelType) {
+    // Map to actual capability names
+    const capabilityMap = {
+      'chat': 'CHAT',
+      'sorting': 'SORT'
     }
-    console.log('🎯 Selected model (predicted):', model)
-    return model
+    router.push({ path: '/config/ai-models', query: { highlight: capabilityMap[modelType] } })
+  } else {
+    router.push('/config/ai-models')
   }
-  
-  // Priority 2: Try to match current store selection
-  const currentModel = modelOptions.value.find(
-    (opt) => opt.model === modelsStore.selectedModel && opt.provider === modelsStore.selectedProvider
-  )
-  if (currentModel) {
-    console.log('🎯 Selected model (store match):', currentModel)
-    return currentModel
-  }
-  
-  // Priority 3: Use the first available model (or null if none available)
-  const firstModel = modelOptions.value[0] || null
-  console.log('🎯 Selected model (first available):', firstModel)
-  return firstModel
-})
+}
 
 const handleAgain = () => {
-  if (props.backendMessageId && (selectedModel.value as any).id) {
+  if (props.backendMessageId && (selectedModel.value as any)?.id) {
     // New backend-driven again
     emit('again', props.backendMessageId, (selectedModel.value as any).id)
   } else {
     // Fallback to old regenerate
-    emit('regenerate', selectedModel.value)
+    emit('regenerate', selectedModel.value as any)
   }
 }
 
@@ -409,5 +686,25 @@ const downloadFile = async (file: MessageFile) => {
     console.error('Download failed:', error)
   }
 }
+
+// Handle clicks on reference numbers in the text
+const handleReferenceClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (target.classList.contains('source-ref')) {
+    const index = parseInt(target.dataset.sourceIndex || '-1')
+    if (index >= 0 && props.searchResults && index < props.searchResults.length) {
+      focusSource(index)
+    }
+  }
+}
+
+// Add event listener for reference clicks
+onMounted(() => {
+  document.addEventListener('click', handleReferenceClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleReferenceClick)
+})
 
 </script>

@@ -47,6 +47,9 @@
               :processing-status="message.isStreaming ? processingStatus : undefined"
               :processing-metadata="message.isStreaming ? processingMetadata : undefined"
               :files="message.files"
+              :search-results="message.searchResults"
+              :ai-models="message.aiModels"
+              :web-search="message.webSearch"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
             />
@@ -73,6 +76,7 @@ import { useHistoryStore, type Message } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { executeCommand } from '@/commands/execute'
 import { useModelsStore } from '@/stores/models'
+import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api'
 import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
@@ -85,6 +89,7 @@ const autoScroll = ref(true)
 const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
 const modelsStore = useModelsStore()
+const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 let streamingAbortController: AbortController | null = null
 
@@ -106,6 +111,9 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
+  // Load AI models config for Again functionality
+  await aiConfigStore.loadModels()
+  
   // Load chats first
   await chatsStore.loadChats()
   
@@ -225,7 +233,7 @@ watch(() => historyStore.messages, () => {
   scrollToBottom()
 }, { deep: true })
 
-const handleSendMessage = async (content: string, options?: { includeReasoning?: boolean, modelId?: number, fileIds?: number[] }) => {
+const handleSendMessage = async (content: string, options?: { includeReasoning?: boolean, webSearch?: boolean, modelId?: number, fileIds?: number[] }) => {
   autoScroll.value = true
 
   // Prepare files info if fileIds are provided
@@ -255,8 +263,21 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
     }
   }
 
-  // Add user message with files
-  historyStore.addMessage('user', [{ type: 'text', content }], files)
+  // Prepare webSearch metadata for user message
+  const webSearchData = options?.webSearch ? { enabled: true } : null
+
+  // Add user message with files and webSearch info
+  historyStore.addMessage(
+    'user', 
+    [{ type: 'text', content }], 
+    files, 
+    undefined, // provider 
+    undefined, // modelLabel
+    undefined, // againData
+    undefined, // backendMessageId
+    undefined, // originalMessageId
+    webSearchData // webSearch
+  )
 
   // Commands have no streaming (e.g. /pic, /search)
   const parts = await executeCommand(content)
@@ -513,6 +534,18 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               if (data.messageId) {
                 console.log('🆔 Setting backendMessageId:', data.messageId)
                 message.backendMessageId = data.messageId
+              }
+              
+              // Store search results if provided
+              if (data.searchResults && Array.isArray(data.searchResults) && data.searchResults.length > 0) {
+                console.log('🔍 Setting searchResults:', data.searchResults.length, 'results')
+                message.searchResults = data.searchResults
+                
+                // Also set webSearch metadata for assistant message
+                message.webSearch = {
+                  query: data.searchResults[0]?.query || '',
+                  resultsCount: data.searchResults.length
+                }
               }
               
               // Update provider and model from backend metadata

@@ -8,15 +8,20 @@
     "config": "AI Config",
     "statistics": "Statistics"
   },
+  "sidebar": {
+    "featureStatus": "Feature Status"
+  },
   "chatInput": {
     "placeholder": "Type your message...",
     "provider": "Provider",
     "model": "Model",
+    "configureModel": "Configure AI Model",
     "attach": "Attach",
     "uploadFile": "Upload",
     "deepResearch": "Deep Research",
     "docs": "Docs",
     "web": "Web",
+    "webSearch": "Search the web for up-to-date information",
     "enhance": "Enhance",
     "thinking": "Thinking",
     "voice": "Start voice",
@@ -284,6 +289,12 @@
     "aiModels": {
       "title": "AI Models",
       "description": "Configure and manage your AI models",
+      "chat": "Chat Model",
+      "sorting": "Sorting Model",
+      "usedFor": "Used for",
+      "chatGeneration": "Response Generation",
+      "messageClassification": "Message Classification",
+      "clickToConfig": "Click to configure",
       "defaultConfig": "Default Model Configuration",
       "saveConfiguration": "Save Configuration",
       "resetForm": "Reset Form",
@@ -507,7 +518,12 @@
     "error": "Error",
     "success": "Success",
     "leave": "Leave",
-    "stay": "Stay"
+    "stay": "Stay",
+    "retry": "Retry"
+  },
+  "search": {
+    "sources": "Sources",
+    "webResults": "Web Search Results"
   },
   "auth": {
     "login": "Login",
@@ -766,6 +782,41 @@
     "limitReached": "Storage limit reached! Please delete some files or upgrade your plan.",
     "almostFull": "Storage almost full! Only {remaining} remaining.",
     "upgradePlan": "Upgrade Plan"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your preferences and configuration",
+    "tabs": {
+      "general": "General",
+      "features": "Features"
+    },
+    "appMode": {
+      "title": "App Mode",
+      "description": "Choose between simplified or full feature set",
+      "easy": "Easy Mode",
+      "easyDesc": "Simplified interface with essential features",
+      "advanced": "Advanced Mode",
+      "advancedDesc": "Full access to all features and tools"
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose your color scheme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "account": {
+      "title": "Account",
+      "email": "Email",
+      "userLevel": "User Level"
+    },
+    "logout": "Logout",
+    "features": {
+      "loading": "Loading features...",
+      "requiredConfig": "Required Configuration:",
+      "set": "Set",
+      "notSet": "Not Set"
+    }
   }
 }
 

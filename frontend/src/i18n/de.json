@@ -4,8 +4,14 @@
     "title": "Chat",
     "newChat": "Neuer Chat"
   },
+  "sidebar": {
+    "featureStatus": "Feature-Status"
+  },
   "chatInput": {
     "placeholder": "Schreibe deine Nachricht hier...",
+    "model": "Modell",
+    "configureModel": "KI-Modell konfigurieren",
+    "webSearch": "Web nach aktuellen Informationen durchsuchen",
     "send": "Senden",
     "stop": "Stoppen",
     "enhance": "Verbessern",
@@ -104,7 +110,13 @@
     },
     "aiModels": {
       "title": "KI-Modelle",
-      "description": "Konfigurieren und verwalten Sie Ihre KI-Modelle"
+      "description": "Konfigurieren und verwalten Sie Ihre KI-Modelle",
+      "chat": "Chat-Modell",
+      "sorting": "Sortier-Modell",
+      "usedFor": "Verwendet für",
+      "chatGeneration": "Antwort-Generierung",
+      "messageClassification": "Nachrichten-Klassifizierung",
+      "clickToConfig": "Klicken zum Konfigurieren"
     },
     "taskPrompts": {
       "title": "Prompt-Verwaltung",
@@ -283,7 +295,12 @@
     "error": "Fehler",
     "success": "Erfolg",
     "leave": "Verlassen",
-    "stay": "Bleiben"
+    "stay": "Bleiben",
+    "retry": "Erneut versuchen"
+  },
+  "search": {
+    "sources": "Quellen",
+    "webResults": "Web-Suchergebnisse"
   },
   "chatShare": {
     "title": "Chat Teilen",
@@ -365,6 +382,41 @@
     "limitReached": "Speicherlimit erreicht! Bitte löschen Sie Dateien oder upgraden Sie Ihren Tarif.",
     "almostFull": "Speicher fast voll! Nur noch {remaining} verfügbar.",
     "upgradePlan": "Tarif upgraden"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "subtitle": "Verwalten Sie Ihre Präferenzen und Konfiguration",
+    "tabs": {
+      "general": "Allgemein",
+      "features": "Features"
+    },
+    "appMode": {
+      "title": "App-Modus",
+      "description": "Wählen Sie zwischen vereinfachter oder vollständiger Funktionsumgebung",
+      "easy": "Easy Mode",
+      "easyDesc": "Vereinfachte Oberfläche mit wesentlichen Funktionen",
+      "advanced": "Advanced Mode",
+      "advancedDesc": "Voller Zugriff auf alle Funktionen und Tools"
+    },
+    "theme": {
+      "title": "Design",
+      "description": "Wählen Sie Ihr Farbschema",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "account": {
+      "title": "Konto",
+      "email": "E-Mail",
+      "userLevel": "Benutzerebene"
+    },
+    "logout": "Abmelden",
+    "features": {
+      "loading": "Lade Features...",
+      "requiredConfig": "Erforderliche Konfiguration:",
+      "set": "Gesetzt",
+      "notSet": "Nicht gesetzt"
+    }
   }
 }
 

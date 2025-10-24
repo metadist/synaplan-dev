@@ -215,12 +215,15 @@ class MessageController extends AbstractController
             $this->em->persist($outgoingMessage);
             $this->em->flush(); // Flush to get message ID for metadata
             
-            // Store detailed provider and model information in MessageMeta
-            $outgoingMessage->setMeta('ai_provider', $aiResponse['provider'] ?? 'unknown');
-            $outgoingMessage->setMeta('ai_model', $aiResponse['model'] ?? 'unknown');
+            // Store CHAT model information in MessageMeta
+            $outgoingMessage->setMeta('ai_chat_provider', $aiResponse['provider'] ?? 'unknown');
+            $outgoingMessage->setMeta('ai_chat_model', $aiResponse['model'] ?? 'unknown');
             if (!empty($aiResponse['usage'])) {
-                $outgoingMessage->setMeta('ai_usage', json_encode($aiResponse['usage']));
+                $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
+            
+            // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
+            // Only StreamController (which uses MessageProcessor) has sorting model metadata
             
             // Update incoming message status
             $incomingMessage->setStatus('complete');

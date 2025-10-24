@@ -6,6 +6,7 @@ use App\Entity\Config;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\AI\Service\ProviderRegistry;
+use App\Service\Search\BraveSearchService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,7 +23,8 @@ class ConfigController extends AbstractController
         private EntityManagerInterface $em,
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
-        private ProviderRegistry $providerRegistry
+        private ProviderRegistry $providerRegistry,
+        private BraveSearchService $braveSearchService
     ) {}
 
     /**
@@ -39,7 +41,7 @@ class ConfigController extends AbstractController
         // Get all active models sorted by quality
         $models = $this->modelRepository->findBy(['active' => 1], ['quality' => 'DESC', 'rating' => 'DESC']);
         
-        // All capabilities get ALL models (user can choose any model for any task)
+        // Build model list with tag information
         $modelList = [];
         foreach ($models as $model) {
             $modelList[] = [
@@ -56,17 +58,58 @@ class ConfigController extends AbstractController
             ];
         }
         
-        // Return same list for all capabilities (cross-capability)
+        // Group models by their appropriate capability based on tag
+        // This allows proper filtering while still enabling cross-capability if needed
         $grouped = [
-            'SORT' => $modelList,
-            'CHAT' => $modelList,
-            'VECTORIZE' => $modelList,
-            'PIC2TEXT' => $modelList,
-            'TEXT2PIC' => $modelList,
-            'SOUND2TEXT' => $modelList,
-            'TEXT2SOUND' => $modelList,
-            'ANALYZE' => $modelList
+            'SORT' => [],
+            'CHAT' => [],
+            'VECTORIZE' => [],
+            'PIC2TEXT' => [],
+            'TEXT2PIC' => [],
+            'SOUND2TEXT' => [],
+            'TEXT2SOUND' => [],
+            'ANALYZE' => []
         ];
+        
+        foreach ($modelList as $model) {
+            $tag = $model['tag'];
+            
+            // Map model tags to capabilities
+            switch ($tag) {
+                case 'CHAT':
+                    $grouped['CHAT'][] = $model;
+                    $grouped['SORT'][] = $model; // Chat models can also be used for sorting
+                    $grouped['ANALYZE'][] = $model; // Chat models can analyze
+                    break;
+                case 'VECTORIZE':
+                case 'EMBEDDING':
+                    $grouped['VECTORIZE'][] = $model;
+                    break;
+                case 'VISION':
+                case 'PIC2TEXT':
+                    $grouped['PIC2TEXT'][] = $model;
+                    break;
+                case 'IMAGE':
+                case 'TEXT2PIC':
+                    $grouped['TEXT2PIC'][] = $model;
+                    break;
+                case 'AUDIO':
+                case 'SOUND2TEXT':
+                case 'TRANSCRIPTION':
+                    $grouped['SOUND2TEXT'][] = $model;
+                    break;
+                case 'TTS':
+                case 'TEXT2SOUND':
+                    $grouped['TEXT2SOUND'][] = $model;
+                    break;
+                default:
+                    // If no specific tag, add to all capabilities (flexible)
+                    foreach (array_keys($grouped) as $cap) {
+                        $grouped[$cap][] = $model;
+                    }
+                    break;
+            }
+        }
 
         return $this->json([
             'success' => true,
@@ -289,6 +332,275 @@ class ConfigController extends AbstractController
         }
 
         return $this->json($response);
+    }
+
+    /**
+     * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
+     * Only available in development mode
+     */
+    #[Route('/features', name: 'features_status', methods: ['GET'])]
+    public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Only allow in development mode
+        $env = $_ENV['APP_ENV'] ?? 'prod';
+        if ($env !== 'dev') {
+            return $this->json(['error' => 'Feature only available in development mode'], Response::HTTP_FORBIDDEN);
+        }
+
+        $features = [];
+
+        // ========== AI Features ==========
+        
+        // Web Search (Brave API)
+        $braveEnabled = $this->braveSearchService->isEnabled();
+        $features['web-search'] = [
+            'id' => 'web-search',
+            'category' => 'AI Features',
+            'name' => 'Web Search',
+            'enabled' => $braveEnabled,
+            'status' => $braveEnabled ? 'active' : 'disabled',
+            'message' => $braveEnabled 
+                ? 'Web search is active and ready to use' 
+                : 'Web search requires Brave Search API configuration',
+            'setup_required' => !$braveEnabled,
+            'env_vars' => [
+                'BRAVE_SEARCH_API_KEY' => [
+                    'required' => true,
+                    'set' => !empty($_ENV['BRAVE_SEARCH_API_KEY'] ?? ''),
+                    'hint' => 'Get your API key from https://api.search.brave.com/'
+                ],
+                'BRAVE_SEARCH_ENABLED' => [
+                    'required' => true,
+                    'set' => ($_ENV['BRAVE_SEARCH_ENABLED'] ?? 'false') === 'true',
+                    'hint' => 'Set to "true" to enable web search'
+                ]
+            ]
+        ];
+
+        // Image Generation
+        $imageModels = $this->modelRepository->findBy(['active' => 1, 'tag' => 'TEXT2PIC']);
+        $hasImageModels = count($imageModels) > 0;
+        $features['image-gen'] = [
+            'id' => 'image-gen',
+            'category' => 'AI Features',
+            'name' => 'Image Generation',
+            'enabled' => $hasImageModels,
+            'status' => $hasImageModels ? 'active' : 'disabled',
+            'message' => $hasImageModels 
+                ? count($imageModels) . ' image generation model(s) available' 
+                : 'No image generation models configured',
+            'setup_required' => !$hasImageModels,
+            'models_available' => count($imageModels)
+        ];
+
+        // Code Interpreter
+        $features['code-interpreter'] = [
+            'id' => 'code-interpreter',
+            'category' => 'AI Features',
+            'name' => 'Code Interpreter',
+            'enabled' => true,
+            'status' => 'active',
+            'message' => 'Code interpreter is active',
+            'setup_required' => false
+        ];
+
+        // ========== AI Providers ==========
+        
+        // Ollama
+        $ollamaUrl = $_ENV['OLLAMA_BASE_URL'] ?? '';
+        $ollamaHealthy = $this->checkServiceHealth($ollamaUrl . '/api/tags');
+        $features['ollama'] = [
+            'id' => 'ollama',
+            'category' => 'AI Providers',
+            'name' => 'Ollama (Local AI)',
+            'enabled' => !empty($ollamaUrl),
+            'status' => $ollamaHealthy ? 'healthy' : ($ollamaUrl ? 'unhealthy' : 'disabled'),
+            'message' => $ollamaHealthy 
+                ? 'Ollama is running and accessible' 
+                : ($ollamaUrl ? 'Ollama service is not responding' : 'Ollama URL not configured'),
+            'setup_required' => empty($ollamaUrl),
+            'url' => $ollamaUrl
+        ];
+
+        // OpenAI
+        $openaiKey = $_ENV['OPENAI_API_KEY'] ?? '';
+        $features['openai'] = [
+            'id' => 'openai',
+            'category' => 'AI Providers',
+            'name' => 'OpenAI',
+            'enabled' => !empty($openaiKey),
+            'status' => !empty($openaiKey) ? 'active' : 'disabled',
+            'message' => !empty($openaiKey) 
+                ? 'OpenAI API key configured' 
+                : 'OpenAI API key not configured',
+            'setup_required' => empty($openaiKey),
+            'env_vars' => [
+                'OPENAI_API_KEY' => [
+                    'required' => true,
+                    'set' => !empty($openaiKey),
+                    'hint' => 'Get your API key from https://platform.openai.com/'
+                ]
+            ]
+        ];
+
+        // Anthropic (Claude)
+        $anthropicKey = $_ENV['ANTHROPIC_API_KEY'] ?? '';
+        $features['anthropic'] = [
+            'id' => 'anthropic',
+            'category' => 'AI Providers',
+            'name' => 'Anthropic (Claude)',
+            'enabled' => !empty($anthropicKey),
+            'status' => !empty($anthropicKey) ? 'active' : 'disabled',
+            'message' => !empty($anthropicKey) 
+                ? 'Anthropic API key configured' 
+                : 'Anthropic API key not configured',
+            'setup_required' => empty($anthropicKey),
+            'env_vars' => [
+                'ANTHROPIC_API_KEY' => [
+                    'required' => true,
+                    'set' => !empty($anthropicKey),
+                    'hint' => 'Get your API key from https://console.anthropic.com/'
+                ]
+            ]
+        ];
+
+        // ========== Processing Services ==========
+        
+        // Whisper (Speech-to-Text)
+        $whisperUrl = $_ENV['WHISPER_API_URL'] ?? 'http://whisper:9000';
+        $whisperHealthy = $this->checkServiceHealth($whisperUrl . '/health');
+        $features['whisper'] = [
+            'id' => 'whisper',
+            'category' => 'Processing Services',
+            'name' => 'Whisper (Speech-to-Text)',
+            'enabled' => true,
+            'status' => $whisperHealthy ? 'healthy' : 'unhealthy',
+            'message' => $whisperHealthy 
+                ? 'Whisper service is running' 
+                : 'Whisper service is not responding',
+            'setup_required' => false,
+            'url' => $whisperUrl
+        ];
+
+        // Apache Tika (Document Processing)
+        $tikaUrl = $_ENV['TIKA_URL'] ?? 'http://tika:9998';
+        $tikaHealthy = $this->checkServiceHealth($tikaUrl . '/tika');
+        $features['tika'] = [
+            'id' => 'tika',
+            'category' => 'Processing Services',
+            'name' => 'Apache Tika (Document Processing)',
+            'enabled' => true,
+            'status' => $tikaHealthy ? 'healthy' : 'unhealthy',
+            'message' => $tikaHealthy 
+                ? 'Tika service is running and processing documents' 
+                : 'Tika service is not responding',
+            'setup_required' => false,
+            'url' => $tikaUrl
+        ];
+
+        // ========== Infrastructure Services ==========
+        
+        // Redis (Cache & Queue)
+        $redisHost = $_ENV['REDIS_HOST'] ?? 'redis';
+        $redisPort = $_ENV['REDIS_PORT'] ?? 6379;
+        $redisHealthy = false;
+        
+        if (extension_loaded('redis')) {
+            try {
+                $redis = new \Redis();
+                $redisHealthy = @$redis->connect($redisHost, (int)$redisPort, 1);
+                if ($redisHealthy) {
+                    $redis->close();
+                }
+            } catch (\Exception $e) {
+                $redisHealthy = false;
+            }
+        }
+        
+        $features['redis'] = [
+            'id' => 'redis',
+            'category' => 'Infrastructure',
+            'name' => 'Redis (Cache & Queue)',
+            'enabled' => extension_loaded('redis'),
+            'status' => $redisHealthy ? 'healthy' : (extension_loaded('redis') ? 'unhealthy' : 'disabled'),
+            'message' => $redisHealthy 
+                ? 'Redis is running and accessible' 
+                : (extension_loaded('redis') ? 'Redis is not responding' : 'Redis PHP extension not installed'),
+            'setup_required' => !extension_loaded('redis'),
+            'url' => "$redisHost:$redisPort"
+        ];
+
+        // Database (MariaDB)
+        try {
+            $this->em->getConnection()->executeQuery('SELECT 1');
+            $dbHealthy = true;
+        } catch (\Exception $e) {
+            $dbHealthy = false;
+        }
+        
+        $features['database'] = [
+            'id' => 'database',
+            'category' => 'Infrastructure',
+            'name' => 'Database (MariaDB)',
+            'enabled' => true,
+            'status' => $dbHealthy ? 'healthy' : 'unhealthy',
+            'message' => $dbHealthy 
+                ? 'Database connection is active' 
+                : 'Database connection failed',
+            'setup_required' => false
+        ];
+
+        // Count ready services
+        $totalServices = count($features);
+        $healthyServices = count(array_filter($features, fn($f) => 
+            in_array($f['status'], ['active', 'healthy'])
+        ));
+
+        return $this->json([
+            'features' => $features,
+            'summary' => [
+                'total' => $totalServices,
+                'healthy' => $healthyServices,
+                'unhealthy' => $totalServices - $healthyServices,
+                'all_ready' => $healthyServices === $totalServices
+            ]
+        ]);
+    }
+
+    /**
+     * Check if a service is healthy by making a simple HTTP request
+     */
+    private function checkServiceHealth(string $url): bool
+    {
+        try {
+            $context = stream_context_create([
+                'http' => [
+                    'timeout' => 2,
+                    'ignore_errors' => true
+                ]
+            ]);
+            
+            $response = @file_get_contents($url, false, $context);
+            
+            if ($response === false) {
+                return false;
+            }
+            
+            // Check HTTP response code
+            if (isset($http_response_header[0])) {
+                preg_match('/\d{3}/', $http_response_header[0], $matches);
+                $statusCode = isset($matches[0]) ? (int)$matches[0] : 0;
+                return $statusCode >= 200 && $statusCode < 500; // Accept 2xx, 3xx, 4xx (not 5xx)
+            }
+            
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 }
 
