@@ -55,4 +55,14 @@ watch(() => props.modelValue, async () => {
 onMounted(() => {
   adjustHeight()
 })
+
+// Expose focus method for parent components
+const focus = () => {
+  textareaRef.value?.focus()
+}
+
+defineExpose({
+  focus,
+  textareaRef
+})
 </script>

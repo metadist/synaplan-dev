@@ -58,6 +58,7 @@
       </div>
 
       <ChatInput 
+        ref="chatInputRef"
         :is-streaming="isStreaming" 
         @send="handleSendMessage"
         @stop="handleStopStreaming"
@@ -67,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
@@ -85,6 +86,7 @@ import { parseAIResponse } from '@/utils/responseParser'
 const { t } = useI18n()
 
 const chatContainer = ref<HTMLElement | null>(null)
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const autoScroll = ref(true)
 const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
@@ -92,6 +94,7 @@ const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 let streamingAbortController: AbortController | null = null
+let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
@@ -124,6 +127,23 @@ onMounted(async () => {
     // Load messages for active chat
     await historyStore.loadMessages(chatsStore.activeChatId)
   }
+  
+  // Auto-focus ChatInput after mounting with delay
+  await nextTick()
+  setTimeout(() => {
+    if (chatInputRef.value?.textareaRef) {
+      console.log('🎯 Auto-focusing ChatInput')
+      chatInputRef.value.textareaRef.focus()
+    } else {
+      console.warn('⚠️ ChatInput ref not available for auto-focus')
+    }
+  }, 100)
+})
+
+// Cleanup: Stop streaming when component unmounts (user leaves chat)
+onBeforeUnmount(() => {
+  console.log('🧹 ChatView unmounting - cleaning up streaming')
+  handleStopStreaming()
 })
 
 // Watch for active chat changes and load messages
@@ -133,6 +153,13 @@ watch(() => chatsStore.activeChatId, async (newChatId) => {
     await historyStore.loadMessages(newChatId)
     await nextTick()
     scrollToBottom()
+    
+    // Auto-focus input when switching chats
+    setTimeout(() => {
+      if (chatInputRef.value?.textareaRef) {
+        chatInputRef.value.textareaRef.focus()
+      }
+    }, 100)
   }
 })
 
@@ -379,6 +406,12 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             const meta = data.metadata || {}
             processingMetadata.value = meta
             processingStatus.value = 'classified'
+          } else if (data.status === 'searching') {
+            processingStatus.value = 'searching'
+            processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'search_complete') {
+            processingStatus.value = 'search_complete'
+            processingMetadata.value = data.metadata || {}
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             processingMetadata.value = data.metadata || {}
@@ -626,9 +659,13 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
         fileIds // Pass array of fileIds
       )
       
+      // Store EventSource cleanup function globally
+      stopStreamingFn = stopStreaming
+      
       // Store cleanup function
       streamingAbortController.signal.addEventListener('abort', () => {
         stopStreaming()
+        stopStreamingFn = null
       })
     }
   } catch (error) {
@@ -637,12 +674,33 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
     historyStore.finishStreamingMessage(messageId)
   } finally {
     streamingAbortController = null
+    stopStreamingFn = null
   }
 }
 
 const handleStopStreaming = () => {
+  console.log('🛑 Stop streaming requested')
+  
+  // Abort the AbortController signal
   if (streamingAbortController) {
     streamingAbortController.abort()
+    streamingAbortController = null
+  }
+  
+  // Close the EventSource connection
+  if (stopStreamingFn) {
+    stopStreamingFn()
+    stopStreamingFn = null
+  }
+  
+  // Clear processing status
+  processingStatus.value = ''
+  processingMetadata.value = {}
+  
+  // Finish any streaming message
+  const streamingMessage = historyStore.messages.find(m => m.isStreaming)
+  if (streamingMessage) {
+    historyStore.finishStreamingMessage(streamingMessage.id)
   }
 }
 

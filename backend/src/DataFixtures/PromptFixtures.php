@@ -56,6 +56,13 @@ class PromptFixtures extends Fixture
                 'shortDescription' => 'Improves and enhances user messages for better clarity and completeness while keeping the same intent and language.',
                 'prompt' => $this->getEnhancePrompt()
             ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'tools:search',
+                'shortDescription' => 'Generates optimized search queries from user questions for web search APIs.',
+                'prompt' => $this->getSearchQueryPrompt()
+            ],
         ];
 
         foreach ($prompts as $data) {
@@ -147,12 +154,21 @@ This is the list, use only this:
 
 5. If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT.
 
+6. **Detect if web search is needed (BWEBSEARCH)**: Set BWEBSEARCH to 1 if the user asks for:
+   - Current/recent information (news, prices, weather, events)
+   - Real-time data or today's information
+   - Questions about events after 2023
+   - Specific locations/places (restaurants, stores, services)
+   - Questions that explicitly require internet search
+   Otherwise, set BWEBSEARCH to 0.
+
 # Answer format
 
 You must respond with the **same JSON object as received**, modifying only:
 
 * "BTOPIC": [KEYLIST]
 * "BLANG": [LANGLIST]
+* "BWEBSEARCH": 0 | 1
 
 If you cannot define the language from the text, leave "BLANG" as "en".  
 If you cannot define the topic, leave "BTOPIC" as "general".  
@@ -163,7 +179,8 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
 Do not change any other fields. 
-Do not add any new fields. Do not add any additional text beyond the JSON. 
+Do not add any new fields beyond BTOPIC, BLANG, and BWEBSEARCH. 
+Do not add any additional text beyond the JSON. 
 **Do not answer the question of the user.**
 Only send the JSON object.
 
@@ -245,6 +262,49 @@ Input: "make pic of cat"
 Output: "Please create an image of a cat."
 
 Now enhance the following user message:
+PROMPT;
+    }
+
+    private function getSearchQueryPrompt(): string
+    {
+        return <<<'PROMPT'
+# Search Query Generator
+
+You are an expert at converting user questions into optimized search queries for web search APIs.
+
+Your task is to analyze the user's question and generate a concise, effective search query that will yield the best results.
+
+## Guidelines:
+1. Extract the core intent and key information from the question
+2. Remove unnecessary words (like "please", "can you", "I want to know")
+3. Keep important context (dates, locations, specific names)
+4. Use keywords that search engines understand well
+5. If the user mentions a specific year or date, include it in the query
+6. Maintain the original language of the question
+7. Keep the query concise (typically 3-8 words)
+8. Return ONLY the search query, no explanations or additional text
+
+## Examples:
+
+Question: "Kannst du mir sagen, wie viel ein Döner in München kostet?"
+Search Query: döner preis münchen
+
+Question: "What's the weather like in Paris this weekend?"
+Search Query: paris weather forecast weekend
+
+Question: "I need to know the latest iPhone 15 specifications and price"
+Search Query: iphone 15 specifications price
+
+Question: "Tell me about the new Tesla Model 3 2024"
+Search Query: tesla model 3 2024 specifications
+
+Question: "Who won the world cup in 2022?"
+Search Query: world cup 2022 winner
+
+Question: "Wie funktioniert ein Quantencomputer?"
+Search Query: quantencomputer funktionsweise
+
+Now generate the search query for the following user question:
 PROMPT;
     }
 }
