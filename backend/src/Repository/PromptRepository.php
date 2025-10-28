@@ -33,6 +33,7 @@ class PromptRepository extends ServiceEntityRepository
             ->setParameter('topic', $topic)
             ->setParameter('ownerId', $ownerId)
             ->setParameter('lang', $lang)
+            ->orderBy('p.id', 'DESC') // Always get the newest prompt
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

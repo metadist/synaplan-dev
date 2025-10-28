@@ -628,4 +628,9 @@ const toggleEnhance = async () => {
     enhanceLoading.value = false
   }
 }
+
+// Expose textarea ref for parent component (auto-focus)
+defineExpose({
+  textareaRef
+})
 </script>

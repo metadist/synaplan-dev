@@ -136,6 +136,7 @@ class MessageSorter
             return [
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
+                'web_search' => $parsed['web_search'] ?? false,
                 'raw_response' => $aiResponse,
                 'model_id' => $modelId,
                 'provider' => $provider,
@@ -193,9 +194,16 @@ class MessageSorter
         try {
             $data = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
             
+            // Parse BWEBSEARCH (can be 0, 1, true, false)
+            $webSearch = false;
+            if (isset($data['BWEBSEARCH'])) {
+                $webSearch = (bool)$data['BWEBSEARCH'];
+            }
+            
             return [
                 'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
-                'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en'
+                'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
+                'web_search' => $webSearch
             ];
         } catch (\JsonException $e) {
             $this->logger->warning('MessageSorter: Failed to parse JSON response', [
@@ -206,7 +214,8 @@ class MessageSorter
             // Fallback to original values or defaults
             return [
                 'topic' => $originalData['BTOPIC'] ?? 'general',
-                'language' => $originalData['BLANG'] ?? 'en'
+                'language' => $originalData['BLANG'] ?? 'en',
+                'web_search' => false
             ];
         }
     }

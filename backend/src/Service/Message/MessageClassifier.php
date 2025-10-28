@@ -108,12 +108,14 @@ class MessageClassifier
             'message_id' => $messageId,
             'topic' => $result['topic'],
             'language' => $result['language'],
+            'web_search' => $result['web_search'] ?? false,
             'model_id' => $result['model_id'] ?? null
         ]);
 
         return [
             'topic' => $result['topic'],
             'language' => $result['language'],
+            'web_search' => $result['web_search'] ?? false,
             'source' => 'ai_sorting',
             'skip_sorting' => false,
             'model_id' => $result['model_id'] ?? null,
@@ -184,7 +186,8 @@ class MessageClassifier
             'BLANG' => $message->getLanguage() ?: 'en',
             'BTEXT' => $message->getText(),
             'BFILETEXT' => $message->getFileText() ?: '',
-            'BFILE' => $message->getFile()
+            'BFILE' => $message->getFile(),
+            'BWEBSEARCH' => 0 // Initialize for AI to set
         ];
     }
 }

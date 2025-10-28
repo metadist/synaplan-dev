@@ -8,6 +8,7 @@ use App\Repository\SearchResultRepository;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\InferenceRouter;
+use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
@@ -33,6 +34,7 @@ class MessageProcessor
         private InferenceRouter $router,
         private ModelConfigService $modelConfigService,
         private BraveSearchService $braveSearchService,
+        private SearchQueryGenerator $searchQueryGenerator,
         private LoggerInterface $logger
     ) {}
 
@@ -156,11 +158,23 @@ class MessageProcessor
                 ]);
             }
 
-            // Step 2.5: Web Search (if requested or classified)
+            // Step 2.5: Web Search (if requested or AI-classified)
             $searchResults = null;
             $shouldSearch = $options['web_search'] ?? false;
             
-            // Also check if classifier detected search intent
+            // Check if AI classifier detected search intent automatically
+            if (!$shouldSearch && isset($classification['web_search'])) {
+                $shouldSearch = (bool)$classification['web_search'];
+                
+                if ($shouldSearch) {
+                    $this->logger->info('🤖 AI Classifier activated web search automatically', [
+                        'message_id' => $message->getId(),
+                        'classification' => $classification
+                    ]);
+                }
+            }
+            
+            // Also check if classifier set a search-related topic (legacy fallback)
             if (!$shouldSearch && isset($classification['source'])) {
                 $source = $classification['source'];
                 $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
@@ -170,8 +184,11 @@ class MessageProcessor
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
                 
                 try {
-                    // Extract search query from message content
-                    $searchQuery = $this->extractSearchQuery($message->getText());
+                    // Generate optimized search query using AI
+                    $searchQuery = $this->searchQueryGenerator->generate(
+                        $message->getText(),
+                        $message->getUserId()
+                    );
                     
                     // Get language from classification (e.g., "de", "en", "fr")
                     // Use it directly as both search_lang and country (ISO 639-1 codes)
@@ -182,7 +199,8 @@ class MessageProcessor
                     $country = strtolower($language);
                     
                     $this->logger->info('🔍 Performing web search', [
-                        'query' => $searchQuery,
+                        'original_question' => $message->getText(),
+                        'optimized_query' => $searchQuery,
                         'language' => $language,
                         'country' => $country,
                         'message_id' => $message->getId()
@@ -472,27 +490,6 @@ class MessageProcessor
             'message' => $message,
             'metadata' => $metadata
         ]);
-    }
-
-    /**
-     * Extract search query from message text
-     * Removes command prefixes like /search or /web if present
-     * Removes surrounding quotes if present
-     */
-    private function extractSearchQuery(string $text): string
-    {
-        // Remove common search command prefixes
-        $text = preg_replace('/^\/(search|web|google|find)\s+/i', '', $text);
-        
-        // Trim whitespace
-        $text = trim($text);
-        
-        // Remove surrounding quotes (single or double)
-        if (preg_match('/^(["\'])(.+)\1$/', $text, $matches)) {
-            $text = $matches[2];
-        }
-        
-        return $text;
     }
 }
 

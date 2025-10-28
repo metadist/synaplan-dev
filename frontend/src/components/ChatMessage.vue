@@ -61,6 +61,21 @@
                 </span>
               </div>
             </template>
+            <template v-else-if="processingStatus === 'searching'">
+              <div class="font-medium animate-pulse">{{ $t('processing.searchingTitle') }}</div>
+              <div class="text-sm txt-tertiary mt-0.5">
+                {{ processingMetadata?.customMessage || $t('processing.searchingDesc') }}
+              </div>
+            </template>
+            <template v-else-if="processingStatus === 'search_complete'">
+              <div class="font-medium">{{ $t('processing.searchCompleteTitle') }}</div>
+              <div class="text-sm txt-tertiary mt-0.5">
+                {{ $t('processing.searchCompleteDesc') }}
+                <span v-if="processingMetadata?.results_count" class="txt-brand font-medium">
+                  · {{ processingMetadata.results_count }} {{ $t('processing.results') }}
+                </span>
+              </div>
+            </template>
             <template v-else-if="processingStatus === 'processing'">
               <div class="font-medium">{{ $t('processing.routingTitle') }}</div>
               <div class="text-sm txt-tertiary mt-0.5">
