@@ -52,7 +52,7 @@ class Message
     #[ORM\Column(name: 'BFILE', type: 'smallint')]
     private int $file = 0;
 
-    #[ORM\Column(name: 'BFILEPATH', length: 255)]
+    #[ORM\Column(name: 'BFILEPATH', type: 'text')]
     private string $filePath = '';
 
     #[ORM\Column(name: 'BFILETYPE', length: 8)]

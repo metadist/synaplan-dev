@@ -126,6 +126,19 @@
             </div>
             <div class="txt-primary whitespace-pre-wrap break-words" v-html="formatMessageText(message.text)"></div>
             
+            <!-- File attachments (images, videos) -->
+            <div v-if="message.file" class="mt-3">
+              <MessageImage 
+                v-if="message.file.type === 'image'" 
+                :url="message.file.path" 
+                :alt="message.text || 'Generated image'" 
+              />
+              <MessageVideo 
+                v-if="message.file.type === 'video'" 
+                :url="message.file.path" 
+              />
+            </div>
+            
             <!-- Topic Badge -->
             <div v-if="message.topic" class="mt-3 flex items-center gap-2 flex-wrap">
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
@@ -183,6 +196,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import MessageImage from '../components/MessageImage.vue'
+import MessageVideo from '../components/MessageVideo.vue'
 
 const route = useRoute()
 const loading = ref(true)
@@ -196,6 +211,10 @@ interface Message {
   topic?: string
   language?: string
   provider?: string
+  file?: {
+    path: string
+    type: string
+  }
 }
 
 interface Chat {

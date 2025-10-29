@@ -271,4 +271,30 @@ class ModelConfigService
         // Use BPROVID if set, otherwise BNAME
         return $model->getProviderId() ?: $model->getName();
     }
+
+    /**
+     * Check if a model supports streaming
+     * Returns true by default if not specified (backward compatibility)
+     */
+    public function supportsStreaming(int $modelId): bool
+    {
+        $model = $this->modelRepository->find($modelId);
+        
+        if (!$model) {
+            return true; // Default: assume streaming support
+        }
+
+        // Check BJSON for supportsStreaming flag
+        $features = $model->getFeatures();
+        $json = $model->getJson();
+        
+        // Check if supportsStreaming is explicitly set to false
+        if (isset($json['supportsStreaming'])) {
+            return (bool) $json['supportsStreaming'];
+        }
+        
+        // Default: true (backward compatibility)
+        return true;
+    }
 }
+

@@ -115,7 +115,10 @@ const isStreaming = computed(() => {
 // Init on mount
 onMounted(async () => {
   // Load AI models config for Again functionality
-  await aiConfigStore.loadModels()
+  await Promise.all([
+    aiConfigStore.loadModels(),
+    aiConfigStore.loadDefaults()
+  ])
   
   // Load chats first
   await chatsStore.loadChats()
@@ -388,6 +391,10 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
           } else if (data.status === 'preprocessing') {
             processingStatus.value = 'preprocessing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'analyzing') {
+            // Analyzing phase (e.g., understanding media generation request)
+            processingStatus.value = 'analyzing'
+            processingMetadata.value = { customMessage: data.message }
           } else if (data.status === 'classifying') {
             processingStatus.value = 'classifying'
             processingMetadata.value = data.metadata || {}
@@ -414,7 +421,11 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             processingMetadata.value = data.metadata || {}
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
-            processingMetadata.value = data.metadata || {}
+            // Use custom message from backend if available, otherwise default
+            processingMetadata.value = { 
+              customMessage: data.message || undefined,
+              ...(data.metadata || {})
+            }
             
             // Update message with real model from backend (instead of store model)
             const message = historyStore.messages.find(m => m.id === messageId)
@@ -427,8 +438,13 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               }
             }
           } else if (data.status === 'processing') {
-            // Processing/routing messages - just log them
-            console.log('Processing:', data.message)
+            // Processing/routing messages - improved logging
+            if (data.message && !data.message.includes('image_generation')) {
+              console.log('Processing:', data.message)
+            } else {
+              // Generic routing message, suppress spam
+              console.log('Processing: Routing to handler')
+            }
           } else if (data.status === 'status') {
             // Generic status message
             console.log('Status:', data.message)
@@ -502,8 +518,30 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               
               message.parts = newParts
             }
+          } else if (data.status === 'reasoning' && data.chunk) {
+            // Reasoning chunks from OpenAI o-series / GPT-5 models
+            console.log('🧠 Received reasoning chunk:', data.chunk.substring(0, 50) + '...')
+            
+            const message = historyStore.messages.find(m => m.id === messageId)
+            if (message) {
+              // Find existing reasoning part or create new one
+              let reasoningPart = message.parts.find(p => p.type === 'thinking' && p.isStreaming)
+              
+              if (!reasoningPart) {
+                // Create new reasoning part at the beginning
+                reasoningPart = {
+                  type: 'thinking',
+                  content: '',
+                  isStreaming: true
+                }
+                message.parts.unshift(reasoningPart)
+              }
+              
+              // Append reasoning content
+              reasoningPart.content += data.chunk
+            }
           } else if (data.status === 'file') {
-            // Handle file attachments (images, videos, etc.)
+            // Handle file attachments (images, videos, audio, etc.)
             console.log('📎 File received:', data.type, data.url)
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
@@ -512,6 +550,8 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 message.parts.push({ type: 'image', url: data.url })
               } else if (data.type === 'video') {
                 message.parts.push({ type: 'video', url: data.url })
+              } else if (data.type === 'audio') {
+                message.parts.push({ type: 'audio', url: data.url })
               }
             }
           } else if (data.status === 'links') {
@@ -547,22 +587,13 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             processingStatus.value = ''
             processingMetadata.value = {}
             
-            // Store againData and backendMessageId if provided
+            // Update message metadata
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
               console.log('📍 Found message to update:', message.id)
               
-              if (data.again) {
-                console.log('🔄 Setting againData from backend:', {
-                  eligibleCount: data.again.eligible?.length || 0,
-                  hasPredictedNext: !!data.again.predictedNext,
-                  eligible: data.again.eligible,
-                  predictedNext: data.again.predictedNext
-                })
-                message.againData = data.again
-              } else {
-                console.warn('⚠️ No againData in complete event!', data)
-              }
+              // NOTE: againData is now generated by frontend in ChatMessage.vue
+              // based on available models and message type (image/video/audio)
               
               if (data.messageId) {
                 console.log('🆔 Setting backendMessageId:', data.messageId)
@@ -590,6 +621,13 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 message.modelLabel = data.model
                 console.log('🤖 Updated model label:', data.model)
               }
+              
+              // Mark reasoning parts as complete (remove streaming flag)
+              message.parts.forEach(part => {
+                if (part.type === 'thinking' && part.isStreaming) {
+                  delete part.isStreaming
+                }
+              })
             } else {
               console.error('❌ Could not find message with id:', messageId)
             }

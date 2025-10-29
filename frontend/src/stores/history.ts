@@ -20,6 +20,7 @@ export interface Part {
   result?: string
   expiresAt?: string
   thinkingTime?: number  // Time in seconds for thinking process
+  isStreaming?: boolean  // For reasoning parts that are still being streamed
 }
 
 export interface MessageFile {
@@ -222,7 +223,28 @@ export const useHistoryStore = defineStore('history', () => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
           const parts = parseContentWithThinking(m.text || '')
           
-          // Parse files from backend response
+          // Add generated file (image/video/audio) as part if present
+          if (m.file && m.file.path) {
+            if (m.file.type === 'image') {
+              parts.push({
+                type: 'image',
+                url: m.file.path,
+                alt: m.text || 'Generated image'
+              })
+            } else if (m.file.type === 'video') {
+              parts.push({
+                type: 'video',
+                url: m.file.path
+              })
+            } else if (m.file.type === 'audio') {
+              parts.push({
+                type: 'audio',
+                url: m.file.path
+              })
+            }
+          }
+          
+          // Parse files from backend response (user uploads)
           const files: MessageFile[] = []
           if (m.files && Array.isArray(m.files)) {
             files.push(...m.files.map((f: any) => ({

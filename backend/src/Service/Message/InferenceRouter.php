@@ -4,20 +4,20 @@ namespace App\Service\Message;
 
 use App\Entity\Message;
 use App\Service\Message\Handler\ChatHandler;
-use App\Service\Message\Handler\ImageGenerationHandler;
+use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\Handler\CodeGenerationHandler;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
 /**
- * Router für Message Processing basierend auf Intent/BTAG
+ * Router for Message Processing based on Intent/BTAG
  * 
- * Dispatched zu:
- * - ChatHandler (normaler Chat)
- * - ImageGenerationHandler (Bilder generieren)
- * - CodeGenerationHandler (Code generieren)
- * - ToolHandler (Email, Kalender, etc.)
- * - etc.
+ * Dispatched to:
+ * - ChatHandler (normal Chat)
+ * - MediaGenerationHandler (Images, Videos, Audio generation)
+ * - CodeGenerationHandler (Code generation)
+ * - ToolHandler (Email, Calendar, etc.)
+ * - Other handlers...
  */
 class InferenceRouter
 {
@@ -77,10 +77,41 @@ class InferenceRouter
     ): array {
         $intent = $classification['intent'] ?? 'chat';
         
+        $this->logger->info('InferenceRouter: Routing to handler', [
+            'intent' => $intent,
+            'topic' => $classification['topic'] ?? 'unknown',
+            'classification' => $classification
+        ]);
+        
+        // DEBUG: Write to file
+        file_put_contents('/tmp/sorting-debug.txt', 
+            "=== ROUTER DEBUG ===\n" .
+            "Time: " . date('Y-m-d H:i:s') . "\n" .
+            "Intent: " . $intent . "\n" .
+            "Topic: " . ($classification['topic'] ?? 'unknown') . "\n" .
+            "Classification: " . json_encode($classification, JSON_PRETTY_PRINT) . "\n" .
+            "===================\n\n",
+            FILE_APPEND
+        );
+        
         $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Handler für Intent finden
         $handler = $this->getHandler($intent);
+        
+        // DEBUG: Write handler info
+        file_put_contents('/tmp/sorting-debug.txt', 
+            "=== HANDLER RESOLVED ===\n" .
+            "Handler Name: " . $handler->getName() . "\n" .
+            "Intent: " . $intent . "\n" .
+            "===================\n\n",
+            FILE_APPEND
+        );
+        
+        $this->logger->info('InferenceRouter: Handler resolved', [
+            'handler_name' => $handler->getName(),
+            'intent' => $intent
+        ]);
 
         try {
             $result = $handler->handleStream($message, $thread, $classification, $streamCallback, $progressCallback, $options);

@@ -546,10 +546,15 @@ class ChatController extends AbstractController
                 'topic' => $m->getTopic(),
                 'language' => $m->getLanguage(),
                 'createdAt' => $m->getDateTime(),
-                'files' => $filesData, // Attached files
+                'files' => $filesData, // Attached files (user uploads)
                 'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
                 'webSearch' => $webSearchData, // Web search metadata
                 'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
+                // Generated content (images, videos from AI)
+                'file' => ($m->getFile() && $m->getFilePath()) ? [
+                    'path' => $m->getFilePath(),
+                    'type' => $m->getFileType()
+                ] : null,
             ];
         }, $messages);
 
@@ -617,13 +622,25 @@ class ChatController extends AbstractController
         );
 
         $messageData = array_map(function ($m) {
-            return [
+            $data = [
                 'id' => $m->getId(),
                 'text' => $m->getText(),
                 'direction' => $m->getDirection(),
                 'timestamp' => $m->getUnixTimestamp(),
                 'provider' => $m->getProviderIndex(),
+                'topic' => $m->getTopic(),
+                'language' => $m->getLanguage(),
             ];
+            
+            // Include file information if present
+            if ($m->getFile() && $m->getFilePath()) {
+                $data['file'] = [
+                    'path' => $m->getFilePath(),
+                    'type' => $m->getFileType()
+                ];
+            }
+            
+            return $data;
         }, $messages);
 
         return $this->json([

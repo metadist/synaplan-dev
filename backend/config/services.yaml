@@ -30,9 +30,14 @@ services:
     App\AI\Provider\OpenAIProvider:
         arguments:
             $apiKey: '%env(OPENAI_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/public/uploads'
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.text_to_speech' }
 
     App\AI\Provider\OllamaProvider:
         arguments:
@@ -40,6 +45,25 @@ services:
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.embedding' }
+
+    App\AI\Provider\GroqProvider:
+        arguments:
+            $apiKey: '%env(GROQ_API_KEY)%'
+        tags:
+            - { name: 'app.ai.chat' }
+
+    App\AI\Provider\GoogleProvider:
+        arguments:
+            $apiKey: '%env(GOOGLE_GEMINI_API_KEY)%'
+            $projectId: '%env(string:default::GOOGLE_CLOUD_PROJECT_ID)%'
+            $region: 'us-central1'
+            $uploadDir: '%kernel.project_dir%/public/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.video_generation' }
+            - { name: 'app.ai.text_to_speech' }
 
     # AI Facade
     App\AI\Service\AiFacade: ~
@@ -86,7 +110,15 @@ services:
     App\Service\Message\MessageProcessor: ~
     
     # Message Handlers
-    App\Service\Message\Handler\ChatHandler: ~
+    App\Service\Message\Handler\ChatHandler:
+        tags:
+            - { name: 'app.message.handler' }
+    
+    App\Service\Message\Handler\MediaGenerationHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/public/uploads'
+        tags:
+            - { name: 'app.message.handler' }
 
     # Circuit Breaker
     App\Service\CircuitBreaker: ~
@@ -130,6 +162,12 @@ services:
     App\Controller\FileServeController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
+    
+    App\Controller\StaticUploadController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/public/uploads'
+        tags:
+            - { name: 'controller.service_arguments' }
 
     App\Service\File\PdfRasterizer:
         arguments:

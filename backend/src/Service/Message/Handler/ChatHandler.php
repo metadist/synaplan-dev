@@ -4,6 +4,7 @@ namespace App\Service\Message\Handler;
 
 use App\Entity\Message;
 use App\Repository\PromptRepository;
+use App\Repository\ModelRepository;
 use App\AI\Service\AiFacade;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
@@ -21,6 +22,7 @@ class ChatHandler implements MessageHandlerInterface
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
+        private ModelRepository $modelRepository,
         private LoggerInterface $logger
     ) {}
 
@@ -161,13 +163,7 @@ class ChatHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
-        // Simple system prompt for streaming (like old system)
-        $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
-
-        // Conversation History bauen (TEXT only for streaming)
-        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
-
-        // Get model - Priority: User-selected (Again) > Classification override > DB default
+        // Get model first - Priority: User-selected (Again) > Classification override > DB default
         $modelId = null;
         $provider = null;
         $modelName = null;
@@ -196,18 +192,45 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId()
             ]);
         }
+
+        // Simple system prompt for streaming (like old system)
+        $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
+
+        // Check if model supports system messages (o1 models don't)
+        if ($modelId) {
+            $model = $this->modelRepository->find($modelId);
+            if ($model) {
+                $json = $model->getJson();
+                // o1 models (non-streaming) don't support system messages
+                if (isset($json['supportsStreaming']) && $json['supportsStreaming'] === false) {
+                    // Don't use system message - it will be prepended to first user message instead
+                    $systemPrompt = null;
+                }
+            }
+        }
+
+        // Conversation History bauen (TEXT only for streaming)
+        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
         
-        // Resolve model ID to provider + model name
+        // Resolve model ID to provider + model name + features
+        $modelFeatures = [];
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
+            
+            // Get model features from DB
+            $model = $this->modelRepository->find($modelId);
+            if ($model) {
+                $modelFeatures = $model->getFeatures();
+            }
             
             error_log('🟢 ChatHandler RESOLVED CHAT MODEL: ' . $provider . ' / ' . $modelName . ' (ID: ' . $modelId . ')');
             
             $this->logger->info('ChatHandler: Resolved model for streaming', [
                 'model_id' => $modelId,
                 'provider' => $provider,
-                'model' => $modelName
+                'model' => $modelName,
+                'features' => $modelFeatures
             ]);
         }
 
@@ -216,6 +239,7 @@ class ChatHandler implements MessageHandlerInterface
             'provider' => $provider,
             'model' => $modelName,
             'temperature' => 0.7,
+            'modelFeatures' => $modelFeatures, // Pass features to provider
         ], $options); // Options from frontend (e.g., reasoning: true/false)
         
         $this->logger->info('🔵 ChatHandler: Calling AiFacade chatStream', [
@@ -275,11 +299,14 @@ class ChatHandler implements MessageHandlerInterface
      * Build messages for streaming (TEXT only, no JSON)
      * Like old system: topicPrompt with $stream = true
      */
-    private function buildStreamingMessages(string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
+    private function buildStreamingMessages(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
     {
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt]
-        ];
+        $messages = [];
+        
+        // Add system message if supported (o1 models don't support it)
+        if ($systemPrompt !== null) {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
 
         // Thread Messages hinzufügen (letzte N Messages)
         foreach ($thread as $msg) {

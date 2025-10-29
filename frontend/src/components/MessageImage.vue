@@ -5,11 +5,15 @@
       @click="openFullscreen"
     >
       <img
-        :src="url"
+        v-if="blobUrl"
+        :src="blobUrl"
         :alt="alt"
         class="w-full h-full object-cover transition-transform group-hover:scale-105"
         loading="lazy"
       />
+      <div v-else class="w-full h-full flex items-center justify-center">
+        <div class="text-sm txt-secondary">Loading image...</div>
+      </div>
       <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
         <div class="opacity-0 group-hover:opacity-100 transition-opacity surface-card p-3 rounded-full">
           <svg class="w-6 h-6 txt-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,7 +49,8 @@
         </svg>
       </button>
       <img
-        :src="url"
+        v-if="blobUrl"
+        :src="blobUrl"
         :alt="alt"
         class="max-w-full max-h-full object-contain"
         @click.stop
@@ -58,16 +63,52 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
 interface Props {
   url: string
   alt?: string
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+const authStore = useAuthStore()
 
 const isFullscreen = ref(false)
+const blobUrl = ref<string>('')
+
+// Load image with auth header
+const loadImage = async () => {
+  try {
+    // External URLs (e.g. from OpenAI) don't need auth
+    if (props.url.startsWith('http://') || props.url.startsWith('https://')) {
+      blobUrl.value = props.url
+      return
+    }
+
+    // Internal API URLs need authentication
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const fullUrl = props.url.startsWith('/') ? `${API_BASE_URL}${props.url}` : props.url
+
+    const token = authStore.token
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: token ? {
+        'Authorization': `Bearer ${token}`
+      } : {}
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    // Convert response to blob
+    const blob = await response.blob()
+    blobUrl.value = URL.createObjectURL(blob)
+  } catch (error) {
+    console.error('Failed to load image:', error)
+  }
+}
 
 const openFullscreen = () => {
   isFullscreen.value = true
@@ -85,9 +126,22 @@ const handleEscape = (e: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleEscape)
+  loadImage()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleEscape)
+  // Clean up blob URL
+  if (blobUrl.value && blobUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(blobUrl.value)
+  }
+})
+
+// Reload image if URL changes
+watch(() => props.url, () => {
+  if (blobUrl.value && blobUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(blobUrl.value)
+  }
+  loadImage()
 })
 </script>

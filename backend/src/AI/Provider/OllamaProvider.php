@@ -133,6 +133,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $model = $options['model'];
+            $modelFeatures = $options['modelFeatures'] ?? [];
+            $supportsReasoning = in_array('reasoning', $modelFeatures, true);
             
             // Check if model exists before attempting to use it
             $availableModels = $this->getAvailableModels();
@@ -154,7 +156,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             
             $this->logger->info('🔵 Ollama streaming chat START', [
                 'model' => $model,
-                'message_count' => count($messages)
+                'message_count' => count($messages),
+                'supportsReasoning' => $supportsReasoning
             ]);
 
             // Build prompt from messages (Ollama Completions API style)
@@ -174,7 +177,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             
             $this->logger->info('🟡 Ollama: Prompt built', ['length' => strlen($prompt)]);
 
-            // Use completions API with streaming (like old code)
+            // Use completions API with streaming
             $stream = $this->client->completions()->createStreamed([
                 'model' => $model,
                 'prompt' => $prompt,
@@ -184,13 +187,67 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             
             $chunkCount = 0;
             $fullResponse = '';
+            $inThinkBlock = false;
+            $thinkBuffer = '';
             
             foreach ($stream as $completion) {
-                // Extract response content (like old code: $completion->response)
+                // Extract response content
                 $textChunk = $completion->response ?? '';
                 
                 if (!empty($textChunk)) {
                     $fullResponse .= $textChunk;
+                    
+                    // Parse <think> tags ONLY if model supports reasoning (from DB)
+                    if ($supportsReasoning) {
+                        // Check for <think> opening tag
+                        if (preg_match('/<think>/', $textChunk)) {
+                            $inThinkBlock = true;
+                            $thinkBuffer = '';
+                            // Extract content after <think>
+                            $parts = preg_split('/<think>/', $textChunk, 2);
+                            if (count($parts) > 1) {
+                                $thinkBuffer .= $parts[1];
+                            }
+                            $this->logger->info('🧠 Ollama: <think> tag detected, starting reasoning buffer');
+                            continue;
+                        }
+                        
+                        // Check for </think> closing tag
+                        if ($inThinkBlock && preg_match('/<\/think>/', $textChunk)) {
+                            $parts = preg_split('/<\/think>/', $textChunk, 2);
+                            $thinkBuffer .= $parts[0];
+                            
+                            // Send accumulated thinking as reasoning chunk
+                            if (!empty($thinkBuffer)) {
+                                $this->logger->info('🧠 Ollama: Sending reasoning chunk', [
+                                    'length' => strlen($thinkBuffer),
+                                    'preview' => substr($thinkBuffer, 0, 100)
+                                ]);
+                                
+                                $callback([
+                                    'type' => 'reasoning',
+                                    'content' => $thinkBuffer
+                                ]);
+                            }
+                            
+                            $inThinkBlock = false;
+                            $thinkBuffer = '';
+                            
+                            // Send remaining content after </think> as regular text
+                            if (isset($parts[1]) && !empty($parts[1])) {
+                                $callback($parts[1]);
+                            }
+                            continue;
+                        }
+                        
+                        // If inside think block, accumulate
+                        if ($inThinkBlock) {
+                            $thinkBuffer .= $textChunk;
+                            continue;
+                        }
+                    }
+                    
+                    // Regular content (not in <think> block or reasoning not supported)
                     $callback($textChunk);
                     $chunkCount++;
                     

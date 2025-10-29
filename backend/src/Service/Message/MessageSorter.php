@@ -71,6 +71,12 @@ class MessageSorter
         $keyList = implode(' | ', array_map(fn($t) => '"' . $t . '"', $topics));
         $langList = implode(' | ', array_map(fn($l) => '"' . $l . '"', self::SUPPORTED_LANGUAGES));
 
+        $this->logger->info('MessageSorter: Dynamic list built', [
+            'topics' => $topics,
+            'dynamic_list' => $dynamicList,
+            'key_list' => $keyList
+        ]);
+
         // Replace placeholders in sorting prompt
         $promptText = $sortingPrompt->getPrompt();
         $promptText = str_replace('[DYNAMICLIST]', $dynamicList, $promptText);
@@ -127,8 +133,19 @@ class MessageSorter
 
             $this->logger->info('MessageSorter: AI response received', [
                 'provider' => $response['provider'],
-                'response_length' => strlen($aiResponse)
+                'response_length' => strlen($aiResponse),
+                'raw_response' => $aiResponse
             ]);
+
+            // DEBUG: Write to file for easier debugging
+            file_put_contents('/tmp/sorting-debug.txt', 
+                "=== SORTING DEBUG ===\n" .
+                "Time: " . date('Y-m-d H:i:s') . "\n" .
+                "AI Response:\n" . $aiResponse . "\n" .
+                "Provider: " . $response['provider'] . "\n" .
+                "===================\n\n",
+                FILE_APPEND
+            );
 
             // Parse JSON response
             $parsed = $this->parseResponse($aiResponse, $messageData);

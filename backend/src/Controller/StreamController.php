@@ -7,7 +7,7 @@ use App\Entity\MessageFile;
 use App\Entity\User;
 use App\AI\Service\AiFacade;
 use App\Service\Message\MessageProcessor;
-use App\Service\AgainService;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,8 +24,8 @@ class StreamController extends AbstractController
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private MessageProcessor $messageProcessor,
-        private AgainService $againService,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private ModelConfigService $modelConfigService
     ) {}
 
     #[Route('/stream', name: 'stream', methods: ['GET'])]
@@ -43,6 +43,8 @@ class StreamController extends AbstractController
         $includeReasoning = $request->query->get('reasoning', '0') === '1';
         $webSearch = $request->query->get('webSearch', '0') === '1';
         $modelId = $request->query->get('modelId', null);
+        
+        error_log('🔍 StreamController: Query params - reasoning=' . $request->query->get('reasoning', 'NOT SET') . ', includeReasoning=' . ($includeReasoning ? 'TRUE' : 'FALSE'));
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
 
         // Parse fileIds (can be comma-separated string or single ID)
@@ -195,26 +197,58 @@ class StreamController extends AbstractController
                     ]);
                 }
                 
+                // Check if selected model supports streaming
+                $supportsStreaming = true;
+                if ($modelId) {
+                    $supportsStreaming = $this->modelConfigService->supportsStreaming((int) $modelId);
+                    error_log('🔍 Model supports streaming: ' . ($supportsStreaming ? 'YES' : 'NO'));
+                }
+                
+                // Route to streaming or non-streaming handler
+                if (!$supportsStreaming) {
+                    // Non-streaming models (e.g., o1-preview, o1-mini)
+                    $this->handleNonStreamingRequest($incomingMessage, $processingOptions);
+                    return $response;
+                }
+                
+                // Regular streaming path
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
-                    // Stream callback - AI streams TEXT directly
+                    // Stream callback - AI streams TEXT directly or structured data (reasoning)
                     function($chunk) use (&$responseText, &$chunkCount) {
                         if (connection_aborted()) {
                             error_log('🔴 StreamController: Connection aborted');
                             return;
                         }
                         
-                        $responseText .= $chunk;
-                        
-                        // Stream immediately to frontend
-                        if (!empty($chunk)) {
-                            $this->sendSSE('data', ['chunk' => $chunk]);
+                        // Handle structured chunk (reasoning models)
+                        if (is_array($chunk)) {
+                            $type = $chunk['type'] ?? 'content';
+                            $content = $chunk['content'] ?? '';
                             
-                            if ($chunkCount === 0) {
-                                error_log('🔵 StreamController: Started streaming');
+                            if ($type === 'reasoning') {
+                                // Send reasoning chunks separately
+                                $this->sendSSE('reasoning', ['chunk' => $content]);
+                            } else {
+                                // Regular content
+                                $responseText .= $content;
+                                if (!empty($content)) {
+                                    $this->sendSSE('data', ['chunk' => $content]);
+                                }
                             }
-                            $chunkCount++;
+                        } else {
+                            // Legacy string chunks (non-reasoning models)
+                            $responseText .= $chunk;
+                            
+                            if (!empty($chunk)) {
+                                $this->sendSSE('data', ['chunk' => $chunk]);
+                            }
                         }
+                        
+                        if ($chunkCount === 0) {
+                            error_log('🔵 StreamController: Started streaming');
+                        }
+                        $chunkCount++;
                     },
                     // Status callback
                     function($statusUpdate) {
@@ -463,21 +497,6 @@ class StreamController extends AbstractController
                 
                 $this->em->flush();
 
-                // Get Again data with message ID to determine current model
-                $this->logger->info('StreamController: Getting againData', [
-                    'topic' => $classification['topic'],
-                    'message_id' => $outgoingMessage->getId()
-                ]);
-                
-                $againData = $this->getAgainData($classification['topic'], $outgoingMessage->getId());
-                
-                $this->logger->info('StreamController: AgainData retrieved', [
-                    'eligible_count' => count($againData['eligible'] ?? []),
-                    'has_predicted' => isset($againData['predictedNext']),
-                    'current_model_id' => $againData['current_model_id'] ?? null,
-                    'tag' => $againData['tag'] ?? null
-                ]);
-
                 // Get search results if available
                 $searchResults = null;
                 if (isset($result['search_results']) && !empty($result['search_results']['results'])) {
@@ -498,7 +517,7 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Send complete event
+                // Send complete event (WITHOUT againData - frontend handles this)
                 $this->sendSSE('complete', [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
@@ -506,7 +525,6 @@ class StreamController extends AbstractController
                     'model' => $response['metadata']['model'] ?? 'unknown',
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
-                    'again' => $againData,
                     'searchResults' => $searchResults, // Include search results
                 ]);
                 
@@ -553,6 +571,59 @@ class StreamController extends AbstractController
         return $response;
     }
 
+    /**
+     * Handle non-streaming requests for models that don't support streaming (e.g., o1-preview)
+     */
+    private function handleNonStreamingRequest(\App\Entity\Message $message, array $options): void
+    {
+        try {
+            // Send processing status
+            $this->sendSSE('status', ['message' => 'Processing with non-streaming model...']);
+            
+            // Process message without streaming
+            $result = $this->messageProcessor->process($message, $options);
+            
+            if (!$result['success']) {
+                $this->sendSSE('error', ['error' => $result['error']]);
+                return;
+            }
+            
+            // Get response content
+            $content = $result['content'] ?? '';
+            $metadata = $result['metadata'] ?? [];
+            
+            // Extract reasoning if present (for o1 models)
+            $reasoning = null;
+            if (isset($metadata['reasoning'])) {
+                $reasoning = $metadata['reasoning'];
+                unset($metadata['reasoning']);
+            }
+            
+            // Send reasoning first if available
+            if ($reasoning) {
+                $this->sendSSE('reasoning_complete', ['reasoning' => $reasoning]);
+            }
+            
+            // Send content in one chunk (simulating streaming)
+            $this->sendSSE('data', ['chunk' => $content]);
+            
+            // Send complete event
+            $this->sendSSE('complete', [
+                'messageId' => $message->getId(),
+                'provider' => $metadata['provider'] ?? 'unknown',
+                'model' => $metadata['model'] ?? 'unknown',
+                'trackId' => $_GET['trackId'] ?? time(),
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->logger->error('Non-streaming processing failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->sendSSE('error', ['error' => 'Failed to process: ' . $e->getMessage()]);
+        }
+    }
+
     private function sendSSE(string $status, array $data): void
     {
         if (connection_aborted()) {
@@ -573,30 +644,4 @@ class StreamController extends AbstractController
         flush();
     }
 
-    private function getAgainData(string $topic, ?int $messageId): array
-    {
-        $tag = $this->againService->resolveTagFromTopic($topic);
-        $eligibleModels = $this->againService->getEligibleModels($tag);
-        
-        // Get current model ID from message metadata
-        $currentModelId = null;
-        if ($messageId) {
-            $message = $this->em->getRepository(Message::class)->find($messageId);
-            if ($message) {
-                $currentModelId = $message->getMeta('ai_chat_model_id');
-                if ($currentModelId) {
-                    $currentModelId = (int)$currentModelId;
-                }
-            }
-        }
-        
-        $predictedNext = $this->againService->getPredictedNext($eligibleModels, $currentModelId);
-
-        return [
-            'eligible' => $eligibleModels,
-            'predictedNext' => $predictedNext,
-            'current_model_id' => $currentModelId,
-            'tag' => $tag,
-        ];
-    }
 }

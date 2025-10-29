@@ -48,6 +48,9 @@ security:
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
         
+        # Public file uploads endpoint (controller handles auth internally)
+        - { path: ^/api/v1/files/uploads/, roles: PUBLIC_ACCESS }
+        
         # Webhook endpoints (require API key authentication)
         - { path: ^/api/v1/webhooks, roles: IS_AUTHENTICATED_FULLY }
         

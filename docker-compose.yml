@@ -22,6 +22,8 @@ services:
       context: .
       dockerfile: _docker/backend/Dockerfile
     container_name: synaplan-backend
+    env_file:
+      - backend/.env
     ports:
       - "8000:80"
     volumes:
@@ -45,24 +47,15 @@ services:
       JWT_PASSPHRASE: 'change_me_in_production'
       # Mailer
       MAILER_DSN: ${MAILER_DSN:-null://null}
-      # External API Keys (optional)
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+      # External API Keys loaded from backend/.env via env_file
       # WhatsApp Business API
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
-      # Brave Search API
-      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
-      BRAVE_SEARCH_API_URL: ${BRAVE_SEARCH_API_URL:-https://api.search.brave.com/res/v1}
-      BRAVE_SEARCH_ENABLED: ${BRAVE_SEARCH_ENABLED:-false}
-      BRAVE_SEARCH_COUNT: ${BRAVE_SEARCH_COUNT:-10}
-      BRAVE_SEARCH_COUNTRY: ${BRAVE_SEARCH_COUNTRY:-us}
-      BRAVE_SEARCH_SEARCH_LANG: ${BRAVE_SEARCH_SEARCH_LANG:-en}
+      # AI Provider API Keys (loaded from backend/.env via env_file above)
+      # GROQ_API_KEY is automatically loaded from backend/.env
       AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-false}
     depends_on:
       db:

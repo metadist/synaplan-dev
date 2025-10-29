@@ -6,6 +6,7 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\FileAnalysisProviderInterface;
@@ -34,6 +35,8 @@ class ProviderRegistry
         iterable $visionProviders = [],
         #[TaggedIterator('app.ai.image_generation')]
         iterable $imageGenerationProviders = [],
+        #[TaggedIterator('app.ai.video_generation')]
+        iterable $videoGenerationProviders = [],
         #[TaggedIterator('app.ai.speech_to_text')]
         iterable $speechToTextProviders = [],
         #[TaggedIterator('app.ai.text_to_speech')]
@@ -56,6 +59,9 @@ class ProviderRegistry
         }
         foreach ($imageGenerationProviders as $provider) {
             $this->providers['image_generation'][$provider->getName()] = $provider;
+        }
+        foreach ($videoGenerationProviders as $provider) {
+            $this->providers['video_generation'][$provider->getName()] = $provider;
         }
         foreach ($speechToTextProviders as $provider) {
             $this->providers['speech_to_text'][$provider->getName()] = $provider;
@@ -97,12 +103,18 @@ class ProviderRegistry
         // Normalize provider name (case-insensitive)
         $providerName = strtolower($providerName);
         
+        // Normalize DB keys to lowercase
+        $dbCaps = array_change_key_case($dbCaps, CASE_LOWER);
+        
+        $this->logger->error('🔍 CAPABILITY CHECK: provider=' . $providerName . ' | capability=' . $capability . ' | dbCaps_keys=' . json_encode(array_keys($dbCaps)) . ' | provider_in_db=' . (isset($dbCaps[$providerName]) ? 'YES' : 'NO'));
+        
         // Map capability names: chat -> chat, embedding -> vectorize, vision -> pic2text
         $capabilityMap = [
             'chat' => 'chat',
             'embedding' => 'vectorize',
             'vision' => 'pic2text',
             'image_generation' => 'text2pic',
+            'video_generation' => 'text2vid',
             'speech_to_text' => 'sound2text',
             'text_to_speech' => 'text2sound',
             'file_analysis' => 'analyze'
@@ -133,8 +145,13 @@ class ProviderRegistry
         }
         
         foreach ($this->providers[$capability] as $provider) {
+            $providerLower = strtolower($provider->getName());
+            $isAvailable = $provider->isAvailable();
+            
+            $this->logger->error('🔍 PROVIDER LOOP: capability=' . $capability . ' | providerLower=' . $providerLower . ' | normalizedName=' . $normalizedName . ' | isAvailable=' . ($isAvailable ? 'YES' : 'NO') . ' | match=' . ($providerLower === $normalizedName ? 'YES' : 'NO'));
+            
             // Case-insensitive comparison
-            if (strtolower($provider->getName()) === $normalizedName && $provider->isAvailable()) {
+            if ($providerLower === $normalizedName && $isAvailable) {
                 // Check if capability is enabled in DB (using normalized name)
                 if (!$this->isCapabilityEnabled($normalizedName, $capability)) {
                     $this->logger->warning('Provider capability disabled in DB', [
@@ -188,6 +205,22 @@ class ProviderRegistry
     public function getImageGenerationProvider(?string $name = null): ImageGenerationProviderInterface
     {
         return $this->getProvider('image_generation', $name);
+    }
+
+    public function getVideoGenerationProvider(?string $name = null): VideoGenerationProviderInterface
+    {
+        $dbCaps = $this->loadDbCapabilities();
+        
+        $registered = array_keys($this->providers['video_generation'] ?? []);
+        $allCaps = array_keys($this->providers);
+        $dbGoogle = $dbCaps['google'] ?? 'NOT_FOUND';
+        
+        $this->logger->error('🎬 VIDEO DEBUG: requested=' . ($name ?? 'DEFAULT') 
+            . ' | registered=' . json_encode($registered)
+            . ' | all_caps=' . json_encode($allCaps)
+            . ' | db_google=' . json_encode($dbGoogle));
+        
+        return $this->getProvider('video_generation', $name);
     }
 
     public function getSpeechToTextProvider(?string $name = null): SpeechToTextProviderInterface

@@ -66,6 +66,7 @@ class ConfigController extends AbstractController
             'VECTORIZE' => [],
             'PIC2TEXT' => [],
             'TEXT2PIC' => [],
+            'TEXT2VID' => [],
             'SOUND2TEXT' => [],
             'TEXT2SOUND' => [],
             'ANALYZE' => []
@@ -92,6 +93,10 @@ class ConfigController extends AbstractController
                 case 'IMAGE':
                 case 'TEXT2PIC':
                     $grouped['TEXT2PIC'][] = $model;
+                    break;
+                case 'VIDEO':
+                case 'TEXT2VID':
+                    $grouped['TEXT2VID'][] = $model;
                     break;
                 case 'AUDIO':
                 case 'SOUND2TEXT':
@@ -128,7 +133,7 @@ class ConfigController extends AbstractController
         }
 
         $userId = $user->getId();
-        $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
         
         $defaults = [];
 
@@ -177,7 +182,7 @@ class ConfigController extends AbstractController
         }
 
         $userId = $user->getId();
-        $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         foreach ($data['defaults'] as $capability => $modelId) {
             if (!in_array($capability, $validCapabilities)) {
