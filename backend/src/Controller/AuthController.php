@@ -9,6 +9,7 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\MailerService;
+use App\Service\RecaptchaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -21,8 +22,10 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/auth', name: 'api_auth_')]
+#[OA\Tag(name: 'Authentication')]
 class AuthController extends AbstractController
 {
     private int $resendCooldownMinutes;
@@ -36,6 +39,7 @@ class AuthController extends AbstractController
         private UserPasswordHasherInterface $passwordHasher,
         private JWTTokenManagerInterface $jwtManager,
         private MailerService $mailerService,
+        private RecaptchaService $recaptchaService,
         private ValidatorInterface $validator,
         private LoggerInterface $logger
     ) {
@@ -44,9 +48,46 @@ class AuthController extends AbstractController
     }
 
     #[Route('/register', name: 'register', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/auth/register',
+        summary: 'Register a new user',
+        description: 'Create a new user account and send verification email',
+        tags: ['Authentication']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['email', 'password'],
+            properties: [
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 201,
+        description: 'User registered successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'message', type: 'string', example: 'User registered successfully'),
+                new OA\Property(property: 'user_id', type: 'integer', example: 123)
+            ]
+        )
+    )]
+    #[OA\Response(response: 409, description: 'Email already registered')]
+    #[OA\Response(response: 400, description: 'Validation error')]
     public function register(
-        #[MapRequestPayload] RegisterRequest $dto
+        #[MapRequestPayload] RegisterRequest $dto,
+        Request $request
     ): JsonResponse {
+        // Verify reCAPTCHA
+        $recaptchaToken = $request->request->get('recaptchaToken') ?? $request->toArray()['recaptchaToken'] ?? '';
+        if (!$this->recaptchaService->verify($recaptchaToken, 'register', $request->getClientIp())) {
+            return $this->json([
+                'error' => 'reCAPTCHA verification failed. Please try again.'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         // Check if user exists
         if ($this->userRepository->findOneBy(['mail' => $dto->email])) {
             return $this->json([
@@ -90,11 +131,52 @@ class AuthController extends AbstractController
     }
 
     #[Route('/login', name: 'login', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/auth/login',
+        summary: 'User login',
+        description: 'Authenticate user and receive JWT token',
+        tags: ['Authentication']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['email', 'password'],
+            properties: [
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
+                new OA\Property(property: 'recaptchaToken', type: 'string', description: 'Google reCAPTCHA v3 token (required in production)', example: '03AGdBq27...')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Login successful',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGc...'),
+                new OA\Property(property: 'user', type: 'object', properties: [
+                    new OA\Property(property: 'id', type: 'integer', example: 123),
+                    new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
+                    new OA\Property(property: 'email_verified', type: 'boolean', example: true)
+                ])
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Invalid credentials')]
+    #[OA\Response(response: 403, description: 'Email not verified')]
     public function login(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
         $email = $data['email'] ?? '';
         $password = $data['password'] ?? '';
+        $recaptchaToken = $data['recaptchaToken'] ?? '';
+
+        // Verify reCAPTCHA
+        if (!$this->recaptchaService->verify($recaptchaToken, 'login', $request->getClientIp())) {
+            return $this->json([
+                'error' => 'reCAPTCHA verification failed. Please try again.'
+            ], Response::HTTP_BAD_REQUEST);
+        }
 
         if (empty($email) || empty($password)) {
             return $this->json(['error' => 'Email and password required'], Response::HTTP_BAD_REQUEST);

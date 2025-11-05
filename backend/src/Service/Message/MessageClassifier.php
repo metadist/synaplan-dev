@@ -231,10 +231,24 @@ class MessageClassifier
     {
         // Map BPROMPTS topics to InferenceRouter intents
         $topicToIntent = [
+            // Media generation
             'mediamaker' => 'image_generation', // Handles images, videos, and audio
+            'text2pic' => 'image_generation',
+            'text2vid' => 'image_generation',
+            'text2sound' => 'image_generation',
+            
+            // Document/Office generation
             'officemaker' => 'document_generation',
+            
+            // Analysis
             'analyzefile' => 'file_analysis',
+            'pic2text' => 'file_analysis',
+            'analyze' => 'file_analysis',
+            
+            // Chat/General
             'general' => 'chat',
+            'chat' => 'chat',
+            
             // Add more mappings as needed
         ];
 

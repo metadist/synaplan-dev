@@ -187,67 +187,24 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             
             $chunkCount = 0;
             $fullResponse = '';
-            $inThinkBlock = false;
-            $thinkBuffer = '';
             
             foreach ($stream as $completion) {
                 // Extract response content
                 $textChunk = $completion->response ?? '';
                 
+                // Sanitize UTF-8 to prevent "Malformed UTF-8 characters" errors
+                if (!empty($textChunk)) {
+                    // Remove invalid UTF-8 characters
+                    $textChunk = mb_convert_encoding($textChunk, 'UTF-8', 'UTF-8');
+                    // Alternative: use iconv for more aggressive cleaning
+                    // $textChunk = iconv('UTF-8', 'UTF-8//IGNORE', $textChunk);
+                }
+                
                 if (!empty($textChunk)) {
                     $fullResponse .= $textChunk;
                     
-                    // Parse <think> tags ONLY if model supports reasoning (from DB)
-                    if ($supportsReasoning) {
-                        // Check for <think> opening tag
-                        if (preg_match('/<think>/', $textChunk)) {
-                            $inThinkBlock = true;
-                            $thinkBuffer = '';
-                            // Extract content after <think>
-                            $parts = preg_split('/<think>/', $textChunk, 2);
-                            if (count($parts) > 1) {
-                                $thinkBuffer .= $parts[1];
-                            }
-                            $this->logger->info('🧠 Ollama: <think> tag detected, starting reasoning buffer');
-                            continue;
-                        }
-                        
-                        // Check for </think> closing tag
-                        if ($inThinkBlock && preg_match('/<\/think>/', $textChunk)) {
-                            $parts = preg_split('/<\/think>/', $textChunk, 2);
-                            $thinkBuffer .= $parts[0];
-                            
-                            // Send accumulated thinking as reasoning chunk
-                            if (!empty($thinkBuffer)) {
-                                $this->logger->info('🧠 Ollama: Sending reasoning chunk', [
-                                    'length' => strlen($thinkBuffer),
-                                    'preview' => substr($thinkBuffer, 0, 100)
-                                ]);
-                                
-                                $callback([
-                                    'type' => 'reasoning',
-                                    'content' => $thinkBuffer
-                                ]);
-                            }
-                            
-                            $inThinkBlock = false;
-                            $thinkBuffer = '';
-                            
-                            // Send remaining content after </think> as regular text
-                            if (isset($parts[1]) && !empty($parts[1])) {
-                                $callback($parts[1]);
-                            }
-                            continue;
-                        }
-                        
-                        // If inside think block, accumulate
-                        if ($inThinkBlock) {
-                            $thinkBuffer .= $textChunk;
-                            continue;
-                        }
-                    }
-                    
-                    // Regular content (not in <think> block or reasoning not supported)
+                    // Send chunk as-is (including <think> tags if present)
+                    // Frontend will parse <think> tags from the accumulated content
                     $callback($textChunk);
                     $chunkCount++;
                     

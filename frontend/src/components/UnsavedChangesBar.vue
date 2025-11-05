@@ -30,7 +30,6 @@
             
             <div class="flex items-center gap-3 w-full md:w-auto">
               <button
-                ref="discardButton"
                 @click="handleDiscard"
                 :disabled="isSaving"
                 class="flex-1 md:flex-none px-6 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2"
@@ -46,7 +45,6 @@
                 {{ $t('widget.previewWidget') }}
               </button>
               <button
-                ref="saveButton"
                 @click="handleSave"
                 :disabled="isSaving"
                 class="flex-1 md:flex-none btn-primary px-8 py-3 rounded-lg font-semibold text-base min-h-[48px] shadow-lg hover:shadow-xl transition-shadow disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)] flex items-center justify-center gap-2"
@@ -87,8 +85,6 @@ const emit = defineEmits<{
 }>()
 
 const isSaving = ref(false)
-const discardButton = ref<HTMLButtonElement | null>(null)
-const saveButton = ref<HTMLButtonElement | null>(null)
 
 const handleSave = async () => {
   if (isSaving.value) return
@@ -109,6 +105,14 @@ const handlePreview = () => {
 const handleKeydown = (e: KeyboardEvent) => {
   if (!props.show || isSaving.value) return
   
+  // Cmd+S / Ctrl+S to save
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault()
+    handleSave()
+    return
+  }
+  
+  // Escape to discard
   if (e.key === 'Escape') {
     e.preventDefault()
     handleDiscard()
@@ -118,12 +122,8 @@ const handleKeydown = (e: KeyboardEvent) => {
 watch(() => props.show, (newVal) => {
   if (!newVal) {
     isSaving.value = false
-  } else {
-    // Focus save button when bar appears
-    setTimeout(() => {
-      saveButton.value?.focus()
-    }, 350)
   }
+  // Don't auto-focus buttons - let user continue typing
 })
 
 onMounted(() => {

@@ -129,12 +129,12 @@ class GroqProvider implements ChatProviderInterface
 
         try {
             $model = $options['model'];
-            $reasoning = $options['reasoning'] ?? false;
+            // Note: Qwen3 models send <think> tags directly in content, not via reasoning_format
+            // reasoning_format is mainly for OpenAI o-series models
             
             $this->logger->info('🟢 Groq streaming chat START', [
                 'model' => $model,
-                'message_count' => count($messages),
-                'reasoning' => $reasoning
+                'message_count' => count($messages)
             ]);
 
             $requestOptions = [
@@ -151,40 +151,33 @@ class GroqProvider implements ChatProviderInterface
                 $requestOptions['temperature'] = $options['temperature'];
             }
 
-            // Reasoning models on Groq may support reasoning_format
-            if ($reasoning) {
-                $requestOptions['reasoning_format'] = 'visible';
-                $this->logger->info('🧠 Groq: Reasoning enabled with visible format');
-            }
-
+            // Note: Qwen3 models automatically include <think> tags in content
+            // We don't need to set reasoning_format for Groq
+            
             $stream = $this->client->chat()->createStreamed($requestOptions);
 
             $chunkCount = 0;
-            $isReasoningModel = stripos($model, 'deepseek-r1') !== false || 
-                               stripos($model, 'reasoning') !== false;
 
             foreach ($stream as $response) {
                 $chunkCount++;
                 
+                // Handle reasoning content (for models with structured reasoning like OpenAI o1)
+                // @phpstan-ignore-next-line - Groq API response structure varies by model
+                if (isset($response->choices[0]->delta->reasoning_content)) {
+                    $reasoningContent = $response->choices[0]->delta->reasoning_content;
+                    
+                    $callback([
+                        'type' => 'reasoning',
+                        'content' => $reasoningContent
+                    ]);
+                }
+                
+                // Handle regular content (may include <think> tags for models like Qwen3)
                 if (isset($response->choices[0]->delta->content)) {
                     $content = $response->choices[0]->delta->content;
                     
-                    // For reasoning models, parse <think> tags
-                    if ($isReasoningModel && $reasoning) {
-                        // Check if this is reasoning content (inside <think> tags)
-                        if (preg_match('/<think>(.*?)<\/think>/s', $content, $matches)) {
-                            $callback([
-                                'type' => 'reasoning',
-                                'content' => $matches[1]
-                            ]);
-                        } else {
-                            // Regular content
-                            $callback($content);
-                        }
-                    } else {
-                        // Non-reasoning models or reasoning disabled
-                        $callback($content);
-                    }
+                    // Send as plain string (not structured) so <think> tags pass through
+                    $callback($content);
                 }
             }
 

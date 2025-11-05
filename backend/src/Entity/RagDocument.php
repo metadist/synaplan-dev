@@ -25,12 +25,16 @@ class RagDocument
     #[ORM\JoinColumn(name: 'BUID', referencedColumnName: 'BID')]
     private ?User $user = null;
 
+    /**
+     * BMID can reference EITHER:
+     * - BMESSAGES.BID (for chat message attachments)
+     * - BMESSAGEFILES.BID (for standalone file uploads)
+     * 
+     * We store only the ID without FK constraint to support both cases flexibly.
+     * Application logic determines which table this ID references based on context.
+     */
     #[ORM\Column(name: 'BMID', type: 'bigint')]
     private int $messageId;
-
-    #[ORM\ManyToOne(targetEntity: Message::class)]
-    #[ORM\JoinColumn(name: 'BMID', referencedColumnName: 'BID')]
-    private ?Message $message = null;
 
     #[ORM\Column(name: 'BGROUPKEY', length: 64)]
     private string $groupKey;
@@ -97,20 +101,6 @@ class RagDocument
     public function setMessageId(int $messageId): self
     {
         $this->messageId = $messageId;
-        return $this;
-    }
-
-    public function getMessage(): ?Message
-    {
-        return $this->message;
-    }
-
-    public function setMessage(?Message $message): self
-    {
-        $this->message = $message;
-        if ($message) {
-            $this->messageId = $message->getId();
-        }
         return $this;
     }
 

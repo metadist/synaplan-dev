@@ -10,6 +10,7 @@ use App\Service\Message\MessageClassifier;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
+use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
 
@@ -33,6 +34,7 @@ class MessageProcessor
         private MessageClassifier $classifier,
         private InferenceRouter $router,
         private ModelConfigService $modelConfigService,
+        private PromptService $promptService,
         private BraveSearchService $braveSearchService,
         private SearchQueryGenerator $searchQueryGenerator,
         private LoggerInterface $logger
@@ -157,6 +159,19 @@ class MessageProcessor
                     'sorting_model_name' => $sortingModelName
                 ]);
             }
+
+            // Step 2.3: Load Prompt Metadata and apply tool restrictions
+            $topic = $classification['topic'] ?? 'general';
+            $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
+            $promptMetadata = $promptData['metadata'] ?? [];
+            
+            // Apply tool restrictions from prompt metadata
+            // If prompt explicitly DISABLES a tool, override frontend request
+            if (isset($promptMetadata['tool_internet_search']) && !$promptMetadata['tool_internet_search']) {
+                $options['web_search'] = false;
+            }
+            
+            // TODO: Add similar logic for files_search and url_screenshot when implemented
 
             // Step 2.5: Web Search (if requested or AI-classified)
             $searchResults = null;

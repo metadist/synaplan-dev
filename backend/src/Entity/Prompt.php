@@ -30,6 +30,9 @@ class Prompt
     #[ORM\Column(name: 'BPROMPT', type: 'text')]
     private string $prompt;
 
+    #[ORM\Column(name: 'BSELECTION_RULES', type: 'text', nullable: true)]
+    private ?string $selectionRules = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -87,6 +90,17 @@ class Prompt
     public function setPrompt(string $prompt): self
     {
         $this->prompt = $prompt;
+        return $this;
+    }
+
+    public function getSelectionRules(): ?string
+    {
+        return $this->selectionRules;
+    }
+
+    public function setSelectionRules(?string $selectionRules): self
+    {
+        $this->selectionRules = $selectionRules;
         return $this;
     }
 }

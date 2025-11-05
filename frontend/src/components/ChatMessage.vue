@@ -270,6 +270,7 @@
                       :alt="result.title"
                       class="w-full h-full object-cover"
                       loading="lazy"
+                      @error="handleThumbnailError"
                     />
                   </div>
                   
@@ -307,7 +308,18 @@
         ]"
       >
         <!-- Left: AI Model Badges + timestamp -->
-        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+        <div class="flex items-center gap-1 min-w-0 flex-wrap">
+          <!-- Topic Badge (assistant only) - Ultra compact -->
+          <template v-if="role === 'assistant' && topic">
+            <div
+              class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 leading-tight"
+              :title="`Topic: ${topic}`"
+            >
+              <Icon icon="mdi:tag" class="w-2.5 h-2.5" />
+              <span class="uppercase tracking-tight">{{ topic.substring(0, 8) }}</span>
+            </div>
+          </template>
+          
           <!-- AI Model Badges (assistant only) -->
           <template v-if="role === 'assistant' && aiModels">
             <!-- Chat/Image/Video Model Badge (dynamic based on content type) -->
@@ -457,6 +469,7 @@ interface Props {
   isStreaming?: boolean
   provider?: string
   modelLabel?: string
+  topic?: string // Topic from message classification
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
@@ -766,6 +779,16 @@ const handleReferenceClick = (event: MouseEvent) => {
     if (index >= 0 && props.searchResults && index < props.searchResults.length) {
       focusSource(index)
     }
+  }
+}
+
+// Handle thumbnail loading errors silently by replacing with placeholder
+const handleThumbnailError = (event: Event) => {
+  const img = event.target as HTMLImageElement
+  if (img) {
+    // Replace with a data URL placeholder to avoid console spam
+    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23f3f4f6"/%3E%3Cpath d="M70 80h60v40H70z" fill="%23d1d5db"/%3E%3Ccircle cx="85" cy="95" r="8" fill="%23ffffff"/%3E%3Cpath d="M70 110l20-15 15 10 25-20v35H70z" fill="%239ca3af"/%3E%3C/svg%3E'
+    img.onerror = null // Prevent infinite loop
   }
 }
 

@@ -142,23 +142,27 @@ class ModelFixtures extends Fixture
             [
                 'id' => 53,
                 'service' => 'Groq',
-                'name' => 'deepseek-r1-distill-llama-70b',
+                'name' => 'Qwen3 32B (Reasoning)',
                 'tag' => 'chat',
-                'selectable' => 0,
-                'active' => 0,
-                'providerId' => 'deepseek-r1-distill-llama-70b',
-                'priceIn' => 0.75,
+                'selectable' => 1,
+                'active' => 1,
+                'providerId' => 'qwen/qwen3-32b',
+                'priceIn' => 0.15,
                 'inUnit' => 'per1M',
-                'priceOut' => 0.99,
+                'priceOut' => 0.60,
                 'outUnit' => 'per1M',
                 'quality' => 9,
-                'rating' => 0,
+                'rating' => 5,
                 'json' => [
-                    'description' => 'DeepSeek R1 Distilled model - NOT available on Groq API',
+                    'description' => '🧠 Groq Qwen3 32B mit Reasoning - 32B-Parameter Reasoning-Modell von Qwen. Zeigt Denkprozess mit <think> Tags. Optimiert für logisches Denken und Problemlösung. Sehr schnell durch Groq Hardware.',
                     'params' => [
-                        'model' => 'deepseek-r1-distill-llama-70b'
+                        'model' => 'qwen/qwen3-32b'
                     ],
-                    'features' => ['reasoning']
+                    'features' => ['reasoning'],
+                    'meta' => [
+                        'context_window' => '32768',
+                        'reasoning_format' => 'raw'
+                    ]
                 ]
             ],
             [
@@ -174,9 +178,9 @@ class ModelFixtures extends Fixture
                 'priceOut' => 0.50,
                 'outUnit' => 'per1M',
                 'quality' => 9,
-                'rating' => 1,
+                'rating' => 3,
                 'json' => [
-                    'description' => 'OpenAIs gpt-oss-20b Modell, bereitgestellt von Groq. Ein 21-Milliarden-Parameter-Modell mit Mixture-of-Experts-Architektur, optimiert für niedrige Latenz und Einsatz auf Consumer-Hardware.',
+                    'description' => 'Groq GPT-OSS 20B - 21B-Parameter MoE-Modell. Optimiert für niedrige Latenz und schnelle Inferenz. Sehr schnell durch Groq Hardware.',
                     'params' => [
                         'model' => 'openai/gpt-oss-20b'
                     ],
@@ -199,10 +203,10 @@ class ModelFixtures extends Fixture
                 'inUnit' => 'per1M',
                 'priceOut' => 0.75,
                 'outUnit' => 'per1M',
-                'quality' => 9,
-                'rating' => 1,
+                'quality' => 10,
+                'rating' => 4,
                 'json' => [
-                    'description' => 'OpenAIs gpt-oss-120b Modell, bereitgestellt von Groq. Ein 120-Milliarden-Parameter-Modell mit Mixture-of-Experts-Architektur, geeignet für anspruchsvolle agentische Anwendungen.',
+                    'description' => 'Groq GPT-OSS 120B - 120B-Parameter MoE-Modell. Für anspruchsvolle agentische Anwendungen. Schnelle Inferenz dank Groq Hardware.',
                     'params' => [
                         'model' => 'openai/gpt-oss-120b'
                     ],
@@ -793,42 +797,77 @@ class ModelFixtures extends Fixture
             [
                 'id' => 69,
                 'service' => 'Anthropic',
-                'name' => 'Claude Opus 4',
+                'name' => 'Claude 3 Opus',
                 'tag' => 'chat',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'claude-opus-4-20250514',
+                'providerId' => 'claude-3-opus-20240229',
                 'priceIn' => 15,
                 'inUnit' => 'per1M',
                 'priceOut' => 75,
                 'outUnit' => 'per1M',
-                'quality' => 7,
-                'rating' => 0.5,
+                'quality' => 10,
+                'rating' => 1,
                 'json' => [
-                    'description' => 'Claude Opus 4 of Anthropic as the alternative chat method.',
+                    'description' => 'Claude 3 Opus - Anthropic\'s most powerful model for complex tasks, analysis, and high-quality outputs. Excellent at reasoning and following instructions.',
                     'params' => [
-                        'model' => 'claude-opus-4-20250514'
+                        'model' => 'claude-3-opus-20240229'
+                    ],
+                    'features' => ['vision'],
+                    'meta' => [
+                        'context_window' => '200000',
+                        'max_output' => '4096'
                     ]
                 ]
             ],
             [
-                'id' => 74,
+                'id' => 92,
                 'service' => 'Anthropic',
-                'name' => 'Claude Sonnet 4',
+                'name' => 'Claude 3 Haiku',
                 'tag' => 'chat',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'claude-sonnet-4-20250514',
-                'priceIn' => 3,
+                'providerId' => 'claude-3-haiku-20240307',
+                'priceIn' => 0.25,
                 'inUnit' => 'per1M',
-                'priceOut' => 15,
+                'priceOut' => 1.25,
                 'outUnit' => 'per1M',
-                'quality' => 9,
+                'quality' => 7,
+                'rating' => 2,
+                'json' => [
+                    'description' => 'Claude 3 Haiku - Fast and cost-effective model for everyday tasks. Great for quick responses and simple queries.',
+                    'params' => [
+                        'model' => 'claude-3-haiku-20240307'
+                    ],
+                    'features' => ['vision'],
+                    'meta' => [
+                        'context_window' => '200000',
+                        'max_output' => '4096'
+                    ]
+                ]
+            ],
+            [
+                'id' => 93,
+                'service' => 'Anthropic',
+                'name' => 'Claude 3 Opus (Vision)',
+                'tag' => 'pic2text',
+                'selectable' => 1,
+                'active' => 1,
+                'providerId' => 'claude-3-opus-20240229',
+                'priceIn' => 15,
+                'inUnit' => 'per1M',
+                'priceOut' => 75,
+                'outUnit' => 'per1M',
+                'quality' => 10,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'Anthropic Claude Sonnet 4 model. Mid-tier reasoning and coding performance with large context window. Balanced between quality and cost.',
+                    'description' => 'Claude 3 Opus for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.',
+                    'prompt' => 'Describe the image in detail. Extract any text you see.',
                     'params' => [
-                        'model' => 'claude-sonnet-4-20250514'
+                        'model' => 'claude-3-opus-20240229'
+                    ],
+                    'meta' => [
+                        'supports_images' => true
                     ]
                 ]
             ],

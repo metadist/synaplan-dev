@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -13,12 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
-/**
- * Phone Verification Controller
- * 
- * Handles phone number verification for WhatsApp integration
- */
 #[Route('/api/v1/user/verify-phone', name: 'api_phone_verify_')]
+#[OA\Tag(name: 'Phone Verification')]
 class PhoneVerificationController extends AbstractController
 {
     public function __construct(
@@ -27,12 +24,36 @@ class PhoneVerificationController extends AbstractController
         private LoggerInterface $logger
     ) {}
 
-    /**
-     * Request phone verification code
-     * 
-     * POST /api/v1/user/verify-phone/request
-     */
     #[Route('/request', name: 'request', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/verify-phone/request',
+        summary: 'Request phone verification code',
+        description: 'Send verification code via WhatsApp to the provided phone number',
+        security: [['Bearer' => []]],
+        tags: ['Phone Verification']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['phone_number'],
+            properties: [
+                new OA\Property(property: 'phone_number', type: 'string', example: '+4915112345678')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Verification code sent successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Verification code sent')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 400, description: 'Invalid phone number')]
+    #[OA\Response(response: 503, description: 'WhatsApp service unavailable')]
     public function requestVerification(
         Request $request,
         #[CurrentUser] ?User $user
@@ -110,12 +131,36 @@ class PhoneVerificationController extends AbstractController
         ]);
     }
 
-    /**
-     * Confirm phone verification code
-     * 
-     * POST /api/v1/user/verify-phone/confirm
-     */
     #[Route('/confirm', name: 'confirm', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/verify-phone/confirm',
+        summary: 'Confirm phone verification code',
+        description: 'Verify the phone number using the code received via WhatsApp',
+        security: [['Bearer' => []]],
+        tags: ['Phone Verification']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['code'],
+            properties: [
+                new OA\Property(property: 'code', type: 'string', example: '123456')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Phone verified successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Phone verified successfully'),
+                new OA\Property(property: 'phone_number', type: 'string', example: '+4915112345678')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 400, description: 'Invalid or expired code')]
     public function confirmVerification(
         Request $request,
         #[CurrentUser] ?User $user

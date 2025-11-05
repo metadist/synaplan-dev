@@ -41,6 +41,7 @@ export interface Message {
   isStreaming?: boolean
   provider?: string
   modelLabel?: string
+  topic?: string // Topic from message classification (e.g., 'general', 'mediamaker')
   againData?: AgainData
   originalMessageId?: number
   backendMessageId?: number
@@ -192,8 +193,17 @@ export const useHistoryStore = defineStore('history', () => {
       // Only parse if we have a single text part that might contain thinking blocks
       else if (message.parts.length === 1 && message.parts[0].type === 'text') {
         const currentContent = message.parts[0]?.content || ''
+        
+        console.log('🔍 finishStreamingMessage: Content length:', currentContent.length)
+        console.log('🔍 finishStreamingMessage: Has <think>?', currentContent.includes('<think>'))
+        console.log('🔍 finishStreamingMessage: Content preview:', currentContent.substring(0, 200))
+        
         if (currentContent && currentContent.includes('<think>')) {
+          console.log('✅ Parsing <think> tags!')
           message.parts = parseContentWithThinking(currentContent)
+          console.log('✅ Parsed parts:', message.parts.length, message.parts.map(p => p.type))
+        } else {
+          console.log('❌ No <think> tags found or content empty')
         }
       }
     }
@@ -264,6 +274,7 @@ export const useHistoryStore = defineStore('history', () => {
             timestamp: new Date(m.timestamp * 1000),
             provider: m.provider,
             modelLabel: m.provider || 'AI',
+            topic: m.topic, // Topic from message classification
             backendMessageId: m.id,
             files: files.length > 0 ? files : undefined,
             aiModels: m.aiModels || null, // Parse AI model metadata from backend

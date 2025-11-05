@@ -7,6 +7,7 @@ use App\Repository\PromptRepository;
 use App\Repository\ModelRepository;
 use App\AI\Service\AiFacade;
 use App\Service\ModelConfigService;
+use App\Service\PromptService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -21,10 +22,13 @@ class ChatHandler implements MessageHandlerInterface
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
+        private PromptService $promptService,
         private ModelConfigService $modelConfigService,
         private ModelRepository $modelRepository,
         private LoggerInterface $logger
     ) {}
+    
+    // VectorSearchService will be injected as needed
 
     public function getName(): string
     {
@@ -163,7 +167,64 @@ class ChatHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
-        // Get model first - Priority: User-selected (Again) > Classification override > DB default
+        // Load prompt WITH metadata based on topic from classification
+        $topic = $classification['topic'] ?? 'general';
+        $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
+        
+        $promptMetadata = $promptData['metadata'] ?? [];
+        
+        $this->logger->info('ChatHandler: Loaded prompt metadata', [
+            'topic' => $topic,
+            'metadata' => $promptMetadata,
+            'user_id' => $message->getUserId()
+        ]);
+        
+        // ✨ NEW: Load RAG context for task prompt (if files are associated)
+        $ragContext = '';
+        $ragResultsCount = 0;
+        
+        if ($topic !== 'general' && !empty($message->getText())) {
+            try {
+                // Inject VectorSearchService only when needed
+                $vectorSearchService = $this->aiFacade->getContainer()->get(\App\Service\RAG\VectorSearchService::class);
+                
+                $groupKey = "TASKPROMPT:{$topic}";
+                $ragResults = $vectorSearchService->search(
+                    $message->getText(),
+                    $message->getUserId(),
+                    $groupKey,  // ✨ Filter by Task Prompt!
+                    limit: 3,  // Top 3 most relevant chunks
+                    minScore: 0.6  // Only include if similarity > 60%
+                );
+                
+                if (!empty($ragResults)) {
+                    $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
+                    foreach ($ragResults as $idx => $result) {
+                        $ragContext .= sprintf(
+                            "[Source %d] %s\n",
+                            $idx + 1,
+                            trim($result['chunk_text'])
+                        );
+                    }
+                    $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
+                    $ragResultsCount = count($ragResults);
+                    
+                    $this->logger->info('ChatHandler: RAG context loaded', [
+                        'topic' => $topic,
+                        'chunks_found' => $ragResultsCount,
+                        'user_id' => $message->getUserId()
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: RAG context loading failed', [
+                    'topic' => $topic,
+                    'error' => $e->getMessage()
+                ]);
+                // Continue without RAG context
+            }
+        }
+
+        // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default
         $modelId = null;
         $provider = null;
         $modelName = null;
@@ -176,7 +237,16 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId()
             ]);
         }
-        // 2. Check if classification provides a model override
+        // 2. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
+        elseif (isset($promptMetadata['aiModel']) && $promptMetadata['aiModel'] > 0) {
+            $modelId = $promptMetadata['aiModel'];
+            $this->logger->info('ChatHandler: Using prompt metadata model', [
+                'model_id' => $modelId,
+                'topic' => $topic,
+                'user_id' => $message->getUserId()
+            ]);
+        }
+        // 3. Check if classification provides a model override
         elseif (isset($classification['override_model_id']) && $classification['override_model_id']) {
             $modelId = $classification['override_model_id'];
             $this->logger->info('ChatHandler: Using classification override model', [
@@ -184,7 +254,7 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId()
             ]);
         }
-        // 3. Fall back to user's default model from DB
+        // 4. Fall back to user's default model from DB
         else {
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
             $this->logger->info('ChatHandler: Using DB default model', [
@@ -195,6 +265,24 @@ class ChatHandler implements MessageHandlerInterface
 
         // Simple system prompt for streaming (like old system)
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
+        
+        // Use prompt content from metadata if available
+        if ($promptData && isset($promptData['prompt'])) {
+            $systemPrompt = $promptData['prompt']->getPrompt();
+            $this->logger->info('ChatHandler: Using custom prompt content', [
+                'topic' => $topic,
+                'prompt_length' => strlen($systemPrompt)
+            ]);
+        }
+        
+        // ✨ NEW: Append RAG context to system prompt if available
+        if (!empty($ragContext)) {
+            $systemPrompt .= $ragContext;
+            $this->logger->info('ChatHandler: RAG context appended to system prompt', [
+                'topic' => $topic,
+                'rag_context_length' => strlen($ragContext)
+            ]);
+        }
 
         // Check if model supports system messages (o1 models don't)
         if ($modelId) {
@@ -242,10 +330,14 @@ class ChatHandler implements MessageHandlerInterface
             'modelFeatures' => $modelFeatures, // Pass features to provider
         ], $options); // Options from frontend (e.g., reasoning: true/false)
         
+        // Log reasoning option
+        error_log('🧠 ChatHandler: Reasoning option = ' . ($aiOptions['reasoning'] ?? 'NOT SET'));
+        
         $this->logger->info('🔵 ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,
             'model' => $modelName,
-            'user_id' => $message->getUserId()
+            'user_id' => $message->getUserId(),
+            'reasoning' => $aiOptions['reasoning'] ?? false
         ]);
         
         $metadata = $this->aiFacade->chatStream(
@@ -314,7 +406,7 @@ class ChatHandler implements MessageHandlerInterface
             $content = $msg->getText();
             
             // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
-            $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + MessageFile texts
+            $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + File texts
             if (!empty($allFilesText)) {
                 $fileInfo = '';
                 if ($msg->getFiles()->count() > 0) {

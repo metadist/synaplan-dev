@@ -42,6 +42,7 @@
               :is-streaming="message.isStreaming"
               :provider="message.provider"
               :model-label="message.modelLabel"
+              :topic="message.topic"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
@@ -326,15 +327,10 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
 const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean; modelId?: number; fileIds?: number[] }) => {
   streamingAbortController = new AbortController()
   
-  // Get current selected model from store
-  const provider = modelsStore.selectedProvider
-  const model = modelsStore.selectedModel
-  
-  // Find model label
-  const modelOption = mockModelOptions.find(
-    opt => opt.provider.toLowerCase() === provider.toLowerCase() && opt.model === model
-  )
-  const modelLabel = modelOption?.label || model
+  // Get current selected model from aiConfig store (DB model with ID)
+  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+  const provider = currentModel?.service || modelsStore.selectedProvider
+  const modelLabel = currentModel?.name || modelsStore.selectedModel
   
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
@@ -369,10 +365,12 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
       
       const includeReasoning = options?.includeReasoning ?? false
       const webSearch = options?.webSearch ?? false
-      const modelId = options?.modelId
+      // IMPORTANT: Only pass modelId if explicitly provided (e.g., "Again" function)
+      // For normal requests, let backend do classification/sorting to determine the right handler
+      const finalModelId = options?.modelId // Don't fallback to current model!
       const fileIds = options?.fileIds || [] // Array of fileIds
       
-      console.log('🚀 Streaming with options:', { includeReasoning, webSearch, modelId, fileIds, fileCount: fileIds.length })
+      console.log('🚀 Streaming with options:', { includeReasoning, webSearch, modelId: finalModelId, fileIds, fileCount: fileIds.length })
       
       const stopStreaming = chatApi.streamMessage(
         userId,
@@ -622,6 +620,12 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 console.log('🤖 Updated model label:', data.model)
               }
               
+              // Store topic from classification
+              if (data.topic) {
+                message.topic = data.topic
+                console.log('🏷️ Updated topic:', data.topic)
+              }
+              
               // Mark reasoning parts as complete (remove streaming flag)
               message.parts.forEach(part => {
                 if (part.type === 'thinking' && part.isStreaming) {
@@ -693,7 +697,7 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
         },
         includeReasoning,
         webSearch,
-        modelId,
+        finalModelId,
         fileIds // Pass array of fileIds
       )
       

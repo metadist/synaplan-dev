@@ -26,6 +26,7 @@ services:
             $apiKey: '%env(ANTHROPIC_API_KEY)%'
         tags:
             - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
 
     App\AI\Provider\OpenAIProvider:
         arguments:
@@ -131,6 +132,13 @@ services:
 
     # Mailer Service
     App\Service\MailerService: ~
+
+    # reCAPTCHA Service
+    App\Service\RecaptchaService:
+        arguments:
+            $secretKey: '%env(RECAPTCHA_SECRET_KEY)%'
+            $enabled: '%env(RECAPTCHA_ENABLED)%'
+            $minScore: '%env(RECAPTCHA_MIN_SCORE)%'
 
     # Again Service (for model suggestions)
     App\Service\AgainService: ~

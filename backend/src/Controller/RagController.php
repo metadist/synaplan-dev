@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Service\RAG\VectorSearchService;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -13,6 +14,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use App\Entity\User;
 
 #[Route('/api/v1/rag', name: 'api_rag_')]
+#[OA\Tag(name: 'RAG (Retrieval-Augmented Generation)')]
 class RagController extends AbstractController
 {
     public function __construct(
@@ -20,18 +22,53 @@ class RagController extends AbstractController
         private LoggerInterface $logger
     ) {}
 
-    /**
-     * Semantic search in vectorized documents
-     * 
-     * POST /api/v1/rag/search
-     * Body: {
-     *   "query": "What is machine learning?",
-     *   "limit": 10,
-     *   "min_score": 0.7,
-     *   "group_key": "optional"
-     * }
-     */
     #[Route('/search', name: 'search', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/rag/search',
+        summary: 'Semantic search in vectorized documents',
+        description: 'Search for relevant document chunks using vector similarity',
+        security: [['Bearer' => []]],
+        tags: ['RAG (Retrieval-Augmented Generation)']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['query'],
+            properties: [
+                new OA\Property(property: 'query', type: 'string', example: 'What is machine learning?'),
+                new OA\Property(property: 'limit', type: 'integer', example: 10, minimum: 1, maximum: 50),
+                new OA\Property(property: 'min_score', type: 'number', format: 'float', example: 0.7, minimum: 0, maximum: 1),
+                new OA\Property(property: 'group_key', type: 'string', nullable: true, example: 'document_123')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Search results with relevant document chunks',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'results',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'text', type: 'string'),
+                            new OA\Property(property: 'score', type: 'number', format: 'float'),
+                            new OA\Property(property: 'file_id', type: 'integer'),
+                            new OA\Property(property: 'file_name', type: 'string'),
+                            new OA\Property(property: 'group_key', type: 'string', nullable: true)
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'query', type: 'string'),
+                new OA\Property(property: 'total_results', type: 'integer')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 400, description: 'Invalid request (missing query)')]
     public function search(
         Request $request,
         #[CurrentUser] ?User $user

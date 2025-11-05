@@ -7,6 +7,7 @@ use App\Entity\Message;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 /**
  * Media Generation Handler
@@ -15,7 +16,8 @@ use Psr\Log\LoggerInterface;
  * 
  * User prompts are used directly - frontend has "Enhance Prompt" button for improvements.
  */
-class MediaGenerationHandler
+#[AutoconfigureTag('app.message.handler')]
+class MediaGenerationHandler implements MessageHandlerInterface
 {
     public function __construct(
         private AiFacade $aiFacade,
@@ -28,6 +30,23 @@ class MediaGenerationHandler
     public function getName(): string
     {
         return 'image_generation'; // Keep legacy name for backward compatibility
+    }
+    
+    /**
+     * Non-streaming handle method (required by interface)
+     */
+    public function handle(
+        Message $message,
+        array $thread,
+        array $classification,
+        ?callable $progressCallback = null
+    ): array {
+        // For media generation, we don't support non-streaming mode
+        // Just return a message that it needs streaming
+        return [
+            'content' => 'Media generation requires streaming mode',
+            'metadata' => []
+        ];
     }
 
     /**

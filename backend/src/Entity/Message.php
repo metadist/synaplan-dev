@@ -279,8 +279,13 @@ class Message
     #[ORM\OneToMany(targetEntity: MessageMeta::class, mappedBy: 'message', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $metadata;
 
-    // MessageFile Relation (NEW: Multiple files per message)
-    #[ORM\OneToMany(targetEntity: MessageFile::class, mappedBy: 'message', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    // File Many-to-Many Relation via Junction Table
+    #[ORM\ManyToMany(targetEntity: File::class)]
+    #[ORM\JoinTable(
+        name: 'BMESSAGE_FILE_ATTACHMENTS',
+        joinColumns: [new ORM\JoinColumn(name: 'BMESSAGEID', referencedColumnName: 'BID', onDelete: 'CASCADE')],
+        inverseJoinColumns: [new ORM\JoinColumn(name: 'BFILEID', referencedColumnName: 'BID', onDelete: 'CASCADE')]
+    )]
     private Collection $files;
 
     public function __construct()
@@ -295,38 +300,24 @@ class Message
     }
 
     /**
-     * Get all files attached to this message
-     * 
-     * @return Collection<int, MessageFile>
+     * @return Collection<int, File>
      */
     public function getFiles(): Collection
     {
         return $this->files;
     }
 
-    /**
-     * Add file to message
-     */
-    public function addFile(MessageFile $file): self
+    public function addFile(File $file): self
     {
         if (!$this->files->contains($file)) {
             $this->files->add($file);
-            $file->setMessage($this);
         }
         return $this;
     }
 
-    /**
-     * Remove file from message
-     */
-    public function removeFile(MessageFile $file): self
+    public function removeFile(File $file): self
     {
-        if ($this->files->removeElement($file)) {
-            // Set the owning side to null (unless already changed)
-            if ($file->getMessage() === $this) {
-                $file->setMessage(null);
-            }
-        }
+        $this->files->removeElement($file);
         return $this;
     }
 

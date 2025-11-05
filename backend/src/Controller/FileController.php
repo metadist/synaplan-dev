@@ -3,10 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\Message;
-use App\Entity\MessageFile;
+use App\Entity\File;
 use App\Entity\User;
 use App\Repository\MessageRepository;
-use App\Repository\MessageFileRepository;
+use App\Repository\FileRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -21,8 +21,10 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/files', name: 'api_files_')]
+#[OA\Tag(name: 'Files')]
 class FileController extends AbstractController
 {
     public function __construct(
@@ -31,7 +33,7 @@ class FileController extends AbstractController
         private VectorizationService $vectorizationService,
         private StorageQuotaService $storageQuotaService,
         private MessageRepository $messageRepository,
-        private MessageFileRepository $messageFileRepository,
+        private FileRepository $fileRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir
@@ -179,8 +181,8 @@ class FileController extends AbstractController
         $relativePath = $storageResult['path'];
         $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
         
-        // Create MessageFile entity (standalone, not attached to a message yet)
-        $messageFile = new MessageFile();
+        // Create File entity (standalone, not attached to a message yet)
+        $messageFile = new File();
         $messageFile->setUserId($user->getId());
         $messageFile->setFilePath($relativePath);
         $messageFile->setFileType($fileExtension);
@@ -314,8 +316,8 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Get the MessageFile entity
-        $messageFile = $this->messageFileRepository->find($id);
+        // Get the File entity
+        $messageFile = $this->fileRepository->find($id);
 
         if (!$messageFile) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
@@ -370,8 +372,8 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Get the MessageFile entity
-        $messageFile = $this->messageFileRepository->find($id);
+        // Get the File entity
+        $messageFile = $this->fileRepository->find($id);
 
         if (!$messageFile) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
@@ -391,8 +393,8 @@ class FileController extends AbstractController
             'mime' => $messageFile->getFileMime(),
             'extracted_text' => $messageFile->getFileText() ?? '',
             'status' => $messageFile->getStatus(),
-            'message_id' => $messageFile->getMessageId(),
-            'is_attached' => $messageFile->getMessageId() !== null,
+            'message_id' => null,
+            'is_attached' => null !== null,
             'uploaded_at' => $messageFile->getCreatedAt(),
             'uploaded_date' => date('Y-m-d H:i:s', $messageFile->getCreatedAt())
         ]);
@@ -422,7 +424,7 @@ class FileController extends AbstractController
         $offset = ($page - 1) * $limit;
 
         // Build query for MessageFiles
-        $qb = $this->messageFileRepository->createQueryBuilder('mf')
+        $qb = $this->fileRepository->createQueryBuilder('mf')
             ->where('mf.userId = :userId')
             ->setParameter('userId', $user->getId())
             ->orderBy('mf.createdAt', 'DESC');
@@ -436,7 +438,7 @@ class FileController extends AbstractController
                           ->getQuery()
                           ->getResult();
 
-        $files = array_map(fn(MessageFile $mf) => [
+        $files = array_map(fn(File $mf) => [
             'id' => $mf->getId(),
             'filename' => $mf->getFileName(),
             'path' => $mf->getFilePath(),
@@ -447,8 +449,8 @@ class FileController extends AbstractController
             'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
             'uploaded_at' => $mf->getCreatedAt(),
             'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-            'message_id' => $mf->getMessageId(), // null if standalone
-            'is_attached' => $mf->getMessageId() !== null
+            'message_id' => null, // null if standalone
+            'is_attached' => null !== null
         ], $messageFiles);
 
         return $this->json([
@@ -477,7 +479,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $messageFile = $this->messageFileRepository->find($id);
+        $messageFile = $this->fileRepository->find($id);
         
         if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
@@ -488,7 +490,7 @@ class FileController extends AbstractController
             $this->storageService->deleteFile($messageFile->getFilePath());
         }
 
-        // Delete MessageFile entity
+        // Delete File entity
         $this->em->remove($messageFile);
         $this->em->flush();
 
@@ -644,6 +646,329 @@ class FileController extends AbstractController
             'success' => true,
             'user_level' => $user->getRateLimitLevel(),
             'storage' => $stats
+        ]);
+    }
+    
+    /**
+     * Update groupKey for an existing file
+     * 
+     * PUT /api/v1/files/{id}/group-key
+     * Body: { "groupKey": "new-group-name" }
+     */
+    #[Route('/{id}/group-key', name: 'update_group_key', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/files/{id}/group-key',
+        summary: 'Update the groupKey for a file',
+        description: 'Updates the groupKey in all RAG documents associated with this file',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'groupKey', type: 'string', example: 'customer-support')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'GroupKey updated successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'chunksUpdated', type: 'integer', example: 15)
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found')
+        ]
+    )]
+    public function updateGroupKey(
+        int $id,
+        Request $request,
+        #[CurrentUser] ?User $user,
+        \App\Repository\RagDocumentRepository $ragRepository
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $messageFile = $this->fileRepository->find($id);
+
+        if (!$messageFile) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Security check: Only owner can update
+        if ($messageFile->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $newGroupKey = $data['groupKey'] ?? null;
+
+        if (!$newGroupKey) {
+            return $this->json(['error' => 'groupKey is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Update all RAG documents for this file
+        $ragDocs = $ragRepository->findBy([
+            'userId' => $user->getId(),
+            'messageId' => $messageFile->getId()
+        ]);
+
+        $chunksUpdated = 0;
+        foreach ($ragDocs as $doc) {
+            $doc->setGroupKey($newGroupKey);
+            $chunksUpdated++;
+        }
+
+        $this->em->flush();
+
+        $this->logger->info('FileController: GroupKey updated', [
+            'file_id' => $id,
+            'user_id' => $user->getId(),
+            'new_group_key' => $newGroupKey,
+            'chunks_updated' => $chunksUpdated
+        ]);
+
+        return $this->json([
+            'success' => true,
+            'chunksUpdated' => $chunksUpdated,
+            'message' => 'GroupKey updated successfully'
+        ]);
+    }
+    
+    /**
+     * Re-vectorize a file (extract text + create embeddings)
+     * 
+     * POST /api/v1/files/{id}/re-vectorize
+     * Body: { "groupKey": "optional-group-name" }
+     */
+    #[Route('/{id}/re-vectorize', name: 're_vectorize', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/re-vectorize',
+        summary: 'Re-vectorize a file',
+        description: 'Extracts text from file and creates vector embeddings. Useful for files uploaded without vectorization.',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'groupKey', type: 'string', example: 'customer-support')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'File re-vectorized successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'chunksCreated', type: 'integer', example: 15),
+                        new OA\Property(property: 'extractedTextLength', type: 'integer', example: 5000)
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found')
+        ]
+    )]
+    public function reVectorize(
+        int $id,
+        Request $request,
+        #[CurrentUser] ?User $user,
+        \App\Repository\RagDocumentRepository $ragRepository
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $messageFile = $this->fileRepository->find($id);
+
+        if (!$messageFile) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Security check: Only owner can re-vectorize
+        if ($messageFile->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $groupKey = $data['groupKey'] ?? 'DEFAULT';
+
+        // Step 1: Delete existing RAG documents for this file
+        $existingDocs = $ragRepository->findBy([
+            'userId' => $user->getId(),
+            'messageId' => $messageFile->getId()
+        ]);
+
+        foreach ($existingDocs as $doc) {
+            $this->em->remove($doc);
+        }
+        $this->em->flush();
+
+        // Step 2: Extract text from file (if not already extracted)
+        $extractedText = $messageFile->getExtractedText();
+        
+        if (empty($extractedText)) {
+            $filePath = $this->uploadDir . '/' . $messageFile->getFilePath();
+            
+            if (!file_exists($filePath)) {
+                return $this->json([
+                    'success' => false,
+                    'error' => 'File not found on disk'
+                ], Response::HTTP_NOT_FOUND);
+            }
+
+            try {
+                $extractResult = $this->fileProcessor->extractText($filePath);
+                
+                if ($extractResult['success']) {
+                    $extractedText = $extractResult['text'];
+                    $messageFile->setExtractedText($extractedText);
+                    $messageFile->setStatus('extracted');
+                    $this->em->flush();
+                } else {
+                    return $this->json([
+                        'success' => false,
+                        'error' => 'Text extraction failed: ' . ($extractResult['error'] ?? 'Unknown error')
+                    ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->error('FileController: Re-vectorization text extraction failed', [
+                    'file_id' => $id,
+                    'error' => $e->getMessage()
+                ]);
+                
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Text extraction failed: ' . $e->getMessage()
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        // Step 3: Vectorize extracted text (NOT the binary file!)
+        try {
+            $vectorResult = $this->vectorizationService->vectorizeAndStore(
+                $extractedText,  // ✅ Using extracted TEXT, not binary file!
+                $user->getId(),
+                $messageFile->getId(),
+                $groupKey,
+                $this->getFileTypeCode($messageFile->getFileType())
+            );
+
+            if ($vectorResult['success']) {
+                $messageFile->setStatus('vectorized');
+                $this->em->flush();
+
+                $this->logger->info('FileController: File re-vectorized successfully', [
+                    'file_id' => $id,
+                    'user_id' => $user->getId(),
+                    'group_key' => $groupKey,
+                    'chunks_created' => $vectorResult['chunks_created']
+                ]);
+
+                return $this->json([
+                    'success' => true,
+                    'chunksCreated' => $vectorResult['chunks_created'],
+                    'extractedTextLength' => strlen($extractedText),
+                    'groupKey' => $groupKey,
+                    'message' => 'File re-vectorized successfully'
+                ]);
+            } else {
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Vectorization failed: ' . ($vectorResult['error'] ?? 'Unknown error')
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('FileController: Re-vectorization failed', [
+                'file_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return $this->json([
+                'success' => false,
+                'error' => 'Vectorization failed: ' . $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    /**
+     * Get groupKey for a file
+     * 
+     * GET /api/v1/files/{id}/group-key
+     */
+    #[Route('/{id}/group-key', name: 'get_group_key', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/{id}/group-key',
+        summary: 'Get the groupKey for a file',
+        description: 'Returns the groupKey from RAG documents, or null if not vectorized',
+        tags: ['Files'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'GroupKey retrieved successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'groupKey', type: 'string', example: 'customer-support', nullable: true),
+                        new OA\Property(property: 'isVectorized', type: 'boolean'),
+                        new OA\Property(property: 'chunks', type: 'integer', example: 15)
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found')
+        ]
+    )]
+    public function getGroupKey(
+        int $id,
+        #[CurrentUser] ?User $user,
+        \App\Repository\RagDocumentRepository $ragRepository
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $messageFile = $this->fileRepository->find($id);
+
+        if (!$messageFile) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Security check: Only owner can view
+        if ($messageFile->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Get RAG documents for this file
+        $ragDocs = $ragRepository->findBy([
+            'userId' => $user->getId(),
+            'messageId' => $messageFile->getId()
+        ]);
+
+        $groupKey = null;
+        $chunks = count($ragDocs);
+        
+        if ($chunks > 0) {
+            // Get groupKey from first chunk (all should have the same)
+            $groupKey = $ragDocs[0]->getGroupKey();
+        }
+
+        return $this->json([
+            'success' => true,
+            'groupKey' => $groupKey,
+            'isVectorized' => $chunks > 0,
+            'chunks' => $chunks,
+            'status' => $messageFile->getStatus()
         ]);
     }
 }

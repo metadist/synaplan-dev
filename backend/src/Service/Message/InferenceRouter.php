@@ -80,36 +80,18 @@ class InferenceRouter
         $this->logger->info('InferenceRouter: Routing to handler', [
             'intent' => $intent,
             'topic' => $classification['topic'] ?? 'unknown',
-            'classification' => $classification
+            'classification' => $classification,
+            'available_handlers' => array_keys($this->handlers)
         ]);
-        
-        // DEBUG: Write to file
-        file_put_contents('/tmp/sorting-debug.txt', 
-            "=== ROUTER DEBUG ===\n" .
-            "Time: " . date('Y-m-d H:i:s') . "\n" .
-            "Intent: " . $intent . "\n" .
-            "Topic: " . ($classification['topic'] ?? 'unknown') . "\n" .
-            "Classification: " . json_encode($classification, JSON_PRETTY_PRINT) . "\n" .
-            "===================\n\n",
-            FILE_APPEND
-        );
         
         $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Handler für Intent finden
         $handler = $this->getHandler($intent);
         
-        // DEBUG: Write handler info
-        file_put_contents('/tmp/sorting-debug.txt', 
-            "=== HANDLER RESOLVED ===\n" .
-            "Handler Name: " . $handler->getName() . "\n" .
-            "Intent: " . $intent . "\n" .
-            "===================\n\n",
-            FILE_APPEND
-        );
-        
         $this->logger->info('InferenceRouter: Handler resolved', [
             'handler_name' => $handler->getName(),
+            'handler_class' => get_class($handler),
             'intent' => $intent
         ]);
 

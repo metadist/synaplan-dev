@@ -323,6 +323,68 @@ export async function getStorageStats(): Promise<{
   return response
 }
 
+/**
+ * Get groupKey for a file
+ */
+export async function getFileGroupKey(fileId: number): Promise<{
+  success: boolean
+  groupKey: string | null
+  isVectorized: boolean
+  chunks: number
+  status: string
+}> {
+  const response = await httpClient<{
+    success: boolean
+    groupKey: string | null
+    isVectorized: boolean
+    chunks: number
+    status: string
+  }>(`/api/v1/files/${fileId}/group-key`)
+  return response
+}
+
+/**
+ * Update groupKey for a file
+ */
+export async function updateFileGroupKey(fileId: number, groupKey: string): Promise<{
+  success: boolean
+  chunksUpdated: number
+  message: string
+}> {
+  const response = await httpClient<{
+    success: boolean
+    chunksUpdated: number
+    message: string
+  }>(`/api/v1/files/${fileId}/group-key`, {
+    method: 'PUT',
+    body: JSON.stringify({ groupKey })
+  })
+  return response
+}
+
+/**
+ * Re-vectorize a file
+ */
+export async function reVectorizeFile(fileId: number, groupKey?: string): Promise<{
+  success: boolean
+  chunksCreated: number
+  extractedTextLength: number
+  groupKey: string
+  message: string
+}> {
+  const response = await httpClient<{
+    success: boolean
+    chunksCreated: number
+    extractedTextLength: number
+    groupKey: string
+    message: string
+  }>(`/api/v1/files/${fileId}/re-vectorize`, {
+    method: 'POST',
+    body: JSON.stringify({ groupKey: groupKey || 'DEFAULT' })
+  })
+  return response
+}
+
 export default {
   uploadFiles,
   listFiles,
@@ -334,6 +396,9 @@ export default {
   shareFile,
   unshareFile,
   getShareInfo,
-  getStorageStats
+  getStorageStats,
+  getFileGroupKey,
+  updateFileGroupKey,
+  reVectorizeFile
 }
 

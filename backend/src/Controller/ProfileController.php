@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -14,6 +15,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/api/v1/profile', name: 'api_profile_')]
+#[OA\Tag(name: 'Profile')]
 class ProfileController extends AbstractController
 {
     public function __construct(
@@ -23,6 +25,42 @@ class ProfileController extends AbstractController
     ) {}
 
     #[Route('', name: 'get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/profile',
+        summary: 'Get user profile',
+        description: 'Returns authenticated user profile information',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'User profile',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'profile',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
+                        new OA\Property(property: 'firstName', type: 'string', example: 'John'),
+                        new OA\Property(property: 'lastName', type: 'string', example: 'Doe'),
+                        new OA\Property(property: 'phone', type: 'string', example: '+49123456789'),
+                        new OA\Property(property: 'companyName', type: 'string', example: 'Acme Inc'),
+                        new OA\Property(property: 'vatId', type: 'string', example: 'DE123456789'),
+                        new OA\Property(property: 'street', type: 'string', example: 'Main St 123'),
+                        new OA\Property(property: 'zipCode', type: 'string', example: '12345'),
+                        new OA\Property(property: 'city', type: 'string', example: 'Berlin'),
+                        new OA\Property(property: 'country', type: 'string', example: 'Germany'),
+                        new OA\Property(property: 'language', type: 'string', example: 'en'),
+                        new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
+                        new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com')
+                    ]
+                )
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function getProfile(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -52,6 +90,44 @@ class ProfileController extends AbstractController
     }
 
     #[Route('', name: 'update', methods: ['PUT', 'PATCH'])]
+    #[OA\Put(
+        path: '/api/v1/profile',
+        summary: 'Update user profile',
+        description: 'Update authenticated user profile information',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'firstName', type: 'string', example: 'John'),
+                new OA\Property(property: 'lastName', type: 'string', example: 'Doe'),
+                new OA\Property(property: 'phone', type: 'string', example: '+49123456789'),
+                new OA\Property(property: 'companyName', type: 'string', example: 'Acme Inc'),
+                new OA\Property(property: 'vatId', type: 'string', example: 'DE123456789'),
+                new OA\Property(property: 'street', type: 'string', example: 'Main St 123'),
+                new OA\Property(property: 'zipCode', type: 'string', example: '12345'),
+                new OA\Property(property: 'city', type: 'string', example: 'Berlin'),
+                new OA\Property(property: 'country', type: 'string', example: 'Germany'),
+                new OA\Property(property: 'language', type: 'string', example: 'en'),
+                new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
+                new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Profile updated successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Profile updated successfully')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 400, description: 'Invalid JSON')]
     public function updateProfile(
         Request $request,
         #[CurrentUser] ?User $user
@@ -93,6 +169,36 @@ class ProfileController extends AbstractController
     }
 
     #[Route('/password', name: 'change_password', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/profile/password',
+        summary: 'Change user password',
+        description: 'Change authenticated user password (requires current password)',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['currentPassword', 'newPassword'],
+            properties: [
+                new OA\Property(property: 'currentPassword', type: 'string', format: 'password', example: 'OldPass123!'),
+                new OA\Property(property: 'newPassword', type: 'string', format: 'password', example: 'NewSecurePass123!')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Password changed successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Password changed successfully')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Current password is incorrect')]
+    #[OA\Response(response: 400, description: 'Invalid password format or missing fields')]
     public function changePassword(
         Request $request,
         #[CurrentUser] ?User $user

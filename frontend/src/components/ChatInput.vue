@@ -342,7 +342,7 @@ const toggleThinking = () => {
   // Check if current model supports reasoning
   if (!supportsReasoning.value) {
     warning($t('chatInput.reasoningNotSupported'))
-    return
+      return
   }
   
   thinkingEnabled.value = !thinkingEnabled.value

@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Message;
-use App\Entity\MessageFile;
+use App\Entity\File;
 use App\Entity\User;
 use App\AI\Service\AiFacade;
 use App\Service\Message\MessageProcessor;
@@ -16,8 +16,10 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/messages', name: 'api_messages_')]
+#[OA\Tag(name: 'Messages')]
 class StreamController extends AbstractController
 {
     public function __construct(
@@ -29,6 +31,77 @@ class StreamController extends AbstractController
     ) {}
 
     #[Route('/stream', name: 'stream', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/messages/stream',
+        summary: 'Stream AI chat response',
+        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments.',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\Parameter(
+        name: 'message',
+        in: 'query',
+        required: true,
+        description: 'The message text to send to AI',
+        schema: new OA\Schema(type: 'string', example: 'What is the weather today?')
+    )]
+    #[OA\Parameter(
+        name: 'chatId',
+        in: 'query',
+        required: true,
+        description: 'The chat ID to send message to',
+        schema: new OA\Schema(type: 'integer', example: 123)
+    )]
+    #[OA\Parameter(
+        name: 'trackId',
+        in: 'query',
+        required: false,
+        description: 'Optional tracking ID for message',
+        schema: new OA\Schema(type: 'integer', example: 1234567890)
+    )]
+    #[OA\Parameter(
+        name: 'reasoning',
+        in: 'query',
+        required: false,
+        description: 'Enable reasoning/thinking mode (1 or 0)',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '1')
+    )]
+    #[OA\Parameter(
+        name: 'webSearch',
+        in: 'query',
+        required: false,
+        description: 'Enable web search (1 or 0)',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
+    )]
+    #[OA\Parameter(
+        name: 'modelId',
+        in: 'query',
+        required: false,
+        description: 'Specific model ID to use (optional)',
+        schema: new OA\Schema(type: 'integer', example: 53)
+    )]
+    #[OA\Parameter(
+        name: 'fileIds',
+        in: 'query',
+        required: false,
+        description: 'Comma-separated list of file IDs to attach',
+        schema: new OA\Schema(type: 'string', example: '1,2,3')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'SSE stream of AI response chunks',
+        content: new OA\MediaType(
+            mediaType: 'text/event-stream',
+            schema: new OA\Schema(
+                type: 'string',
+                example: "event: data\ndata: {\"chunk\":\"Hello\"}\n\nevent: complete\ndata: {\"status\":\"complete\",\"messageId\":123}\n\n"
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Not authenticated'
+    )]
     public function streamMessage(
         Request $request,
         #[CurrentUser] ?User $user
@@ -44,7 +117,7 @@ class StreamController extends AbstractController
         $webSearch = $request->query->get('webSearch', '0') === '1';
         $modelId = $request->query->get('modelId', null);
         
-        error_log('🔍 StreamController: Query params - reasoning=' . $request->query->get('reasoning', 'NOT SET') . ', includeReasoning=' . ($includeReasoning ? 'TRUE' : 'FALSE'));
+        
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
 
         // Parse fileIds (can be comma-separated string or single ID)
@@ -113,11 +186,11 @@ class StreamController extends AbstractController
                 $this->em->persist($incomingMessage);
                 $this->em->flush(); // Flush first so message has an ID
                 
-                // Attach multiple files if uploaded (NEW: MessageFile entities)
+                // Attach multiple files if uploaded (NEW: File entities)
                 if (!empty($fileIdArray)) {
                     $fileCount = 0;
                     foreach ($fileIdArray as $fileId) {
-                        $messageFile = $this->em->getRepository(MessageFile::class)->find($fileId);
+                        $messageFile = $this->em->getRepository(File::class)->find($fileId);
                         // Accept files in any status (uploaded, extracted, vectorized)
                         if ($messageFile && $messageFile->getUserId() === $user->getId()) {
                             // Associate file with message
@@ -208,14 +281,18 @@ class StreamController extends AbstractController
                 if (!$supportsStreaming) {
                     // Non-streaming models (e.g., o1-preview, o1-mini)
                     $this->handleNonStreamingRequest($incomingMessage, $processingOptions);
-                    return $response;
+                    return; // Exit callback early
                 }
                 
                 // Regular streaming path
+                // Reasoning buffer for wrapping in <think> tags
+                $reasoningBuffer = '';
+                $hasReasoningStarted = false;
+                
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
                     // Stream callback - AI streams TEXT directly or structured data (reasoning)
-                    function($chunk) use (&$responseText, &$chunkCount) {
+                    function($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted) {
                         if (connection_aborted()) {
                             error_log('🔴 StreamController: Connection aborted');
                             return;
@@ -227,9 +304,22 @@ class StreamController extends AbstractController
                             $content = $chunk['content'] ?? '';
                             
                             if ($type === 'reasoning') {
-                                // Send reasoning chunks separately
-                                $this->sendSSE('reasoning', ['chunk' => $content]);
+                                // Accumulate reasoning chunks
+                                if (!$hasReasoningStarted) {
+                                    $reasoningBuffer = '<think>';
+                                    $hasReasoningStarted = true;
+                                }
+                                $reasoningBuffer .= $content;
                             } else {
+                                // If we have buffered reasoning, close it and send
+                                if ($hasReasoningStarted) {
+                                    $reasoningBuffer .= '</think>';
+                                    $this->sendSSE('data', ['chunk' => $reasoningBuffer]);
+                                    $responseText .= $reasoningBuffer;
+                                    $reasoningBuffer = '';
+                                    $hasReasoningStarted = false;
+                                }
+                                
                                 // Regular content
                                 $responseText .= $content;
                                 if (!empty($content)) {
@@ -237,8 +327,22 @@ class StreamController extends AbstractController
                                 }
                             }
                         } else {
-                            // Legacy string chunks (non-reasoning models)
+                            // Close any open reasoning buffer
+                            if ($hasReasoningStarted) {
+                                $reasoningBuffer .= '</think>';
+                                $this->sendSSE('data', ['chunk' => $reasoningBuffer]);
+                                $responseText .= $reasoningBuffer;
+                                $reasoningBuffer = '';
+                                $hasReasoningStarted = false;
+                            }
+                            
+                            // Legacy string chunks (includes <think> tags from models)
                             $responseText .= $chunk;
+                            
+                            // Log if we detect <think> tags
+                            if (strpos($chunk, '<think>') !== false || strpos($chunk, '</think>') !== false) {
+                                error_log('🧠 StreamController: <think> tag detected in chunk: ' . substr($chunk, 0, 100));
+                            }
                             
                             if (!empty($chunk)) {
                                 $this->sendSSE('data', ['chunk' => $chunk]);
@@ -264,6 +368,13 @@ class StreamController extends AbstractController
                     },
                     $processingOptions
                 );
+                
+                // Close any open reasoning buffer at the end
+                if ($hasReasoningStarted) {
+                    $reasoningBuffer .= '</think>';
+                    $this->sendSSE('data', ['chunk' => $reasoningBuffer]);
+                    $responseText .= $reasoningBuffer;
+                }
 
                 if (!$result['success']) {
                     // Build user-friendly error message as AI response
@@ -631,17 +742,37 @@ class StreamController extends AbstractController
             return;
         }
 
+        // Sanitize all string values in data to ensure valid UTF-8
+        $sanitizedData = $this->sanitizeUtf8($data);
+
         $event = [
             'status' => $status,
-            ...$data,
+            ...$sanitizedData,
         ];
 
-        echo "data: " . json_encode($event) . "\n\n";
+        echo "data: " . json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE) . "\n\n";
         
         if (ob_get_level() > 0) {
             ob_flush();
         }
         flush();
+    }
+
+    /**
+     * Recursively sanitize UTF-8 in arrays to prevent JSON encoding errors
+     */
+    private function sanitizeUtf8($value)
+    {
+        if (is_array($value)) {
+            return array_map([$this, 'sanitizeUtf8'], $value);
+        }
+        
+        if (is_string($value)) {
+            // Remove invalid UTF-8 characters
+            return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        }
+        
+        return $value;
     }
 
 }

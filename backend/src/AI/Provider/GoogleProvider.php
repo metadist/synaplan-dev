@@ -345,8 +345,8 @@ class GoogleProvider implements
                 'operation' => $operationName
             ]);
 
-            // Poll the operation until it's done (max 60 seconds polling)
-            $maxAttempts = 12; // 12 attempts * 5 seconds = 60 seconds
+            // Poll the operation until it's done (max 5 minutes polling)
+            $maxAttempts = 60; // 60 attempts * 5 seconds = 300 seconds (5 minutes)
             $attempt = 0;
             $operationUrl = self::API_BASE . '/' . $operationName;
             
