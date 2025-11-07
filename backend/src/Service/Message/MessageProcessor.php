@@ -67,14 +67,32 @@ class MessageProcessor
             // Check if this is "Again" functionality (model explicitly specified)
             // If so, skip classification to save time and API calls
             $isAgainRequest = isset($options['model_id']) && $options['model_id'];
+            
+            // Check if this is a Widget request with fixed task prompt
+            // If so, skip classification entirely and use the fixed prompt
+            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
 
-            // Step 2: Classification (Sorting) - skip if "Again"
+            // Step 2: Classification (Sorting) - skip if "Again" or Widget with fixed prompt
             $sortingModelId = null;
             $sortingProvider = null;
             $sortingModelName = null;
             $conversationHistory = [];
             
-            if ($isAgainRequest) {
+            if ($hasFixedPrompt) {
+                // Widget Mode: Use fixed task prompt, no classification needed
+                $this->logger->info('MessageProcessor: Using fixed task prompt (Widget mode)', [
+                    'task_prompt' => $options['fixed_task_prompt']
+                ]);
+                
+                $this->notify($statusCallback, 'classified', 'Using widget task prompt (skipped classification)');
+                
+                // Minimal classification with fixed topic
+                $classification = [
+                    'topic' => $options['fixed_task_prompt'],
+                    'language' => 'en', // Default, could be enhanced
+                    'source' => 'widget'
+                ];
+            } elseif ($isAgainRequest) {
                 // Skip classification for "Again" - use specified model directly
                 $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
                     'specified_model_id' => $options['model_id']
@@ -131,7 +149,7 @@ class MessageProcessor
                 ]);
             }
 
-            if (!$isAgainRequest) {
+            if (!$isAgainRequest && !$hasFixedPrompt) {
                 // Run classification
                 $classification = $this->classifier->classify($message, $conversationHistory);
                 

@@ -74,9 +74,9 @@
             <Icon icon="heroicons:eye" class="w-5 h-5" />
             {{ $t('widgets.preview') }}
           </h3>
-          <div class="surface-chip rounded-lg p-8 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative min-h-[500px] overflow-hidden">
+          <div class="surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative h-[600px] overflow-hidden">
             <!-- Background hint -->
-            <div class="absolute inset-0 flex items-center justify-center txt-secondary text-sm pointer-events-none">
+            <div class="absolute inset-0 flex items-center justify-center txt-secondary text-sm pointer-events-none z-0">
               <div class="text-center">
                 <Icon icon="heroicons:chat-bubble-left-right" class="w-12 h-12 mx-auto mb-2 opacity-20" />
                 <p class="opacity-50">{{ $t('widgets.previewDescription') }}</p>
@@ -84,7 +84,7 @@
             </div>
             
             <!-- Live Preview Widget (positioned absolute within this container) -->
-            <div class="relative w-full h-full">
+            <div class="absolute inset-0 z-10">
               <ChatWidget
                 :widget-id="widget.widgetId"
                 :primary-color="widget.config.primaryColor || '#007bff'"
@@ -95,7 +95,7 @@
                 :message-limit="widget.config.messageLimit || 50"
                 :max-file-size="widget.config.maxFileSize || 10"
                 :default-theme="widget.config.defaultTheme || 'light'"
-                :is-preview="false"
+                :is-preview="true"
               />
             </div>
           </div>

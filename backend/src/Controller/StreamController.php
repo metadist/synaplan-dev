@@ -8,6 +8,8 @@ use App\Entity\User;
 use App\AI\Service\AiFacade;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\WidgetService;
+use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,7 +29,9 @@ class StreamController extends AbstractController
         private AiFacade $aiFacade,
         private MessageProcessor $messageProcessor,
         private LoggerInterface $logger,
-        private ModelConfigService $modelConfigService
+        private ModelConfigService $modelConfigService,
+        private WidgetService $widgetService,
+        private WidgetSessionService $widgetSessionService
     ) {}
 
     #[Route('/stream', name: 'stream', methods: ['GET'])]
@@ -106,8 +110,69 @@ class StreamController extends AbstractController
         Request $request,
         #[CurrentUser] ?User $user
     ): Response {
+        // Widget-Mode: Check for Widget headers if no authenticated user
+        $isWidgetMode = false;
+        $widget = null;
+        $widgetSession = null;
+        $fixedTaskPromptTopic = null;
+
         if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            $widgetId = $request->headers->get('X-Widget-Id');
+            $sessionId = $request->headers->get('X-Widget-Session');
+
+            if ($widgetId && $sessionId) {
+                // Widget authentication
+                $widget = $this->widgetService->getWidgetById($widgetId);
+                if (!$widget) {
+                    return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+                }
+
+                if (!$this->widgetService->isWidgetActive($widget)) {
+                    return $this->json([
+                        'error' => 'Widget is not active',
+                        'reason' => 'owner_limits_exceeded'
+                    ], Response::HTTP_SERVICE_UNAVAILABLE);
+                }
+
+                // Get or create widget session
+                $widgetSession = $this->widgetSessionService->getOrCreateSession($widgetId, $sessionId);
+
+                // Check session rate limits (anonymous limits)
+                $limitCheck = $this->widgetSessionService->checkSessionLimit($widgetSession);
+                if (!$limitCheck['allowed']) {
+                    return $this->json([
+                        'error' => 'Rate limit exceeded',
+                        'reason' => $limitCheck['reason'],
+                        'remaining' => $limitCheck['remaining'],
+                        'retryAfter' => $limitCheck['retry_after']
+                    ], Response::HTTP_TOO_MANY_REQUESTS);
+                }
+
+                // Get widget owner as the "user" for this request
+                $ownerId = $widget->getOwnerId();
+                if (!$ownerId) {
+                    return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                $user = $this->em->getRepository(User::class)->find($ownerId);
+                if (!$user) {
+                    return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                // Get fixed task prompt from widget config
+                $fixedTaskPromptTopic = $widget->getTaskPromptTopic();
+
+                $isWidgetMode = true;
+                $this->logger->info('Widget request authenticated', [
+                    'widget_id' => $widgetId,
+                    'session_id' => $sessionId,
+                    'owner_id' => $user->getId(),
+                    'task_prompt' => $fixedTaskPromptTopic
+                ]);
+            } else {
+                // No user and no widget headers = unauthorized
+                return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            }
         }
 
         $messageText = $request->query->get('message', '');
@@ -150,7 +215,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -266,6 +331,14 @@ class StreamController extends AbstractController
                     $processingOptions['model_id'] = (int) $modelId;
                     $this->logger->info('StreamController: Using specified model', [
                         'model_id' => $modelId
+                    ]);
+                }
+                
+                // Widget Mode: Force fixed task prompt (no sorting)
+                if ($isWidgetMode && $fixedTaskPromptTopic) {
+                    $processingOptions['fixed_task_prompt'] = $fixedTaskPromptTopic;
+                    $this->logger->info('StreamController: Using fixed task prompt for widget', [
+                        'task_prompt' => $fixedTaskPromptTopic
                     ]);
                 }
                 
@@ -722,6 +795,15 @@ class StreamController extends AbstractController
                     'message_id' => $outgoingMessage->getId(),
                     'topic' => $classification['topic'],
                 ]);
+
+                // Widget Mode: Increment session message count
+                if ($isWidgetMode && $widgetSession) {
+                    $this->widgetSessionService->incrementMessageCount($widgetSession);
+                    $this->logger->info('Widget session message count incremented', [
+                        'session_id' => $widgetSession->getSessionId(),
+                        'message_count' => $widgetSession->getMessageCount()
+                    ]);
+                }
 
             } catch (\App\AI\Exception\ProviderException $e) {
                 $this->logger->error('AI Provider failed', [

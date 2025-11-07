@@ -122,8 +122,18 @@ class WidgetPublicController extends AbstractController
     public function message(string $widgetId, Request $request): StreamedResponse|JsonResponse
     {
         $data = json_decode($request->getContent(), true);
+        
+        // Immediate test to see if we reach here
+        if ($data === null) {
+            return $this->json([
+                'error' => 'Invalid JSON in request body'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        error_log('📥 Widget message request: ' . json_encode($data));
 
         if (empty($data['sessionId']) || empty($data['text'])) {
+            error_log('❌ Missing fields - sessionId: ' . ($data['sessionId'] ?? 'NULL') . ', text: ' . ($data['text'] ?? 'NULL'));
             return $this->json([
                 'error' => 'Missing required fields: sessionId, text'
             ], Response::HTTP_BAD_REQUEST);
@@ -132,8 +142,11 @@ class WidgetPublicController extends AbstractController
         // Get widget
         $widget = $this->widgetService->getWidgetById($widgetId);
         if (!$widget) {
+            error_log('❌ Widget not found: ' . $widgetId);
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
+
+        error_log('✅ Widget found: ' . $widget->getName());
 
         // Check if widget is active
         if (!$this->widgetService->isWidgetActive($widget)) {
@@ -158,7 +171,13 @@ class WidgetPublicController extends AbstractController
         }
 
         // Check owner's limits
-        $owner = $widget->getOwner();
+        $ownerId = $widget->getOwnerId();
+        if (!$ownerId) {
+            return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        // Get owner entity (we need it for the user entity)
+        $owner = $this->em->getRepository(\App\Entity\User::class)->find($ownerId);
         if (!$owner) {
             return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -269,11 +288,21 @@ class WidgetPublicController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
-                'widget_id' => $widgetId
+                'trace' => $e->getTraceAsString(),
+                'widget_id' => $widgetId,
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ]);
 
+            // DEBUG: Return detailed error (REMOVE IN PRODUCTION!)
             return $this->json([
-                'error' => 'Failed to process message'
+                'error' => 'Failed to process message',
+                'debug' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => explode("\n", $e->getTraceAsString())
+                ]
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

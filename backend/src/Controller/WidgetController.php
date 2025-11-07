@@ -250,11 +250,8 @@ class WidgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        $this->logger->info('Widget update request', [
-            'widget_id' => $widgetId,
-            'data' => $data,
-            'content' => $request->getContent()
-        ]);
+        error_log('🔧 Widget update request - widgetId: ' . $widgetId);
+        error_log('🔧 Data received: ' . json_encode($data));
 
         try {
             if (isset($data['name'])) {
@@ -275,6 +272,9 @@ class WidgetController extends AbstractController
                 'message' => 'Widget updated successfully'
             ]);
         } catch (\Exception $e) {
+            error_log('❌ Widget update error: ' . $e->getMessage());
+            error_log('❌ Stack trace: ' . $e->getTraceAsString());
+            
             $this->logger->error('Failed to update widget', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

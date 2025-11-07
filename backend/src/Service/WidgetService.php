@@ -59,7 +59,7 @@ class WidgetService
     public function updateWidget(Widget $widget, array $config): void
     {
         $widget->setConfig($this->sanitizeConfig($config));
-        $widget->updateTimestamp();
+        $widget->touch();
         $this->em->flush();
 
         $this->logger->info('Widget updated', [
@@ -73,7 +73,7 @@ class WidgetService
     public function updateWidgetName(Widget $widget, string $name): void
     {
         $widget->setName($name);
-        $widget->updateTimestamp();
+        $widget->touch();
         $this->em->flush();
     }
 

@@ -143,3 +143,107 @@ export async function getWidgetStats(widgetId: string): Promise<{
   return data.stats
 }
 
+/**
+ * Send message to widget (public endpoint - no auth required, SSE streaming)
+ */
+export async function sendWidgetMessage(
+  widgetId: string,
+  text: string,
+  sessionId: string,
+  chatId?: number,
+  onChunk?: (chunk: string) => void
+): Promise<{
+  success: boolean
+  messageId: number
+  chatId: number
+}> {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  
+  return new Promise(async (resolve, reject) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sessionId,
+          text,
+          ...(chatId ? { chatId } : {})
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('❌ Widget message API error:', error)
+        reject(new Error(error.error || `HTTP ${response.status}`))
+        return
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        reject(new Error('No response body'))
+        return
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let messageId: number | null = null
+      let finalChatId: number | null = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            continue
+          }
+
+          if (line.startsWith('data:')) {
+            const jsonStr = line.slice(5).trim()
+            try {
+              const data = JSON.parse(jsonStr)
+              
+              // Handle chunk data
+              if (data.chunk && onChunk) {
+                onChunk(data.chunk)
+              }
+              
+              // Handle completion
+              if (data.status === 'complete') {
+                messageId = data.messageId
+                finalChatId = data.chatId
+              }
+              
+              // Handle error
+              if (data.error) {
+                reject(new Error(data.error))
+                return
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE data:', e, jsonStr)
+            }
+          }
+        }
+      }
+
+      if (messageId && finalChatId) {
+        resolve({
+          success: true,
+          messageId,
+          chatId: finalChatId
+        })
+      } else {
+        reject(new Error('Invalid completion data'))
+      }
+    } catch (error) {
+      reject(error)
+    }
+  })
+}
+
