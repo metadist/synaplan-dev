@@ -250,6 +250,12 @@ class WidgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
+        $this->logger->info('Widget update request', [
+            'widget_id' => $widgetId,
+            'data' => $data,
+            'content' => $request->getContent()
+        ]);
+
         try {
             if (isset($data['name'])) {
                 $this->widgetService->updateWidgetName($widget, $data['name']);
@@ -271,6 +277,7 @@ class WidgetController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->error('Failed to update widget', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'widget_id' => $widgetId
             ]);
 

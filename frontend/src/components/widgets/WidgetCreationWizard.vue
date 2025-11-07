@@ -12,7 +12,7 @@
           <p class="text-xs lg:text-sm txt-secondary mt-1 hidden sm:block">{{ $t('widgets.wizardSubtitle') }}</p>
         </div>
         <button
-          @click="$emit('close')"
+          @click="handleClose"
           class="w-9 h-9 lg:w-10 lg:h-10 rounded-lg hover-surface transition-colors flex items-center justify-center flex-shrink-0"
           :aria-label="$t('common.close')"
         >
@@ -308,7 +308,8 @@
 
               <!-- Live Widget Preview -->
               <ChatWidget
-                :widget-id="'preview'"
+                v-if="previewWidget"
+                :widget-id="previewWidget.widgetId"
                 :primary-color="formData.config.primaryColor"
                 :icon-color="formData.config.iconColor"
                 :position="formData.config.position"
@@ -317,8 +318,14 @@
                 :message-limit="formData.config.messageLimit"
                 :max-file-size="formData.config.maxFileSize"
                 :default-theme="formData.config.defaultTheme"
-                :is-preview="true"
+                :is-preview="false"
               />
+              <div v-else class="flex items-center justify-center h-full txt-secondary">
+                <div class="text-center">
+                  <Icon icon="heroicons:arrow-path" class="w-8 h-8 animate-spin mx-auto mb-2" />
+                  <p class="text-sm">Loading preview...</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -338,7 +345,7 @@
 
         <div class="flex items-center gap-2 lg:gap-3">
           <button
-            @click="$emit('close')"
+            @click="handleClose"
             class="px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium text-sm lg:text-base"
           >
             {{ $t('common.cancel') }}
@@ -370,7 +377,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -382,11 +389,13 @@ const emit = defineEmits<{
   created: []
 }>()
 
-const { showError } = useNotification()
+const { error: showError } = useNotification()
 
 const currentStep = ref(0)
 const creating = ref(false)
 const taskPrompts = ref<any[]>([])
+const previewWidget = ref<widgetsApi.Widget | null>(null)
+const isCreatingPreview = ref(false)
 
 // Filter out system prompts - only show custom prompts for widgets
 const customTaskPrompts = computed(() => {
@@ -426,9 +435,72 @@ const canCreate = computed(() => {
   return canProceed.value && !creating.value
 })
 
-const nextStep = () => {
+/**
+ * Create a temporary preview widget when user provides basic info
+ */
+const createPreviewWidget = async () => {
+  if (!canProceed.value || isCreatingPreview.value || previewWidget.value) {
+    return
+  }
+
+  isCreatingPreview.value = true
+  try {
+    const tempWidget = await widgetsApi.createWidget({
+      name: `[PREVIEW] ${formData.value.name}`,
+      taskPromptTopic: formData.value.taskPromptTopic,
+      config: formData.value.config
+    })
+    previewWidget.value = tempWidget
+    console.log('✅ Preview widget created:', tempWidget.widgetId)
+  } catch (error: any) {
+    console.error('Failed to create preview widget:', error)
+    // Don't show error to user - preview is optional
+  } finally {
+    isCreatingPreview.value = false
+  }
+}
+
+/**
+ * Update preview widget configuration when form changes
+ */
+watch(
+  () => formData.value.config,
+  async (newConfig) => {
+    if (previewWidget.value) {
+      try {
+        await widgetsApi.updateWidget(previewWidget.value.widgetId, {
+          config: newConfig
+        })
+      } catch (error) {
+        console.error('Failed to update preview widget:', error)
+      }
+    }
+  },
+  { deep: true }
+)
+
+/**
+ * Delete preview widget if user cancels
+ */
+const cleanupPreview = async () => {
+  if (previewWidget.value) {
+    try {
+      await widgetsApi.deleteWidget(previewWidget.value.widgetId)
+      console.log('🗑️ Preview widget deleted')
+    } catch (error) {
+      console.error('Failed to delete preview widget:', error)
+    }
+  }
+}
+
+const nextStep = async () => {
   if (currentStep.value < steps.length - 1 && canProceed.value) {
     currentStep.value++
+    
+    // Create preview widget when moving from step 0 to step 1
+    if (currentStep.value === 1 && !previewWidget.value) {
+      await createPreviewWidget()
+    }
   }
 }
 
@@ -444,7 +516,20 @@ const createWidget = async () => {
   creating.value = true
   try {
     console.log('Creating widget with data:', JSON.stringify(formData.value, null, 2))
-    await widgetsApi.createWidget(formData.value)
+    
+    // If preview widget exists, update it to be the real widget
+    if (previewWidget.value) {
+      await widgetsApi.updateWidget(previewWidget.value.widgetId, {
+        name: formData.value.name, // Remove [PREVIEW] prefix
+        config: formData.value.config,
+        status: 'active'
+      })
+      previewWidget.value = null // Prevent cleanup on close
+    } else {
+      // No preview widget, create new one
+      await widgetsApi.createWidget(formData.value)
+    }
+    
     emit('created')
   } catch (error: any) {
     console.error('Widget creation failed:', error)
@@ -452,6 +537,11 @@ const createWidget = async () => {
   } finally {
     creating.value = false
   }
+}
+
+const handleClose = async () => {
+  await cleanupPreview()
+  emit('close')
 }
 
 const loadTaskPrompts = async () => {
@@ -464,6 +554,10 @@ const loadTaskPrompts = async () => {
 
 onMounted(() => {
   loadTaskPrompts()
+})
+
+onBeforeUnmount(() => {
+  cleanupPreview()
 })
 </script>
 

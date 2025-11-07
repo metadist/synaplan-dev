@@ -74,27 +74,30 @@
             <Icon icon="heroicons:eye" class="w-5 h-5" />
             {{ $t('widgets.preview') }}
           </h3>
-          <div class="surface-chip rounded-lg p-8 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative min-h-[400px]">
-            <div class="absolute inset-0 flex items-center justify-center txt-secondary text-sm">
+          <div class="surface-chip rounded-lg p-8 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative min-h-[500px] overflow-hidden">
+            <!-- Background hint -->
+            <div class="absolute inset-0 flex items-center justify-center txt-secondary text-sm pointer-events-none">
               <div class="text-center">
-                <Icon icon="heroicons:chat-bubble-left-right" class="w-12 h-12 mx-auto mb-2 opacity-30" />
-                <p>{{ $t('widgets.previewDescription') }}</p>
+                <Icon icon="heroicons:chat-bubble-left-right" class="w-12 h-12 mx-auto mb-2 opacity-20" />
+                <p class="opacity-50">{{ $t('widgets.previewDescription') }}</p>
               </div>
             </div>
             
-            <!-- Live Preview Widget -->
-            <ChatWidget
-              :widget-id="widget.widgetId"
-              :primary-color="widget.config.primaryColor || '#007bff'"
-              :icon-color="widget.config.iconColor || '#ffffff'"
-              :position="widget.config.position || 'bottom-right'"
-              :auto-open="false"
-              :auto-message="widget.config.autoMessage || 'Hello! How can I help you?'"
-              :message-limit="widget.config.messageLimit || 50"
-              :max-file-size="widget.config.maxFileSize || 10"
-              :default-theme="widget.config.defaultTheme || 'light'"
-              :is-preview="true"
-            />
+            <!-- Live Preview Widget (positioned absolute within this container) -->
+            <div class="relative w-full h-full">
+              <ChatWidget
+                :widget-id="widget.widgetId"
+                :primary-color="widget.config.primaryColor || '#007bff'"
+                :icon-color="widget.config.iconColor || '#ffffff'"
+                :position="widget.config.position || 'bottom-right'"
+                :auto-open="false"
+                :auto-message="widget.config.autoMessage || 'Hello! How can I help you?'"
+                :message-limit="widget.config.messageLimit || 50"
+                :max-file-size="widget.config.maxFileSize || 10"
+                :default-theme="widget.config.defaultTheme || 'light'"
+                :is-preview="false"
+              />
+            </div>
           </div>
         </div>
 

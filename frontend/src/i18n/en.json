@@ -513,6 +513,8 @@
     "delete": "Delete",
     "save": "Save",
     "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied!",
     "sending": "Sending...",
     "yes": "Yes",
     "no": "No",
