@@ -220,3 +220,4 @@ export function getHelpCategories(): Array<{ key: HelpSection['category']; label
     { key: 'troubleshooting', label: 'Troubleshooting' }
   ];
 }
+
