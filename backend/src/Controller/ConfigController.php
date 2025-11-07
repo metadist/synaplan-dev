@@ -15,8 +15,10 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use App\Entity\User;
+use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/config', name: 'api_config_')]
+#[OA\Tag(name: 'Configuration')]
 class ConfigController extends AbstractController
 {
     public function __construct(
@@ -32,6 +34,42 @@ class ConfigController extends AbstractController
      * User can choose ANY model for ANY capability (cross-capability usage)
      */
     #[Route('/models', name: 'models_list', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/models',
+        summary: 'Get all available AI models',
+        description: 'Returns list of all active models grouped by capability (CHAT, IMAGE, SORT, etc.)',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'List of available models',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'models',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'CHAT',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 53),
+                                    new OA\Property(property: 'service', type: 'string', example: 'Groq'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen3 32B (Reasoning)'),
+                                    new OA\Property(property: 'quality', type: 'integer', example: 9),
+                                    new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning'))
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function getModels(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -66,6 +104,7 @@ class ConfigController extends AbstractController
             'VECTORIZE' => [],
             'PIC2TEXT' => [],
             'TEXT2PIC' => [],
+            'TEXT2VID' => [],
             'SOUND2TEXT' => [],
             'TEXT2SOUND' => [],
             'ANALYZE' => []
@@ -92,6 +131,10 @@ class ConfigController extends AbstractController
                 case 'IMAGE':
                 case 'TEXT2PIC':
                     $grouped['TEXT2PIC'][] = $model;
+                    break;
+                case 'VIDEO':
+                case 'TEXT2VID':
+                    $grouped['TEXT2VID'][] = $model;
                     break;
                 case 'AUDIO':
                 case 'SOUND2TEXT':
@@ -128,7 +171,7 @@ class ConfigController extends AbstractController
         }
 
         $userId = $user->getId();
-        $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
         
         $defaults = [];
 
@@ -177,7 +220,7 @@ class ConfigController extends AbstractController
         }
 
         $userId = $user->getId();
-        $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         foreach ($data['defaults'] as $capability => $modelId) {
             if (!in_array($capability, $validCapabilities)) {
@@ -287,24 +330,29 @@ class ConfigController extends AbstractController
             
             // Check if API key is configured
             $envVarMap = [
-                'openai' => 'OPENAI_API_KEY',
-                'anthropic' => 'ANTHROPIC_API_KEY',
-                'groq' => 'GROQ_API_KEY',
-                'gemini' => 'GEMINI_API_KEY',
-                'google' => 'GOOGLE_API_KEY',
-                'mistral' => 'MISTRAL_API_KEY'
+                'openai' => ['OPENAI_API_KEY'],
+                'anthropic' => ['ANTHROPIC_API_KEY'],
+                'groq' => ['GROQ_API_KEY'],
+                'gemini' => ['GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_API_KEY'], // Support multiple key names
+                'google' => ['GOOGLE_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY'], // Support multiple key names
+                'mistral' => ['MISTRAL_API_KEY']
             ];
             
-            $envVar = $envVarMap[$service] ?? null;
+            $envVars = $envVarMap[$service] ?? [];
             
-            if ($envVar) {
-                // Check if env var is set and not empty
+            // Check if any of the env vars is set and not empty
+            $available = false;
+            foreach ($envVars as $envVar) {
                 $apiKey = $_ENV[$envVar] ?? '';
-                $available = !empty($apiKey) && $apiKey !== 'your-api-key-here';
+                if (!empty($apiKey) && $apiKey !== 'your-api-key-here') {
+                    $available = true;
+                    break;
+                }
+            }
                 
                 if (!$available) {
                     $message = "API key not configured for {$service}";
-                }
+                $envVar = $envVars[0] ?? null; // Use first one for setup instructions
             }
         } else {
             // Unknown provider (e.g., test, custom)

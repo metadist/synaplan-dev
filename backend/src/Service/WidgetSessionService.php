@@ -1,0 +1,157 @@
+<?php
+
+namespace App\Service;
+
+use App\Entity\WidgetSession;
+use App\Repository\WidgetSessionRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+
+/**
+ * Widget Session Management Service
+ * 
+ * Handles anonymous user sessions for chat widgets
+ */
+class WidgetSessionService
+{
+    // Session limits (from BCONFIG table, but with defaults)
+    const DEFAULT_MAX_MESSAGES = 50;         // Total messages per session
+    const DEFAULT_MAX_PER_MINUTE = 10;       // Messages per minute
+    const SESSION_EXPIRY_HOURS = 24;         // Session expires after 24h of inactivity
+
+    public function __construct(
+        private EntityManagerInterface $em,
+        private WidgetSessionRepository $sessionRepository,
+        private LoggerInterface $logger
+    ) {}
+
+    /**
+     * Get or create a session for a widget
+     */
+    public function getOrCreateSession(string $widgetId, string $sessionId): WidgetSession
+    {
+        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+
+        if (!$session) {
+            $session = new WidgetSession();
+            $session->setWidgetId($widgetId);
+            $session->setSessionId($sessionId);
+            $this->em->persist($session);
+            $this->em->flush();
+
+            $this->logger->info('New widget session created', [
+                'widget_id' => $widgetId,
+                'session_id' => substr($sessionId, 0, 8) . '...'
+            ]);
+        } elseif ($session->isExpired()) {
+            // Reset expired session
+            $session->setMessageCount(0);
+            $session->setExpires(time() + (self::SESSION_EXPIRY_HOURS * 3600));
+            $this->em->flush();
+
+            $this->logger->info('Widget session reset after expiry', [
+                'widget_id' => $widgetId,
+                'session_id' => substr($sessionId, 0, 8) . '...'
+            ]);
+        }
+
+        return $session;
+    }
+
+    /**
+     * Check if session can send a message (rate limits)
+     */
+    public function checkSessionLimit(WidgetSession $session): array
+    {
+        // Use default limits
+        $maxMessages = self::DEFAULT_MAX_MESSAGES;
+        $maxPerMinute = self::DEFAULT_MAX_PER_MINUTE;
+
+        // Check total message limit
+        if ($session->getMessageCount() >= $maxMessages) {
+            return [
+                'allowed' => false,
+                'reason' => 'total_limit_reached',
+                'remaining' => 0,
+                'retry_after' => null,
+                'max_messages' => $maxMessages
+            ];
+        }
+
+        // Check per-minute limit
+        $lastMinute = time() - 60;
+        if ($session->getLastMessage() >= $lastMinute) {
+            $messagesInLastMinute = $this->getMessagesInLastMinute($session);
+            
+            if ($messagesInLastMinute >= $maxPerMinute) {
+                $retryAfter = 60 - (time() - $session->getLastMessage());
+                
+                return [
+                    'allowed' => false,
+                    'reason' => 'rate_limit_exceeded',
+                    'remaining' => 0,
+                    'retry_after' => $retryAfter,
+                    'max_per_minute' => $maxPerMinute
+                ];
+            }
+        }
+
+        $remaining = $maxMessages - $session->getMessageCount();
+
+        return [
+            'allowed' => true,
+            'reason' => null,
+            'remaining' => $remaining,
+            'retry_after' => null,
+            'max_messages' => $maxMessages
+        ];
+    }
+
+    /**
+     * Increment message count and update last message time
+     */
+    public function incrementMessageCount(WidgetSession $session): void
+    {
+        $session->incrementMessageCount();
+        $session->updateLastMessage();
+        $this->em->flush();
+    }
+
+    /**
+     * Get messages sent in the last minute
+     * (For now, we'll implement a simple check; in production, use Redis/Cache)
+     */
+    private function getMessagesInLastMinute(WidgetSession $session): int
+    {
+        // Simplified: assume 1 message if last message was within the last minute
+        // In production, track per-second timestamps in cache
+        $lastMinute = time() - 60;
+        return $session->getLastMessage() >= $lastMinute ? 1 : 0;
+    }
+
+    /**
+     * Cleanup expired sessions (run via cron)
+     */
+    public function cleanupExpiredSessions(): int
+    {
+        $deleted = $this->sessionRepository->deleteExpiredSessions();
+        
+        $this->logger->info('Cleaned up expired widget sessions', [
+            'deleted_count' => $deleted
+        ]);
+
+        return $deleted;
+    }
+
+    /**
+     * Get session statistics for a widget
+     */
+    public function getWidgetStats(string $widgetId): array
+    {
+        return [
+            'active_sessions' => $this->sessionRepository->countActiveSessionsByWidget($widgetId),
+            'total_messages' => $this->sessionRepository->getTotalMessageCountByWidget($widgetId)
+        ];
+    }
+}
+

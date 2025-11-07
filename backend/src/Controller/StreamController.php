@@ -3,11 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\Message;
-use App\Entity\MessageFile;
+use App\Entity\File;
 use App\Entity\User;
 use App\AI\Service\AiFacade;
 use App\Service\Message\MessageProcessor;
-use App\Service\AgainService;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -16,19 +16,92 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/messages', name: 'api_messages_')]
+#[OA\Tag(name: 'Messages')]
 class StreamController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private MessageProcessor $messageProcessor,
-        private AgainService $againService,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private ModelConfigService $modelConfigService
     ) {}
 
     #[Route('/stream', name: 'stream', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/messages/stream',
+        summary: 'Stream AI chat response',
+        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments.',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\Parameter(
+        name: 'message',
+        in: 'query',
+        required: true,
+        description: 'The message text to send to AI',
+        schema: new OA\Schema(type: 'string', example: 'What is the weather today?')
+    )]
+    #[OA\Parameter(
+        name: 'chatId',
+        in: 'query',
+        required: true,
+        description: 'The chat ID to send message to',
+        schema: new OA\Schema(type: 'integer', example: 123)
+    )]
+    #[OA\Parameter(
+        name: 'trackId',
+        in: 'query',
+        required: false,
+        description: 'Optional tracking ID for message',
+        schema: new OA\Schema(type: 'integer', example: 1234567890)
+    )]
+    #[OA\Parameter(
+        name: 'reasoning',
+        in: 'query',
+        required: false,
+        description: 'Enable reasoning/thinking mode (1 or 0)',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '1')
+    )]
+    #[OA\Parameter(
+        name: 'webSearch',
+        in: 'query',
+        required: false,
+        description: 'Enable web search (1 or 0)',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
+    )]
+    #[OA\Parameter(
+        name: 'modelId',
+        in: 'query',
+        required: false,
+        description: 'Specific model ID to use (optional)',
+        schema: new OA\Schema(type: 'integer', example: 53)
+    )]
+    #[OA\Parameter(
+        name: 'fileIds',
+        in: 'query',
+        required: false,
+        description: 'Comma-separated list of file IDs to attach',
+        schema: new OA\Schema(type: 'string', example: '1,2,3')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'SSE stream of AI response chunks',
+        content: new OA\MediaType(
+            mediaType: 'text/event-stream',
+            schema: new OA\Schema(
+                type: 'string',
+                example: "event: data\ndata: {\"chunk\":\"Hello\"}\n\nevent: complete\ndata: {\"status\":\"complete\",\"messageId\":123}\n\n"
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Not authenticated'
+    )]
     public function streamMessage(
         Request $request,
         #[CurrentUser] ?User $user
@@ -43,6 +116,8 @@ class StreamController extends AbstractController
         $includeReasoning = $request->query->get('reasoning', '0') === '1';
         $webSearch = $request->query->get('webSearch', '0') === '1';
         $modelId = $request->query->get('modelId', null);
+        
+        
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
 
         // Parse fileIds (can be comma-separated string or single ID)
@@ -111,24 +186,23 @@ class StreamController extends AbstractController
                 $this->em->persist($incomingMessage);
                 $this->em->flush(); // Flush first so message has an ID
                 
-                // Attach multiple files if uploaded (NEW: MessageFile entities)
+                // Attach multiple files if uploaded (NEW: File entities with ManyToMany)
                 if (!empty($fileIdArray)) {
                     $fileCount = 0;
                     foreach ($fileIdArray as $fileId) {
-                        $messageFile = $this->em->getRepository(MessageFile::class)->find($fileId);
+                        $file = $this->em->getRepository(File::class)->find($fileId);
                         // Accept files in any status (uploaded, extracted, vectorized)
-                        if ($messageFile && $messageFile->getUserId() === $user->getId()) {
-                            // Associate file with message
-                            $messageFile->setMessageId($incomingMessage->getId());
-                            $this->em->persist($messageFile);
+                        if ($file && $file->getUserId() === $user->getId()) {
+                            // Associate file with message using ManyToMany relationship
+                            $incomingMessage->addFile($file);
                             $fileCount++;
                             
                             $this->logger->info('StreamController: File attached to message', [
                                 'message_id' => $incomingMessage->getId(),
                                 'file_id' => $fileId,
-                                'file_path' => $messageFile->getFilePath(),
-                                'file_type' => $messageFile->getFileType(),
-                                'file_status' => $messageFile->getStatus()
+                                'file_path' => $file->getFilePath(),
+                                'file_type' => $file->getFileType(),
+                                'file_status' => $file->getStatus()
                             ]);
                         }
                     }
@@ -195,26 +269,145 @@ class StreamController extends AbstractController
                     ]);
                 }
                 
+                // Check if selected model supports streaming
+                $supportsStreaming = true;
+                if ($modelId) {
+                    $supportsStreaming = $this->modelConfigService->supportsStreaming((int) $modelId);
+                    error_log('🔍 Model supports streaming: ' . ($supportsStreaming ? 'YES' : 'NO'));
+                }
+                
+                // Route to streaming or non-streaming handler
+                if (!$supportsStreaming) {
+                    // Non-streaming models (e.g., o1-preview, o1-mini)
+                    $this->handleNonStreamingRequest($incomingMessage, $processingOptions);
+                    return; // Exit callback early
+                }
+                
+                // Regular streaming path
+                // Reasoning buffer for wrapping in <think> tags
+                $reasoningBuffer = '';
+                $hasReasoningStarted = false;
+                
+                // ✨ NEW: JSON detection and parsing
+                $jsonBuffer = '';
+                $isBufferingJson = false;
+                
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
-                    // Stream callback - AI streams TEXT directly
-                    function($chunk) use (&$responseText, &$chunkCount) {
+                    // Stream callback - AI streams TEXT directly or structured data (reasoning)
+                    function($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson) {
                         if (connection_aborted()) {
-                            error_log('🔴 StreamController: Connection aborted');
-                            return;
+                            throw new \RuntimeException('Client disconnected');
                         }
                         
-                        $responseText .= $chunk;
-                        
-                        // Stream immediately to frontend
-                        if (!empty($chunk)) {
-                            $this->sendSSE('data', ['chunk' => $chunk]);
+                        // Handle structured chunk (reasoning models)
+                        if (is_array($chunk)) {
+                            $type = $chunk['type'] ?? 'content';
+                            $content = $chunk['content'] ?? '';
                             
-                            if ($chunkCount === 0) {
-                                error_log('🔵 StreamController: Started streaming');
+                            if ($type === 'reasoning') {
+                                // Accumulate reasoning chunks
+                                if (!$hasReasoningStarted) {
+                                    $reasoningBuffer = '<think>';
+                                    $hasReasoningStarted = true;
+                                }
+                                $reasoningBuffer .= $content;
+                            } else {
+                                // If we have buffered reasoning, close it and send
+                                if ($hasReasoningStarted) {
+                                    $reasoningBuffer .= '</think>';
+                                    $this->sendSSE('data', ['chunk' => $reasoningBuffer]);
+                                    $responseText .= $reasoningBuffer;
+                                    $reasoningBuffer = '';
+                                    $hasReasoningStarted = false;
+                                }
+                                
+                                // Regular content
+                                $responseText .= $content;
+                                if (!empty($content)) {
+                                    $this->sendSSE('data', ['chunk' => $content]);
+                                }
                             }
-                            $chunkCount++;
+                        } else {
+                            // Close any open reasoning buffer
+                            if ($hasReasoningStarted) {
+                                $reasoningBuffer .= '</think>';
+                                $this->sendSSE('data', ['chunk' => $reasoningBuffer]);
+                                $responseText .= $reasoningBuffer;
+                                $reasoningBuffer = '';
+                                $hasReasoningStarted = false;
+                            }
+                            
+                            // ✨ JSON detection and buffering during streaming
+                            // Detect and buffer JSON responses
+                            if (is_string($chunk) && !empty(trim($chunk))) {
+                                // Start buffering if this is the FIRST chunk and it starts with {
+                                if (!$isBufferingJson && $chunkCount === 0 && str_starts_with(trim($chunk), '{')) {
+                                    $isBufferingJson = true;
+                                    $jsonBuffer = $chunk;
+                                    $chunkCount++;
+                                    return; // Don't send yet, buffer it
+                                }
+                            }
+                            
+                            if ($isBufferingJson) {
+                                $jsonBuffer .= $chunk;
+                                
+                                // Check if JSON is complete (has closing brace)
+                                if (str_contains($jsonBuffer, '}')) {
+                                    // Try to find the complete JSON object
+                                    $trimmed = trim($jsonBuffer);
+                                    
+                                    // Find last closing brace position
+                                    $lastBrace = strrpos($trimmed, '}');
+                                    if ($lastBrace !== false) {
+                                        $potentialJson = substr($trimmed, 0, $lastBrace + 1);
+                                        
+                                        // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
+                                        $potentialJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $potentialJson);
+                                        $potentialJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $potentialJson);
+                                        $potentialJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $potentialJson);
+                                        
+                                        try {
+                                            $jsonData = json_decode($potentialJson, true, 512, JSON_THROW_ON_ERROR);
+                                            
+                                            // Extract BTEXT and send ONLY that
+                                            if (isset($jsonData['BTEXT'])) {
+                                                $extractedText = $jsonData['BTEXT'];
+                                                $responseText .= $extractedText;
+                                                $this->sendSSE('data', ['chunk' => $extractedText]);
+                                                
+                                                $isBufferingJson = false;
+                                                $jsonBuffer = '';
+                                                return;
+                                            }
+                                        } catch (\JsonException $e) {
+                                            // JSON not valid yet, keep buffering
+                                            return;
+                                        }
+                                    }
+                                }
+                                
+                                return; // Keep buffering
+                            }
+                            
+                            // Normal text chunk (not JSON)
+                            $responseText .= $chunk;
+                            
+                            // Log if we detect <think> tags
+                            if (strpos($chunk, '<think>') !== false || strpos($chunk, '</think>') !== false) {
+                                error_log('🧠 StreamController: <think> tag detected in chunk: ' . substr($chunk, 0, 100));
+                            }
+                            
+                            if (!empty($chunk)) {
+                                $this->sendSSE('data', ['chunk' => $chunk]);
+                            }
                         }
+                        
+                        if ($chunkCount === 0) {
+                            error_log('🔵 StreamController: Started streaming');
+                        }
+                        $chunkCount++;
                     },
                     // Status callback
                     function($statusUpdate) {
@@ -230,6 +423,13 @@ class StreamController extends AbstractController
                     },
                     $processingOptions
                 );
+                
+                // Close any open reasoning buffer at the end
+                if ($hasReasoningStarted) {
+                    $reasoningBuffer .= '</think>';
+                    $this->sendSSE('data', ['chunk' => $reasoningBuffer]);
+                    $responseText .= $reasoningBuffer;
+                }
 
                 if (!$result['success']) {
                     // Build user-friendly error message as AI response
@@ -380,7 +580,28 @@ class StreamController extends AbstractController
                 $outgoingMessage->setFileType($fileType);
                 $outgoingMessage->setTopic($classification['topic']);
                 $outgoingMessage->setLanguage($classification['language']);
-                $outgoingMessage->setText($responseText); // Pure TEXT, not JSON
+                
+                // ✨ Parse JSON response if AI responded in JSON format (fallback for non-streamed parsing)
+                $finalText = $responseText;
+                if (str_starts_with(trim($responseText), '{')) {
+                    // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
+                    $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $responseText);
+                    $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $cleanedJson);
+                    $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
+                    
+                    try {
+                        $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+                        
+                        // Extract BTEXT as main content
+                        if (isset($jsonData['BTEXT'])) {
+                            $finalText = $jsonData['BTEXT'];
+                        }
+                    } catch (\JsonException $e) {
+                        // Not valid JSON or extraction failed, use content as-is
+                    }
+                }
+                
+                $outgoingMessage->setText($finalText); // Pure TEXT, not JSON
                 $outgoingMessage->setDirection('OUT');
                 $outgoingMessage->setStatus('complete');
 
@@ -463,21 +684,6 @@ class StreamController extends AbstractController
                 
                 $this->em->flush();
 
-                // Get Again data with message ID to determine current model
-                $this->logger->info('StreamController: Getting againData', [
-                    'topic' => $classification['topic'],
-                    'message_id' => $outgoingMessage->getId()
-                ]);
-                
-                $againData = $this->getAgainData($classification['topic'], $outgoingMessage->getId());
-                
-                $this->logger->info('StreamController: AgainData retrieved', [
-                    'eligible_count' => count($againData['eligible'] ?? []),
-                    'has_predicted' => isset($againData['predictedNext']),
-                    'current_model_id' => $againData['current_model_id'] ?? null,
-                    'tag' => $againData['tag'] ?? null
-                ]);
-
                 // Get search results if available
                 $searchResults = null;
                 if (isset($result['search_results']) && !empty($result['search_results']['results'])) {
@@ -498,7 +704,7 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Send complete event
+                // Send complete event (WITHOUT againData - frontend handles this)
                 $this->sendSSE('complete', [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
@@ -506,7 +712,6 @@ class StreamController extends AbstractController
                     'model' => $response['metadata']['model'] ?? 'unknown',
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
-                    'again' => $againData,
                     'searchResults' => $searchResults, // Include search results
                 ]);
                 
@@ -539,6 +744,14 @@ class StreamController extends AbstractController
 
                 $this->sendSSE('error', $errorData);
             } catch (\Exception $e) {
+                // Don't send error if client disconnected intentionally
+                if ($e->getMessage() === 'Client disconnected') {
+                    $this->logger->info('Stream stopped - client disconnected', [
+                        'user_id' => $user->getId(),
+                    ]);
+                    return; // Silently stop
+                }
+                
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),
                     'error' => $e->getMessage(),
@@ -553,6 +766,59 @@ class StreamController extends AbstractController
         return $response;
     }
 
+    /**
+     * Handle non-streaming requests for models that don't support streaming (e.g., o1-preview)
+     */
+    private function handleNonStreamingRequest(\App\Entity\Message $message, array $options): void
+    {
+        try {
+            // Send processing status
+            $this->sendSSE('status', ['message' => 'Processing with non-streaming model...']);
+            
+            // Process message without streaming
+            $result = $this->messageProcessor->process($message, $options);
+            
+            if (!$result['success']) {
+                $this->sendSSE('error', ['error' => $result['error']]);
+                return;
+            }
+            
+            // Get response content
+            $content = $result['content'] ?? '';
+            $metadata = $result['metadata'] ?? [];
+            
+            // Extract reasoning if present (for o1 models)
+            $reasoning = null;
+            if (isset($metadata['reasoning'])) {
+                $reasoning = $metadata['reasoning'];
+                unset($metadata['reasoning']);
+            }
+            
+            // Send reasoning first if available
+            if ($reasoning) {
+                $this->sendSSE('reasoning_complete', ['reasoning' => $reasoning]);
+            }
+            
+            // Send content in one chunk (simulating streaming)
+            $this->sendSSE('data', ['chunk' => $content]);
+            
+            // Send complete event
+            $this->sendSSE('complete', [
+                'messageId' => $message->getId(),
+                'provider' => $metadata['provider'] ?? 'unknown',
+                'model' => $metadata['model'] ?? 'unknown',
+                'trackId' => $_GET['trackId'] ?? time(),
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->logger->error('Non-streaming processing failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->sendSSE('error', ['error' => 'Failed to process: ' . $e->getMessage()]);
+        }
+    }
+
     private function sendSSE(string $status, array $data): void
     {
         if (connection_aborted()) {
@@ -560,12 +826,15 @@ class StreamController extends AbstractController
             return;
         }
 
+        // Sanitize all string values in data to ensure valid UTF-8
+        $sanitizedData = $this->sanitizeUtf8($data);
+
         $event = [
             'status' => $status,
-            ...$data,
+            ...$sanitizedData,
         ];
 
-        echo "data: " . json_encode($event) . "\n\n";
+        echo "data: " . json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE) . "\n\n";
         
         if (ob_get_level() > 0) {
             ob_flush();
@@ -573,30 +842,21 @@ class StreamController extends AbstractController
         flush();
     }
 
-    private function getAgainData(string $topic, ?int $messageId): array
+    /**
+     * Recursively sanitize UTF-8 in arrays to prevent JSON encoding errors
+     */
+    private function sanitizeUtf8($value)
     {
-        $tag = $this->againService->resolveTagFromTopic($topic);
-        $eligibleModels = $this->againService->getEligibleModels($tag);
-        
-        // Get current model ID from message metadata
-        $currentModelId = null;
-        if ($messageId) {
-            $message = $this->em->getRepository(Message::class)->find($messageId);
-            if ($message) {
-                $currentModelId = $message->getMeta('ai_chat_model_id');
-                if ($currentModelId) {
-                    $currentModelId = (int)$currentModelId;
-                }
-            }
+        if (is_array($value)) {
+            return array_map([$this, 'sanitizeUtf8'], $value);
         }
         
-        $predictedNext = $this->againService->getPredictedNext($eligibleModels, $currentModelId);
-
-        return [
-            'eligible' => $eligibleModels,
-            'predictedNext' => $predictedNext,
-            'current_model_id' => $currentModelId,
-            'tag' => $tag,
-        ];
+        if (is_string($value)) {
+            // Remove invalid UTF-8 characters
+            return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        }
+        
+        return $value;
     }
+
 }

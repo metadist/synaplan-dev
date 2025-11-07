@@ -176,9 +176,11 @@
         <button
           @click="toggleThinking"
           type="button"
+          :disabled="!supportsReasoning"
           :class="[
             'pill flex-shrink-0',
-            thinkingEnabled && 'pill--active'
+            thinkingEnabled && 'pill--active',
+            !supportsReasoning && 'opacity-50 cursor-not-allowed'
           ]"
           :aria-label="$t('chatInput.thinking')"
         >
@@ -282,6 +284,28 @@ const canSend = computed(() => {
   return (hasMessage || hasFiles) && filesReady && !uploading.value
 })
 
+const supportsReasoning = computed(() => {
+  // Get the configured default model
+  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+  
+  // If no model yet (store still loading), return false (button will be disabled)
+  if (!currentModel) {
+    return false
+  }
+  
+  // Check if model has reasoning capability
+  return currentModel.features?.includes('reasoning') ?? false
+})
+
+// Auto-enable thinking when switching to a reasoning-capable model
+watch(supportsReasoning, (newValue) => {
+  if (newValue) {
+    thinkingEnabled.value = true
+  } else {
+    thinkingEnabled.value = false
+  }
+}, { immediate: true })
+
 watch(message, (newValue) => {
   if (newValue.startsWith('/')) {
     paletteVisible.value = true
@@ -315,13 +339,10 @@ const sendMessage = () => {
 }
 
 const toggleThinking = () => {
-  const currentModel = aiConfigStore.getCurrentModel('CHAT')
-  
-  if (!thinkingEnabled.value) {
-    if (!currentModel?.features?.includes('reasoning')) {
-      warning('Your current chat model does not support reasoning. Please change your model in /config/ai-models to use this feature.')
+  // Check if current model supports reasoning
+  if (!supportsReasoning.value) {
+    warning($t('chatInput.reasoningNotSupported'))
       return
-    }
   }
   
   thinkingEnabled.value = !thinkingEnabled.value

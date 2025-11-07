@@ -20,6 +20,7 @@ export interface Part {
   result?: string
   expiresAt?: string
   thinkingTime?: number  // Time in seconds for thinking process
+  isStreaming?: boolean  // For reasoning parts that are still being streamed
 }
 
 export interface MessageFile {
@@ -40,6 +41,7 @@ export interface Message {
   isStreaming?: boolean
   provider?: string
   modelLabel?: string
+  topic?: string // Topic from message classification (e.g., 'general', 'mediamaker')
   againData?: AgainData
   originalMessageId?: number
   backendMessageId?: number
@@ -191,8 +193,17 @@ export const useHistoryStore = defineStore('history', () => {
       // Only parse if we have a single text part that might contain thinking blocks
       else if (message.parts.length === 1 && message.parts[0].type === 'text') {
         const currentContent = message.parts[0]?.content || ''
+        
+        console.log('🔍 finishStreamingMessage: Content length:', currentContent.length)
+        console.log('🔍 finishStreamingMessage: Has <think>?', currentContent.includes('<think>'))
+        console.log('🔍 finishStreamingMessage: Content preview:', currentContent.substring(0, 200))
+        
         if (currentContent && currentContent.includes('<think>')) {
+          console.log('✅ Parsing <think> tags!')
           message.parts = parseContentWithThinking(currentContent)
+          console.log('✅ Parsed parts:', message.parts.length, message.parts.map(p => p.type))
+        } else {
+          console.log('❌ No <think> tags found or content empty')
         }
       }
     }
@@ -220,9 +231,43 @@ export const useHistoryStore = defineStore('history', () => {
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map((m: any) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
-          const parts = parseContentWithThinking(m.text || '')
           
-          // Parse files from backend response
+          // Parse text - handle both plain text and JSON format
+          let messageText = m.text || ''
+          try {
+            // If text is a JSON object with BTEXT property, extract BTEXT
+            const parsed = JSON.parse(messageText)
+            if (parsed && typeof parsed === 'object' && 'BTEXT' in parsed) {
+              messageText = parsed.BTEXT || ''
+            }
+          } catch (e) {
+            // Not JSON, use as-is
+          }
+          
+          const parts = parseContentWithThinking(messageText)
+          
+          // Add generated file (image/video/audio) as part if present
+          if (m.file && m.file.path) {
+            if (m.file.type === 'image') {
+              parts.push({
+                type: 'image',
+                url: m.file.path,
+                alt: m.text || 'Generated image'
+              })
+            } else if (m.file.type === 'video') {
+              parts.push({
+                type: 'video',
+                url: m.file.path
+              })
+            } else if (m.file.type === 'audio') {
+              parts.push({
+                type: 'audio',
+                url: m.file.path
+              })
+            }
+          }
+          
+          // Parse files from backend response (user uploads)
           const files: MessageFile[] = []
           if (m.files && Array.isArray(m.files)) {
             files.push(...m.files.map((f: any) => ({
@@ -242,6 +287,7 @@ export const useHistoryStore = defineStore('history', () => {
             timestamp: new Date(m.timestamp * 1000),
             provider: m.provider,
             modelLabel: m.provider || 'AI',
+            topic: m.topic, // Topic from message classification
             backendMessageId: m.id,
             files: files.length > 0 ? files : undefined,
             aiModels: m.aiModels || null, // Parse AI model metadata from backend

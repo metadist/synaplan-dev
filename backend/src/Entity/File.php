@@ -3,31 +3,22 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use App\Repository\MessageFileRepository;
+use App\Repository\FileRepository;
 
 /**
- * MessageFile Entity
- * 
- * Stores file attachments for messages.
- * Supports multiple files per message via 1-to-N relation.
+ * File Entity (Table: BFILES)
  */
-#[ORM\Entity(repositoryClass: MessageFileRepository::class)]
-#[ORM\Table(name: 'BMESSAGEFILES')]
-#[ORM\Index(columns: ['BMESSAGEID'], name: 'idx_messagefile_message')]
-#[ORM\Index(columns: ['BFILETYPE'], name: 'idx_messagefile_type')]
-class MessageFile
+#[ORM\Entity(repositoryClass: FileRepository::class)]
+#[ORM\Table(name: 'BFILES')]
+#[ORM\Index(columns: ['BUSERID'], name: 'idx_file_user')]
+#[ORM\Index(columns: ['BFILETYPE'], name: 'idx_file_type')]
+#[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
+class File
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
     private ?int $id = null;
-
-    #[ORM\Column(name: 'BMESSAGEID', type: 'bigint', nullable: true)]
-    private ?int $messageId = null;
-
-    #[ORM\ManyToOne(targetEntity: Message::class, inversedBy: 'files')]
-    #[ORM\JoinColumn(name: 'BMESSAGEID', referencedColumnName: 'BID', nullable: true, onDelete: 'CASCADE')]
-    private ?Message $message = null;
 
     #[ORM\Column(name: 'BUSERID', type: 'bigint')]
     private int $userId;
@@ -66,29 +57,6 @@ class MessageFile
     public function getId(): ?int
     {
         return $this->id;
-    }
-
-    public function getMessageId(): ?int
-    {
-        return $this->messageId;
-    }
-
-    public function setMessageId(?int $messageId): self
-    {
-        $this->messageId = $messageId;
-        return $this;
-    }
-
-    public function getMessage(): ?Message
-    {
-        return $this->message;
-    }
-
-    public function setMessage(?Message $message): self
-    {
-        $this->message = $message;
-        $this->messageId = $message?->getId();
-        return $this;
     }
 
     public function getUserId(): int

@@ -42,6 +42,7 @@
               :is-streaming="message.isStreaming"
               :provider="message.provider"
               :model-label="message.modelLabel"
+              :topic="message.topic"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
@@ -115,7 +116,10 @@ const isStreaming = computed(() => {
 // Init on mount
 onMounted(async () => {
   // Load AI models config for Again functionality
-  await aiConfigStore.loadModels()
+  await Promise.all([
+    aiConfigStore.loadModels(),
+    aiConfigStore.loadDefaults()
+  ])
   
   // Load chats first
   await chatsStore.loadChats()
@@ -323,15 +327,10 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
 const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean; modelId?: number; fileIds?: number[] }) => {
   streamingAbortController = new AbortController()
   
-  // Get current selected model from store
-  const provider = modelsStore.selectedProvider
-  const model = modelsStore.selectedModel
-  
-  // Find model label
-  const modelOption = mockModelOptions.find(
-    opt => opt.provider.toLowerCase() === provider.toLowerCase() && opt.model === model
-  )
-  const modelLabel = modelOption?.label || model
+  // Get current selected model from aiConfig store (DB model with ID)
+  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+  const provider = currentModel?.service || modelsStore.selectedProvider
+  const modelLabel = currentModel?.name || modelsStore.selectedModel
   
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
@@ -366,10 +365,12 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
       
       const includeReasoning = options?.includeReasoning ?? false
       const webSearch = options?.webSearch ?? false
-      const modelId = options?.modelId
+      // IMPORTANT: Only pass modelId if explicitly provided (e.g., "Again" function)
+      // For normal requests, let backend do classification/sorting to determine the right handler
+      const finalModelId = options?.modelId // Don't fallback to current model!
       const fileIds = options?.fileIds || [] // Array of fileIds
       
-      console.log('🚀 Streaming with options:', { includeReasoning, webSearch, modelId, fileIds, fileCount: fileIds.length })
+      console.log('🚀 Streaming with options:', { includeReasoning, webSearch, modelId: finalModelId, fileIds, fileCount: fileIds.length })
       
       const stopStreaming = chatApi.streamMessage(
         userId,
@@ -387,6 +388,10 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             processingMetadata.value = {}
           } else if (data.status === 'preprocessing') {
             processingStatus.value = 'preprocessing'
+            processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'analyzing') {
+            // Analyzing phase (e.g., understanding media generation request)
+            processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
           } else if (data.status === 'classifying') {
             processingStatus.value = 'classifying'
@@ -414,7 +419,11 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             processingMetadata.value = data.metadata || {}
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
-            processingMetadata.value = data.metadata || {}
+            // Use custom message from backend if available, otherwise default
+            processingMetadata.value = { 
+              customMessage: data.message || undefined,
+              ...(data.metadata || {})
+            }
             
             // Update message with real model from backend (instead of store model)
             const message = historyStore.messages.find(m => m.id === messageId)
@@ -427,8 +436,13 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               }
             }
           } else if (data.status === 'processing') {
-            // Processing/routing messages - just log them
+            // Processing/routing messages - improved logging
+            if (data.message && !data.message.includes('image_generation')) {
             console.log('Processing:', data.message)
+            } else {
+              // Generic routing message, suppress spam
+              console.log('Processing: Routing to handler')
+            }
           } else if (data.status === 'status') {
             // Generic status message
             console.log('Status:', data.message)
@@ -443,6 +457,9 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             // AI gibt nur TEXT zurück (keine JSON!)
             fullContent += data.chunk
             
+            // Don't parse JSON during streaming - it's incomplete!
+            // We'll parse it at the end in the 'complete' event
+            
             // Extrahiere thinking blocks und content separat
             const thinkingMatches = fullContent.match(/<think>([\s\S]*?)(<\/think>|$)/g)
             const thinkingParts: any[] = []
@@ -456,7 +473,7 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               })
             }
             
-            // Display content OHNE <think> blocks
+            // Display content OHNE <think> blocks (RAW - will be parsed on complete)
             const displayContent = fullContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
             
             // Parse für code blocks, etc.
@@ -502,8 +519,30 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               
               message.parts = newParts
             }
+          } else if (data.status === 'reasoning' && data.chunk) {
+            // Reasoning chunks from OpenAI o-series / GPT-5 models
+            console.log('🧠 Received reasoning chunk:', data.chunk.substring(0, 50) + '...')
+            
+            const message = historyStore.messages.find(m => m.id === messageId)
+            if (message) {
+              // Find existing reasoning part or create new one
+              let reasoningPart = message.parts.find(p => p.type === 'thinking' && p.isStreaming)
+              
+              if (!reasoningPart) {
+                // Create new reasoning part at the beginning
+                reasoningPart = {
+                  type: 'thinking',
+                  content: '',
+                  isStreaming: true
+                }
+                message.parts.unshift(reasoningPart)
+              }
+              
+              // Append reasoning content
+              reasoningPart.content += data.chunk
+            }
           } else if (data.status === 'file') {
-            // Handle file attachments (images, videos, etc.)
+            // Handle file attachments (images, videos, audio, etc.)
             console.log('📎 File received:', data.type, data.url)
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
@@ -512,6 +551,8 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 message.parts.push({ type: 'image', url: data.url })
               } else if (data.type === 'video') {
                 message.parts.push({ type: 'video', url: data.url })
+              } else if (data.type === 'audio') {
+                message.parts.push({ type: 'audio', url: data.url })
               }
             }
           } else if (data.status === 'links') {
@@ -547,22 +588,42 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             processingStatus.value = ''
             processingMetadata.value = {}
             
-            // Store againData and backendMessageId if provided
+            // Update message metadata
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
               console.log('📍 Found message to update:', message.id)
               
-              if (data.again) {
-                console.log('🔄 Setting againData from backend:', {
-                  eligibleCount: data.again.eligible?.length || 0,
-                  hasPredictedNext: !!data.again.predictedNext,
-                  eligible: data.again.eligible,
-                  predictedNext: data.again.predictedNext
-                })
-                message.againData = data.again
-              } else {
-                console.warn('⚠️ No againData in complete event!', data)
+              // ✨ NEW: Parse JSON response if AI responded in JSON format
+              if (message.parts.length > 0) {
+                const firstPart = message.parts.find(p => p.type === 'text')
+                if (firstPart && firstPart.content) {
+                  const content = firstPart.content.trim()
+                  
+                  // Check if content is JSON with BTEXT field
+                  if (content.startsWith('{')) {
+                    try {
+                      const jsonData = JSON.parse(content)
+                      if (jsonData && typeof jsonData === 'object' && 'BTEXT' in jsonData) {
+                        console.log('🔍 Found JSON response, extracting BTEXT...')
+                        
+                        // Extract BTEXT
+                        firstPart.content = jsonData.BTEXT || ''
+                        console.log('✅ Extracted BTEXT:', (firstPart.content || '').substring(0, 100))
+                        
+                        // TODO: Handle BFILETEXT and BFILE if needed
+                        // if (jsonData.BFILETEXT && jsonData.BFILE) {
+                        //   // Create file part
+                        // }
+                      }
+                    } catch (e) {
+                      console.log('⚠️ Content looks like JSON but failed to parse:', e)
+                    }
+                  }
+                }
               }
+              
+              // NOTE: againData is now generated by frontend in ChatMessage.vue
+              // based on available models and message type (image/video/audio)
               
               if (data.messageId) {
                 console.log('🆔 Setting backendMessageId:', data.messageId)
@@ -590,6 +651,19 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 message.modelLabel = data.model
                 console.log('🤖 Updated model label:', data.model)
               }
+              
+              // Store topic from classification
+              if (data.topic) {
+                message.topic = data.topic
+                console.log('🏷️ Updated topic:', data.topic)
+              }
+              
+              // Mark reasoning parts as complete (remove streaming flag)
+              message.parts.forEach(part => {
+                if (part.type === 'thinking' && part.isStreaming) {
+                  delete part.isStreaming
+                }
+              })
             } else {
               console.error('❌ Could not find message with id:', messageId)
             }
@@ -655,7 +729,7 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
         },
         includeReasoning,
         webSearch,
-        modelId,
+        finalModelId,
         fileIds // Pass array of fileIds
       )
       

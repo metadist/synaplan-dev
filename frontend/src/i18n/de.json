@@ -15,7 +15,8 @@
     "send": "Senden",
     "stop": "Stoppen",
     "enhance": "Verbessern",
-    "thinking": "Denken"
+    "thinking": "Denken",
+    "reasoningNotSupported": "Dein aktuelles Chat-Modell unterstützt kein Reasoning. Bitte wähle ein Reasoning-fähiges Modell (GPT-5, o3, DeepSeek-R1) in der KI-Konfiguration → Modelle."
   },
   "login": {
     "title": "Anmelden",
@@ -96,6 +97,9 @@
     "searchCompleteTitle": "Web-Suche abgeschlossen",
     "searchCompleteDesc": "Informationen gefunden",
     "results": "Ergebnisse",
+    "analyzing": "Analysiere Anfrage...",
+    "analyzingTitle": "Analysiere deine Anfrage",
+    "analyzingDesc": "Verstehe was du brauchst",
     "routing": "Leite zu Handler",
     "routingTitle": "Leite Anfrage weiter",
     "routingDesc": "Leite zum passenden Handler:",
@@ -127,7 +131,28 @@
     },
     "taskPrompts": {
       "title": "Prompt-Verwaltung",
-      "description": "Verwalten Sie Ihre Prompts"
+      "description": "Verwalten Sie Ihre Prompts",
+      "subtitle": "Verwalten und anpassen von KI-Prompts für verschiedene Aufgaben",
+      "selectPrompt": "Prompt auswählen",
+      "promptDetails": "Prompt-Details",
+      "rulesForSelection": "Auswahlregeln",
+      "aiModel": "KI-Modell",
+      "availableTools": "Verfügbare Tools",
+      "promptContent": "Prompt-Inhalt",
+      "contentPlaceholder": "Geben Sie Ihren System-Prompt hier ein...",
+      "promptContentPlaceholder": "Geben Sie den System-Prompt ein, der das Verhalten der KI für diese Aufgabe steuert...",
+      "createNew": "Neuen Prompt erstellen",
+      "loadTemplate": "Vorlage laden",
+      "topic": "Thema",
+      "topicPlaceholder": "z.B. custom-analyzer",
+      "name": "Name",
+      "namePlaceholder": "z.B. Eigener Datei-Analyzer",
+      "createButton": "Neuen Prompt erstellen",
+      "dangerZone": "Gefahrenzone",
+      "deleteWarning": "Das Löschen dieses Prompts ist dauerhaft und kann nicht rückgängig gemacht werden.",
+      "deletePrompt": "Prompt löschen",
+      "saveChanges": "Änderungen speichern",
+      "noPrompts": "Keine Prompts verfügbar"
     },
     "sortingPrompt": {
       "title": "Preprocessor",

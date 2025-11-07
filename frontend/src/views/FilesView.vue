@@ -239,6 +239,7 @@
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.name') }}</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.size') }}</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.status') }}</th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">GroupKey / Tag</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.attachment') }}</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.uploaded') }}</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.action') }}</th>
@@ -275,6 +276,65 @@
                       {{ $t(`files.status_${file.status}`) }}
                     </span>
                   </td>
+                  <!-- GroupKey Column with inline edit -->
+                  <td class="py-3 px-3">
+                    <div v-if="editingGroupKey === file.id" class="flex items-center gap-2">
+                      <input
+                        v-model="tempGroupKey"
+                        @keyup.enter="saveGroupKey(file.id)"
+                        @keyup.escape="cancelEditGroupKey"
+                        type="text"
+                        class="px-2 py-1 text-xs rounded border border-[var(--brand)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-transparent txt-primary"
+                        placeholder="GroupKey"
+                        ref="groupKeyInput"
+                      />
+                      <button
+                        @click="saveGroupKey(file.id)"
+                        class="p-1 rounded hover:bg-green-500/10 text-green-600"
+                        title="Save"
+                      >
+                        <Icon icon="heroicons:check" class="w-4 h-4" />
+                      </button>
+                      <button
+                        @click="cancelEditGroupKey"
+                        class="p-1 rounded hover:bg-red-500/10 text-red-500"
+                        title="Cancel"
+                      >
+                        <Icon icon="heroicons:x-mark" class="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div v-else class="flex items-center gap-2">
+                      <span
+                        v-if="fileGroupKeys[file.id]?.groupKey"
+                        class="pill text-xs font-mono cursor-pointer hover:bg-[var(--brand)]/20 transition-colors"
+                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
+                        :title="`Click to edit • ${fileGroupKeys[file.id]?.chunks || 0} chunks`"
+                      >
+                        {{ fileGroupKeys[file.id].groupKey }}
+                      </span>
+                      <span
+                        v-else-if="fileGroupKeys[file.id]?.isVectorized === false"
+                        class="pill pill--warning text-xs"
+                        title="Not vectorized - click Re-Vectorize below"
+                      >
+                        Not vectorized
+                      </span>
+                      <span
+                        v-else
+                        class="pill text-xs opacity-50"
+                      >
+                        Loading...
+                      </span>
+                      <button
+                        v-if="fileGroupKeys[file.id]?.groupKey"
+                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
+                        class="p-1 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Edit GroupKey"
+                      >
+                        <Icon icon="heroicons:pencil" class="w-3 h-3" />
+                      </button>
+                    </div>
+                  </td>
                   <td class="py-3 px-3">
                     <span
                       v-if="file.is_attached"
@@ -294,6 +354,15 @@
                   <td class="py-3 px-3 txt-secondary text-xs">{{ file.uploaded_date }}</td>
                 <td class="py-3 px-3">
                   <div class="flex gap-2">
+                    <!-- Re-Vectorize Button (only if not vectorized) -->
+                    <button
+                      v-if="fileGroupKeys[file.id]?.isVectorized === false"
+                      @click="reVectorize(file.id)"
+                      class="p-2 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
+                      title="Re-vectorize this file with extracted text"
+                    >
+                      <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
+                    </button>
                     <button
                       @click="viewFileContent(file.id)"
                       class="p-2 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
@@ -381,12 +450,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import MainLayout from '@/components/MainLayout.vue'
 import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
+import { Icon } from '@iconify/vue'
 import {
   CloudArrowUpIcon,
   TrashIcon,
@@ -411,6 +481,12 @@ const currentPage = ref(1)
 const itemsPerPage = 10
 const isUploading = ref(false)
 const isLoading = ref(false)
+
+// GroupKey management
+const fileGroupKeys = ref<Record<number, { groupKey: string | null; isVectorized: boolean; chunks: number; status: string }>>({})
+const editingGroupKey = ref<number | null>(null)
+const tempGroupKey = ref('')
+const groupKeyInput = ref<HTMLInputElement | null>(null)
 
 // Modal state
 const isModalOpen = ref(false)
@@ -515,6 +591,9 @@ const loadFiles = async (page = currentPage.value) => {
     files.value = response.files
     totalCount.value = response.pagination.total
     currentPage.value = response.pagination.page
+    
+    // Load groupKeys for all loaded files
+    await loadAllFileGroupKeys()
   } catch (error: any) {
     console.error('Failed to load files:', error)
     
@@ -694,10 +773,110 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
+/**
+ * Load groupKey for a file
+ */
+const loadFileGroupKey = async (fileId: number) => {
+  try {
+    const result = await filesService.getFileGroupKey(fileId)
+    fileGroupKeys.value[fileId] = {
+      groupKey: result.groupKey,
+      isVectorized: result.isVectorized,
+      chunks: result.chunks,
+      status: result.status
+    }
+  } catch (err: any) {
+    console.error(`Failed to load groupKey for file ${fileId}:`, err)
+    fileGroupKeys.value[fileId] = {
+      groupKey: null,
+      isVectorized: false,
+      chunks: 0,
+      status: 'unknown'
+    }
+  }
+}
+
+/**
+ * Load groupKeys for all visible files
+ */
+const loadAllFileGroupKeys = async () => {
+  const promises = paginatedFiles.value.map(file => loadFileGroupKey(file.id))
+  await Promise.all(promises)
+}
+
+/**
+ * Start editing groupKey
+ */
+const startEditGroupKey = async (fileId: number, currentGroupKey: string | null) => {
+  editingGroupKey.value = fileId
+  tempGroupKey.value = currentGroupKey || ''
+  await nextTick()
+  groupKeyInput.value?.focus()
+}
+
+/**
+ * Cancel editing groupKey
+ */
+const cancelEditGroupKey = () => {
+  editingGroupKey.value = null
+  tempGroupKey.value = ''
+}
+
+/**
+ * Save groupKey
+ */
+const saveGroupKey = async (fileId: number) => {
+  if (!tempGroupKey.value.trim()) {
+    showError('GroupKey cannot be empty')
+    return
+  }
+
+  try {
+    await filesService.updateFileGroupKey(fileId, tempGroupKey.value.trim())
+    showSuccess('GroupKey updated successfully!')
+    
+    // Reload the groupKey for this file
+    await loadFileGroupKey(fileId)
+    
+    cancelEditGroupKey()
+    
+    // Reload file groups to update the dropdown
+    await loadFileGroups()
+  } catch (err: any) {
+    const errorMessage = err.message || 'Failed to update groupKey'
+    showError(errorMessage)
+  }
+}
+
+/**
+ * Re-vectorize a file
+ */
+const reVectorize = async (fileId: number) => {
+  const groupKey = tempGroupKey.value || 'DEFAULT'
+  
+  try {
+    showInfo('Re-vectorizing file... This may take a moment.')
+    
+    const result = await filesService.reVectorizeFile(fileId, groupKey)
+    
+    showSuccess(`File re-vectorized! Created ${result.chunksCreated} chunks from ${result.extractedTextLength} characters.`)
+    
+    // Reload the groupKey for this file
+    await loadFileGroupKey(fileId)
+    
+    // Reload file groups
+    await loadFileGroups()
+  } catch (err: any) {
+    const errorMessage = err.message || 'Failed to re-vectorize file'
+    showError(errorMessage)
+  }
+}
+
 // Load initial data
 onMounted(async () => {
   await loadFiles()
   await loadFileGroups()
+  await loadAllFileGroupKeys()
 })
 </script>
 

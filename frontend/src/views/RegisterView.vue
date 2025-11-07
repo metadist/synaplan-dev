@@ -191,12 +191,14 @@ import { useI18n } from 'vue-i18n'
 import { SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
+import { useRecaptcha } from '../composables/useRecaptcha'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
 import Button from '../components/Button.vue'
 
 const router = useRouter()
 const { locale } = useI18n()
 const themeStore = useTheme()
+const { getToken: getReCaptchaToken } = useRecaptcha()
 
 const isDark = computed(() => {
   if (themeStore.theme.value === 'dark') return true
@@ -255,7 +257,10 @@ const handleRegister = async () => {
     return
   }
   
-  const success = await register(email.value, password.value)
+  // Get reCAPTCHA token (empty string if disabled)
+  const recaptchaToken = await getReCaptchaToken('register')
+  
+  const success = await register(email.value, password.value, recaptchaToken)
   
   if (success) {
     router.push('/verify-email')

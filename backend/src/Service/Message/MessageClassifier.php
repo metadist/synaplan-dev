@@ -4,6 +4,8 @@ namespace App\Service\Message;
 
 use App\Entity\Message;
 use App\Repository\MessageMetaRepository;
+use App\Service\ModelConfigService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -34,6 +36,8 @@ class MessageClassifier
     public function __construct(
         private MessageSorter $messageSorter,
         private MessageMetaRepository $messageMetaRepository,
+        private ModelConfigService $modelConfigService,
+        private EntityManagerInterface $em,
         private LoggerInterface $logger
     ) {}
 
@@ -60,6 +64,31 @@ class MessageClassifier
         $promptOverride = $this->checkPromptOverride($messageId);
         $modelOverride = $this->checkModelOverride($messageId);
         
+        if ($modelOverride && !$promptOverride) {
+            // "Again" with model but no prompt override
+            // Detect model type from model tag and set topic accordingly
+            $modelTag = $this->getModelTag($modelOverride);
+            $topic = $this->mapModelTagToTopic($modelTag, $message->getTopic());
+            $intent = $this->mapTopicToIntent($topic);
+            
+            $this->logger->info('MessageClassifier: Using model override with auto-detected topic', [
+                'message_id' => $messageId,
+                'model_id' => $modelOverride,
+                'model_tag' => $modelTag,
+                'detected_topic' => $topic,
+                'intent' => $intent
+            ]);
+
+            return [
+                'topic' => $topic,
+                'language' => $message->getLanguage() ?: 'en',
+                'intent' => $intent,
+                'source' => 'model_override_auto',
+                'skip_sorting' => true,
+                'model_id' => $modelOverride
+            ];
+        }
+        
         if ($promptOverride) {
             $this->logger->info('MessageClassifier: Using prompt override (Again function)', [
                 'message_id' => $messageId,
@@ -70,6 +99,7 @@ class MessageClassifier
             $result = [
                 'topic' => $promptOverride,
                 'language' => $message->getLanguage() ?: 'en',
+                'intent' => $this->mapTopicToIntent($promptOverride),
                 'source' => 'prompt_override',
                 'skip_sorting' => true
             ];
@@ -94,6 +124,7 @@ class MessageClassifier
                 return [
                     'topic' => $toolTopic,
                     'language' => $message->getLanguage() ?: 'en',
+                    'intent' => $this->mapTopicToIntent($toolTopic),
                     'source' => 'tool_command',
                     'skip_sorting' => true
                 ];
@@ -109,7 +140,8 @@ class MessageClassifier
             'topic' => $result['topic'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'model_id' => $result['model_id'] ?? null
+            'model_id' => $result['model_id'] ?? null,
+            'raw_ai_response' => $result['raw_response'] ?? 'N/A'
         ]);
 
         return [
@@ -120,7 +152,8 @@ class MessageClassifier
             'skip_sorting' => false,
             'model_id' => $result['model_id'] ?? null,
             'provider' => $result['provider'] ?? null,
-            'model_name' => $result['model_name'] ?? null
+            'model_name' => $result['model_name'] ?? null,
+            'intent' => $this->mapTopicToIntent($result['topic']) // Map topic to intent for routing
         ];
     }
 
@@ -189,5 +222,66 @@ class MessageClassifier
             'BFILE' => $message->getFile(),
             'BWEBSEARCH' => 0 // Initialize for AI to set
         ];
+    }
+
+    /**
+     * Map topic to intent for handler routing
+     */
+    private function mapTopicToIntent(string $topic): string
+    {
+        // Map BPROMPTS topics to InferenceRouter intents
+        $topicToIntent = [
+            // Media generation
+            'mediamaker' => 'image_generation', // Handles images, videos, and audio
+            'text2pic' => 'image_generation',
+            'text2vid' => 'image_generation',
+            'text2sound' => 'image_generation',
+            
+            // Document/Office generation
+            'officemaker' => 'document_generation',
+            
+            // Analysis
+            'analyzefile' => 'file_analysis',
+            'pic2text' => 'file_analysis',
+            'analyze' => 'file_analysis',
+            
+            // Chat/General
+            'general' => 'chat',
+            'chat' => 'chat',
+            
+            // Add more mappings as needed
+        ];
+
+        return $topicToIntent[$topic] ?? 'chat'; // Default to chat
+    }
+
+    /**
+     * Get model tag (capability) from model ID
+     */
+    private function getModelTag(int $modelId): string
+    {
+        $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+        if ($model) {
+            return $model->getTag();
+        }
+        return 'chat'; // fallback
+    }
+
+    /**
+     * Map model tag to appropriate topic
+     */
+    private function mapModelTagToTopic(string $modelTag, ?string $fallbackTopic): string
+    {
+        $tagToTopicMap = [
+            'text2pic' => 'mediamaker',
+            'text2vid' => 'mediamaker',
+            'text2sound' => 'mediamaker',
+            'pic2text' => 'analyzefile',
+            'analyze' => 'analyzefile',
+            'chat' => 'general',
+            'vectorize' => 'general',
+        ];
+
+        return $tagToTopicMap[$modelTag] ?? ($fallbackTopic ?: 'general');
     }
 }

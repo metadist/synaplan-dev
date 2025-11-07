@@ -3,7 +3,7 @@
 namespace App\Service\Message;
 
 use App\Entity\Message;
-use App\Entity\MessageFile;
+use App\Entity\File;
 use App\Repository\MessageRepository;
 use App\Service\WhisperService;
 use App\AI\Service\AiFacade;
@@ -38,7 +38,7 @@ class MessagePreProcessor
         // Check for legacy single file
         $hasLegacyFile = $message->getFile() > 0 && $message->getFilePath();
         
-        // Check for new multiple files (MessageFile entities)
+        // Check for new multiple files (File entities)
         $messageFiles = $message->getFiles();
         $hasNewFiles = $messageFiles->count() > 0;
         
@@ -54,7 +54,7 @@ class MessagePreProcessor
             $this->notify($progressCallback, 'preprocessing', 'File processing complete.');
         }
         
-        // Process new multiple files (MessageFile entities)
+        // Process new multiple files (File entities)
         if ($hasNewFiles) {
             $this->logger->info('PreProcessor: Processing multiple files', [
                 'count' => $messageFiles->count()
@@ -74,7 +74,7 @@ class MessagePreProcessor
             }
             $this->notify($progressCallback, 'preprocessing', 'All files processed.');
             
-            // CRITICAL: Persist changes to MessageFile entities!
+            // CRITICAL: Persist changes to File entities!
             $this->messageRepository->save($message);
         } else {
             $this->logger->warning('PreProcessor: No files to process', [
@@ -88,9 +88,9 @@ class MessagePreProcessor
     }
 
     /**
-     * Process a MessageFile entity (NEW: multiple files support)
+     * Process a File entity (NEW: multiple files support)
      */
-    private function processMessageFile(MessageFile $messageFile): void
+    private function processMessageFile(File $messageFile): void
     {
         $filePath = $messageFile->getFilePath();
         $fileType = strtolower($messageFile->getFileType());
@@ -98,12 +98,12 @@ class MessagePreProcessor
         // File existiert lokal?
         $fullPath = $this->uploadsDir . '/' . $filePath;
         if (!file_exists($fullPath)) {
-            $this->logger->warning("MessageFile not found: {$fullPath}");
+            $this->logger->warning("File not found: {$fullPath}");
             $messageFile->setStatus('error');
             return;
         }
 
-        $this->logger->info('PreProcessor: Processing MessageFile', [
+        $this->logger->info('PreProcessor: Processing File', [
             'file_id' => $messageFile->getId(),
             'type' => $fileType,
             'size' => $messageFile->getFileSize()

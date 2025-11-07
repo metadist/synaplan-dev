@@ -4,8 +4,10 @@ namespace App\Service\Message\Handler;
 
 use App\Entity\Message;
 use App\Repository\PromptRepository;
+use App\Repository\ModelRepository;
 use App\AI\Service\AiFacade;
 use App\Service\ModelConfigService;
+use App\Service\PromptService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -20,9 +22,13 @@ class ChatHandler implements MessageHandlerInterface
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
+        private PromptService $promptService,
         private ModelConfigService $modelConfigService,
+        private ModelRepository $modelRepository,
         private LoggerInterface $logger
     ) {}
+    
+    // VectorSearchService will be injected as needed
 
     public function getName(): string
     {
@@ -161,13 +167,65 @@ class ChatHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
-        // Simple system prompt for streaming (like old system)
-        $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
+        // Load prompt WITH metadata based on topic from classification
+        $topic = $classification['topic'] ?? 'general';
+        $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
+        
+        $promptMetadata = $promptData['metadata'] ?? [];
+        
+        $this->logger->info('ChatHandler: Loaded prompt metadata', [
+            'topic' => $topic,
+            'metadata' => $promptMetadata,
+            'user_id' => $message->getUserId()
+        ]);
+        
+        // ✨ NEW: Load RAG context for task prompt (if files are associated)
+        $ragContext = '';
+        $ragResultsCount = 0;
+        
+        if ($topic !== 'general' && !empty($message->getText())) {
+            try {
+                // Inject VectorSearchService only when needed
+                /** @phpstan-ignore-next-line */
+                $vectorSearchService = $this->aiFacade->getContainer()->get(\App\Service\RAG\VectorSearchService::class);
+                
+                $groupKey = "TASKPROMPT:{$topic}";
+                $ragResults = $vectorSearchService->search(
+                    $message->getText(),
+                    $message->getUserId(),
+                    $groupKey,  // ✨ Filter by Task Prompt!
+                    limit: 3,  // Top 3 most relevant chunks
+                    minScore: 0.6  // Only include if similarity > 60%
+                );
+                
+                if (!empty($ragResults)) {
+                    $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
+                    foreach ($ragResults as $idx => $result) {
+                        $ragContext .= sprintf(
+                            "[Source %d] %s\n",
+                            $idx + 1,
+                            trim($result['chunk_text'])
+                        );
+                    }
+                    $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
+                    $ragResultsCount = count($ragResults);
+                    
+                    $this->logger->info('ChatHandler: RAG context loaded', [
+                        'topic' => $topic,
+                        'chunks_found' => $ragResultsCount,
+                        'user_id' => $message->getUserId()
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: RAG context loading failed', [
+                    'topic' => $topic,
+                    'error' => $e->getMessage()
+                ]);
+                // Continue without RAG context
+            }
+        }
 
-        // Conversation History bauen (TEXT only for streaming)
-        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
-
-        // Get model - Priority: User-selected (Again) > Classification override > DB default
+        // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default
         $modelId = null;
         $provider = null;
         $modelName = null;
@@ -180,7 +238,16 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId()
             ]);
         }
-        // 2. Check if classification provides a model override
+        // 2. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
+        elseif (isset($promptMetadata['aiModel']) && $promptMetadata['aiModel'] > 0) {
+            $modelId = $promptMetadata['aiModel'];
+            $this->logger->info('ChatHandler: Using prompt metadata model', [
+                'model_id' => $modelId,
+                'topic' => $topic,
+                'user_id' => $message->getUserId()
+            ]);
+        }
+        // 3. Check if classification provides a model override
         elseif (isset($classification['override_model_id']) && $classification['override_model_id']) {
             $modelId = $classification['override_model_id'];
             $this->logger->info('ChatHandler: Using classification override model', [
@@ -188,7 +255,7 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId()
             ]);
         }
-        // 3. Fall back to user's default model from DB
+        // 4. Fall back to user's default model from DB
         else {
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
             $this->logger->info('ChatHandler: Using DB default model', [
@@ -196,18 +263,63 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId()
             ]);
         }
+
+        // Simple system prompt for streaming (like old system)
+        $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
         
-        // Resolve model ID to provider + model name
+        // Use prompt content from metadata if available
+        if ($promptData && isset($promptData['prompt'])) {
+            $systemPrompt = $promptData['prompt']->getPrompt();
+            $this->logger->info('ChatHandler: Using custom prompt content', [
+                'topic' => $topic,
+                'prompt_length' => strlen($systemPrompt)
+            ]);
+        }
+        
+        // ✨ NEW: Append RAG context to system prompt if available
+        if (!empty($ragContext)) {
+            $systemPrompt .= $ragContext;
+            $this->logger->info('ChatHandler: RAG context appended to system prompt', [
+                'topic' => $topic,
+                'rag_context_length' => strlen($ragContext)
+            ]);
+        }
+
+        // Check if model supports system messages (o1 models don't)
+        if ($modelId) {
+            $model = $this->modelRepository->find($modelId);
+            if ($model) {
+                $json = $model->getJson();
+                // o1 models (non-streaming) don't support system messages
+                if (isset($json['supportsStreaming']) && $json['supportsStreaming'] === false) {
+                    // Don't use system message - it will be prepended to first user message instead
+                    $systemPrompt = null;
+                }
+            }
+        }
+
+        // Conversation History bauen (TEXT only for streaming)
+        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
+        
+        // Resolve model ID to provider + model name + features
+        $modelFeatures = [];
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
+            
+            // Get model features from DB
+            $model = $this->modelRepository->find($modelId);
+            if ($model) {
+                $modelFeatures = $model->getFeatures();
+            }
             
             error_log('🟢 ChatHandler RESOLVED CHAT MODEL: ' . $provider . ' / ' . $modelName . ' (ID: ' . $modelId . ')');
             
             $this->logger->info('ChatHandler: Resolved model for streaming', [
                 'model_id' => $modelId,
                 'provider' => $provider,
-                'model' => $modelName
+                'model' => $modelName,
+                'features' => $modelFeatures
             ]);
         }
 
@@ -216,12 +328,17 @@ class ChatHandler implements MessageHandlerInterface
             'provider' => $provider,
             'model' => $modelName,
             'temperature' => 0.7,
+            'modelFeatures' => $modelFeatures, // Pass features to provider
         ], $options); // Options from frontend (e.g., reasoning: true/false)
+        
+        // Log reasoning option
+        error_log('🧠 ChatHandler: Reasoning option = ' . ($aiOptions['reasoning'] ?? 'NOT SET'));
         
         $this->logger->info('🔵 ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,
             'model' => $modelName,
-            'user_id' => $message->getUserId()
+            'user_id' => $message->getUserId(),
+            'reasoning' => $aiOptions['reasoning'] ?? false
         ]);
         
         $metadata = $this->aiFacade->chatStream(
@@ -275,11 +392,14 @@ class ChatHandler implements MessageHandlerInterface
      * Build messages for streaming (TEXT only, no JSON)
      * Like old system: topicPrompt with $stream = true
      */
-    private function buildStreamingMessages(string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
+    private function buildStreamingMessages(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
     {
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt]
-        ];
+        $messages = [];
+        
+        // Add system message if supported (o1 models don't support it)
+        if ($systemPrompt !== null) {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
 
         // Thread Messages hinzufügen (letzte N Messages)
         foreach ($thread as $msg) {
@@ -287,7 +407,7 @@ class ChatHandler implements MessageHandlerInterface
             $content = $msg->getText();
             
             // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
-            $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + MessageFile texts
+            $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + File texts
             if (!empty($allFilesText)) {
                 $fileInfo = '';
                 if ($msg->getFiles()->count() > 0) {

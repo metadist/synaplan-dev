@@ -24,12 +24,12 @@ export const useAuthStore = defineStore('auth', () => {
   const isPro = computed(() => ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value))
 
   // Actions
-  async function login(email: string, password: string): Promise<boolean> {
+  async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
     loading.value = true
     error.value = null
 
     try {
-      const result = await authService.login(email, password)
+      const result = await authService.login(email, password, recaptchaToken)
       
       if (result.success) {
         token.value = authService.getToken()
@@ -47,12 +47,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(email: string, password: string): Promise<boolean> {
+  async function register(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
     loading.value = true
     error.value = null
 
     try {
-      const result = await authService.register(email, password)
+      const result = await authService.register(email, password, recaptchaToken)
       
       if (result.success) {
         token.value = authService.getToken()

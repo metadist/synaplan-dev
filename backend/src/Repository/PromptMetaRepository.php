@@ -38,5 +38,14 @@ class PromptMetaRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    public function remove(PromptMeta $promptMeta, bool $flush = true): void
+    {
+        $this->getEntityManager()->remove($promptMeta);
+        
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
 }
 

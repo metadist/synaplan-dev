@@ -190,14 +190,15 @@ class AiFacade
      * @param string $imagePath Relative path to image from upload dir
      * @param string $prompt Analysis prompt
      * @param int|null $userId User ID for config lookup
+     * @param array $options Additional options (provider, model, etc.)
      * @return array Response mit content, provider, model
      */
-    public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null): array
+    public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
-        $providerName = null;
+        $providerName = $options['provider'] ?? null;
         
         // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
-        if ($userId > 0) {
+        if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'pic2text');
         }
         
@@ -211,25 +212,208 @@ class AiFacade
         
         try {
             $response = $this->circuitBreaker->execute(
-                callback: fn() => $provider->analyzeImage($imagePath, $prompt),
+                callback: fn() => $provider->explainImage($imagePath, $prompt, $options),
                 serviceName: 'ai_provider_vision_' . $provider->getName(),
-                fallback: function() use ($imagePath, $prompt) {
-                    $this->logger->warning('Using fallback vision provider');
-                    $fallbackProvider = $this->registry->getVisionProvider('test');
-                    return $fallbackProvider->analyzeImage($imagePath, $prompt);
-                }
+                fallback: null // NO FALLBACK
             );
         } catch (\Exception $e) {
             $this->logger->error('AI vision failed', [
                 'error' => $e->getMessage()
             ]);
-            throw new ProviderException('Vision AI failed', $e);
+            throw new ProviderException('Vision AI failed', 'unknown', null, 0, $e);
         }
         
         return [
             'content' => $response,
             'provider' => $provider->getName(),
-            'model' => $provider->getDefaultModels()['vision'] ?? 'unknown',
+            'model' => $options['model'] ?? 'unknown',
+        ];
+    }
+
+    /**
+     * Generate Image with AI (DALL-E, etc.)
+     * 
+     * @param string $prompt Image generation prompt
+     * @param int|null $userId User ID for config lookup
+     * @param array $options Additional options (provider, model, size, quality, style, etc.)
+     * @return array Generated images with metadata
+     */
+    public function generateImage(string $prompt, ?int $userId = null, array $options = []): array
+    {
+        $providerName = $options['provider'] ?? null;
+        
+        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        if (!$providerName && $userId > 0) {
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'image_generation');
+        }
+        
+        $provider = $this->registry->getImageGenerationProvider($providerName);
+        
+        $this->logger->info('AI image generation request', [
+            'provider' => $provider->getName(),
+            'user_id' => $userId,
+            'prompt_length' => strlen($prompt),
+        ]);
+        
+        try {
+            $images = $this->circuitBreaker->execute(
+                callback: fn() => $provider->generateImage($prompt, $options),
+                serviceName: 'ai_provider_image_' . $provider->getName(),
+                fallback: null // NO FALLBACK
+            );
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            $this->logger->error('AI image generation failed', [
+                'error' => $e->getMessage()
+            ]);
+            throw new ProviderException('Image generation failed', 'unknown', null, 0, $e);
+        }
+        
+        return [
+            'images' => $images,
+            'provider' => $provider->getName(),
+            'model' => $options['model'] ?? 'unknown',
+        ];
+    }
+
+    /**
+     * Generate Video with AI
+     * 
+     * @param string $prompt Video generation prompt
+     * @param int|null $userId User ID for config lookup
+     * @param array $options Additional options (provider, model, duration, resolution, etc.)
+     * @return array Generated videos with metadata
+     */
+    public function generateVideo(string $prompt, ?int $userId = null, array $options = []): array
+    {
+        $providerName = $options['provider'] ?? null;
+        
+        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        if (!$providerName && $userId > 0) {
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'video_generation');
+        }
+        
+        $provider = $this->registry->getVideoGenerationProvider($providerName);
+        
+        $this->logger->info('AI video generation request', [
+            'provider' => $provider->getName(),
+            'user_id' => $userId,
+            'prompt_length' => strlen($prompt),
+        ]);
+        
+        try {
+            $videos = $this->circuitBreaker->execute(
+                callback: fn() => $provider->generateVideo($prompt, $options),
+                serviceName: 'ai_provider_video_' . $provider->getName(),
+                fallback: null // NO FALLBACK
+            );
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            $this->logger->error('AI video generation failed', [
+                'error' => $e->getMessage()
+            ]);
+            throw new ProviderException('Video generation failed', 'unknown', null, 0, $e);
+        }
+        
+        return [
+            'videos' => $videos,
+            'provider' => $provider->getName(),
+            'model' => $options['model'] ?? 'unknown',
+        ];
+    }
+
+    /**
+     * Transcribe Audio (Whisper)
+     * 
+     * @param string $audioPath Relative path to audio file from upload dir
+     * @param int|null $userId User ID for config lookup
+     * @param array $options Additional options (provider, model, language, etc.)
+     * @return array Transcription result with text, language, duration, segments
+     */
+    public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
+    {
+        $providerName = $options['provider'] ?? null;
+        
+        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        if (!$providerName && $userId > 0) {
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'speech_to_text');
+        }
+        
+        $provider = $this->registry->getSpeechToTextProvider($providerName);
+        
+        $this->logger->info('AI transcription request', [
+            'provider' => $provider->getName(),
+            'user_id' => $userId,
+            'audio' => basename($audioPath),
+        ]);
+        
+        try {
+            $result = $this->circuitBreaker->execute(
+                callback: fn() => $provider->transcribe($audioPath, $options),
+                serviceName: 'ai_provider_stt_' . $provider->getName(),
+                fallback: null // NO FALLBACK
+            );
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            $this->logger->error('AI transcription failed', [
+                'error' => $e->getMessage()
+            ]);
+            throw new ProviderException('Transcription failed', 'unknown', null, 0, $e);
+        }
+        
+        return array_merge($result, [
+            'provider' => $provider->getName(),
+            'model' => $options['model'] ?? 'unknown',
+        ]);
+    }
+
+    /**
+     * Synthesize Speech (TTS)
+     * 
+     * @param string $text Text to synthesize
+     * @param int|null $userId User ID for config lookup
+     * @param array $options Additional options (provider, model, voice, speed, format, etc.)
+     * @return array Result with filename and metadata
+     */
+    public function synthesize(string $text, ?int $userId = null, array $options = []): array
+    {
+        $providerName = $options['provider'] ?? null;
+        
+        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        if (!$providerName && $userId > 0) {
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'text_to_speech');
+        }
+        
+        $provider = $this->registry->getTextToSpeechProvider($providerName);
+        
+        $this->logger->info('AI TTS request', [
+            'provider' => $provider->getName(),
+            'user_id' => $userId,
+            'text_length' => strlen($text),
+        ]);
+        
+        try {
+            $filename = $this->circuitBreaker->execute(
+                callback: fn() => $provider->synthesize($text, $options),
+                serviceName: 'ai_provider_tts_' . $provider->getName(),
+                fallback: null // NO FALLBACK
+            );
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            $this->logger->error('AI TTS failed', [
+                'error' => $e->getMessage()
+            ]);
+            throw new ProviderException('TTS failed', 'unknown', null, 0, $e);
+        }
+        
+        return [
+            'filename' => $filename,
+            'provider' => $provider->getName(),
+            'model' => $options['model'] ?? 'unknown',
         ];
     }
 }

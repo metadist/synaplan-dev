@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Repository\MessageRepository;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,6 +14,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use App\Entity\User;
 
 #[Route('/api/v1/messages', name: 'api_messages_')]
+#[OA\Tag(name: 'Messages')]
 class MessageAgainController extends AbstractController
 {
     public function __construct(
@@ -21,11 +23,51 @@ class MessageAgainController extends AbstractController
         private ModelConfigService $modelConfigService
     ) {}
 
-    /**
-     * Get eligible models for "Again" functionality
-     * Returns models + predicted next model based on ranking
-     */
     #[Route('/{messageId}/again-options', name: 'again_options', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/messages/{messageId}/again-options',
+        summary: 'Get eligible models for "Again" functionality',
+        description: 'Returns available models to regenerate a message with different AI models',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\Parameter(
+        name: 'messageId',
+        in: 'path',
+        required: true,
+        description: 'Message ID to get again options for',
+        schema: new OA\Schema(type: 'integer', example: 123)
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'List of eligible models',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'models',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'service', type: 'string', example: 'openai'),
+                            new OA\Property(property: 'name', type: 'string', example: 'gpt-4'),
+                            new OA\Property(property: 'providerId', type: 'string', example: 'openai'),
+                            new OA\Property(property: 'description', type: 'string'),
+                            new OA\Property(property: 'quality', type: 'integer'),
+                            new OA\Property(property: 'rating', type: 'number', format: 'float'),
+                            new OA\Property(property: 'tag', type: 'string', example: 'CHAT'),
+                            new OA\Property(property: 'label', type: 'string', example: 'gpt-4 (OpenAI)')
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'predicted', type: 'integer', nullable: true, description: 'Predicted best next model ID')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Access denied - not message owner')]
+    #[OA\Response(response: 404, description: 'Message not found')]
     public function getAgainOptions(
         int $messageId,
         #[CurrentUser] ?User $user

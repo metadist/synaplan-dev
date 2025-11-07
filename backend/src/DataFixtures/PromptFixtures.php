@@ -39,7 +39,7 @@ class PromptFixtures extends Fixture
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'mediamaker',
-                'shortDescription' => 'The user asks for generation of image(s), video(s) or sounds. Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
+                'shortDescription' => 'The user asks for generation of an image, video or audio. Examples: "generiere ein bild", "create an image", "make a video", "generate a picture", "erstelle ein foto". User wants to CREATE visual or audio media, not analyze it. This handles the connection to media generation AIs like DALL-E, Stable Diffusion, etc.',
                 'prompt' => $this->getMediaMakerPrompt()
             ],
             [

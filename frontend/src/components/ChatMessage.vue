@@ -76,6 +76,12 @@
                 </span>
               </div>
             </template>
+            <template v-else-if="processingStatus === 'analyzing'">
+              <div class="font-medium animate-pulse">{{ $t('processing.analyzingTitle') }}</div>
+              <div class="text-sm txt-tertiary mt-0.5">
+                {{ processingMetadata?.customMessage || $t('processing.analyzingDesc') }}
+              </div>
+            </template>
             <template v-else-if="processingStatus === 'processing'">
               <div class="font-medium">{{ $t('processing.routingTitle') }}</div>
               <div class="text-sm txt-tertiary mt-0.5">
@@ -88,10 +94,15 @@
             <template v-else-if="processingStatus === 'generating'">
               <div class="font-medium animate-pulse">{{ $t('processing.generatingTitle') }}</div>
               <div class="text-sm txt-tertiary mt-0.5">
-                {{ $t('processing.generatingDesc') }}
-                <span v-if="processingMetadata?.model_name || processingMetadata?.provider" class="txt-brand">
-                  · {{ processingMetadata.model_name || processingMetadata.provider }}
-                </span>
+                <template v-if="processingMetadata?.customMessage">
+                  {{ processingMetadata.customMessage }}
+                </template>
+                <template v-else>
+                  {{ $t('processing.generatingDesc') }}
+                  <span v-if="processingMetadata?.model_name || processingMetadata?.provider" class="txt-brand">
+                    · {{ processingMetadata.model_name || processingMetadata.provider }}
+                  </span>
+                </template>
               </div>
             </template>
           </div>
@@ -259,6 +270,7 @@
                       :alt="result.title"
                       class="w-full h-full object-cover"
                       loading="lazy"
+                      @error="handleThumbnailError"
                     />
                   </div>
                   
@@ -296,19 +308,31 @@
         ]"
       >
         <!-- Left: AI Model Badges + timestamp -->
-        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+        <div class="flex items-center gap-1 min-w-0 flex-wrap">
+          <!-- Topic Badge (assistant only) - Ultra compact + Clickable -->
+          <template v-if="role === 'assistant' && topic">
+            <router-link
+              :to="`/config/task-prompts?topic=${topic}`"
+              class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors leading-tight cursor-pointer"
+              :title="`Topic: ${topic} - Click to view prompt`"
+            >
+              <Icon icon="mdi:tag" class="w-2.5 h-2.5" />
+              <span class="uppercase tracking-tight">{{ topic.substring(0, 8) }}</span>
+            </router-link>
+          </template>
+          
           <!-- AI Model Badges (assistant only) -->
           <template v-if="role === 'assistant' && aiModels">
-            <!-- Chat Model Badge -->
+            <!-- Chat/Image/Video Model Badge (dynamic based on content type) -->
             <button
               v-if="aiModels.chat"
               type="button"
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
-              :title="$t('config.aiModels.chatGeneration')"
+              :title="getModelTypeTitle"
               @click="showModelDetails('chat')"
             >
-              <Icon icon="mdi:chat" class="w-3.5 h-3.5" />
-              <span class="hidden sm:inline">{{ $t('config.aiModels.chat') }}:</span>
+              <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
+              <span class="hidden sm:inline">{{ getModelTypeLabel }}:</span>
               <span class="font-semibold">{{ aiModels.chat.model }}</span>
             </button>
             
@@ -446,6 +470,7 @@ interface Props {
   isStreaming?: boolean
   provider?: string
   modelLabel?: string
+  topic?: string // Topic from message classification
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
@@ -587,6 +612,35 @@ const displayProvider = computed(() => {
   return props.provider || 'OpenAI'
 })
 
+// Determine model type based on message content
+const hasImageContent = computed(() => props.parts.some(p => p.type === 'image'))
+const hasVideoContent = computed(() => props.parts.some(p => p.type === 'video'))
+const hasAudioContent = computed(() => props.parts.some(p => p.type === 'audio'))
+
+// Dynamic label for model badge based on content type
+const getModelTypeLabel = computed(() => {
+  if (hasImageContent.value) return 'Image Model'
+  if (hasVideoContent.value) return 'Video Model'
+  if (hasAudioContent.value) return 'Audio Model'
+  return 'Chat Model'
+})
+
+// Dynamic icon for model badge
+const getModelTypeIcon = computed(() => {
+  if (hasImageContent.value) return 'mdi:image'
+  if (hasVideoContent.value) return 'mdi:video'
+  if (hasAudioContent.value) return 'mdi:music'
+  return 'mdi:chat'
+})
+
+// Dynamic title for model badge
+const getModelTypeTitle = computed(() => {
+  if (hasImageContent.value) return 'Image Generation (Text → Image)'
+  if (hasVideoContent.value) return 'Video Generation (Text → Video)'
+  if (hasAudioContent.value) return 'Audio Generation (Text → Audio)'
+  return 'Chat Generation'
+})
+
 const formattedTime = computed(() => {
   const date = props.timestamp
   const hours = date.getHours().toString().padStart(2, '0')
@@ -604,20 +658,36 @@ const modelDropdownOpen = ref(false)
 
 // Use model selection composable
 const againDataComputed = computed(() => props.againData)
-const { modelOptions, predictedModel, hasModels } = useModelSelection(againDataComputed)
+const filesComputed = computed(() => props.files)
+const currentProviderComputed = computed(() => props.provider)
+const currentModelNameComputed = computed(() => props.modelLabel)
+const { modelOptions, predictedModel, hasModels } = useModelSelection(
+  againDataComputed, 
+  filesComputed,
+  currentProviderComputed,
+  currentModelNameComputed
+)
 
 // Selected model: use predicted or first available
 const selectedModel = computed(() => predictedModel.value)
 
 // Navigate to AI models configuration with highlight
 const showModelDetails = (modelType?: 'chat' | 'sorting') => {
-  if (modelType) {
-    // Map to actual capability names
-    const capabilityMap = {
-      'chat': 'CHAT',
-      'sorting': 'SORT'
+  if (modelType === 'chat') {
+    // Determine the correct capability based on content type
+    let capability = 'CHAT'
+    
+    if (hasImageContent.value) {
+      capability = 'TEXT2PIC'
+    } else if (hasVideoContent.value) {
+      capability = 'TEXT2VID'
+    } else if (hasAudioContent.value) {
+      capability = 'TEXT2SOUND'
     }
-    router.push({ path: '/config/ai-models', query: { highlight: capabilityMap[modelType] } })
+    
+    router.push({ path: '/config/ai-models', query: { highlight: capability } })
+  } else if (modelType === 'sorting') {
+    router.push({ path: '/config/ai-models', query: { highlight: 'SORT' } })
   } else {
     router.push('/config/ai-models')
   }
@@ -710,6 +780,16 @@ const handleReferenceClick = (event: MouseEvent) => {
     if (index >= 0 && props.searchResults && index < props.searchResults.length) {
       focusSource(index)
     }
+  }
+}
+
+// Handle thumbnail loading errors silently by replacing with placeholder
+const handleThumbnailError = (event: Event) => {
+  const img = event.target as HTMLImageElement
+  if (img) {
+    // Replace with a data URL placeholder to avoid console spam
+    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23f3f4f6"/%3E%3Cpath d="M70 80h60v40H70z" fill="%23d1d5db"/%3E%3Ccircle cx="85" cy="95" r="8" fill="%23ffffff"/%3E%3Cpath d="M70 110l20-15 15 10 25-20v35H70z" fill="%239ca3af"/%3E%3C/svg%3E'
+    img.onerror = null // Prevent infinite loop
   }
 }
 

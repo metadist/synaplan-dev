@@ -68,12 +68,12 @@
         </button>
         <button
           @click="saveConfiguration"
-          :disabled="saving"
+          :disabled="saving || !hasChanges"
           class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div v-if="saving" class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
           <CheckIcon v-else class="w-5 h-5" />
-          {{ saving ? 'Saving...' : 'Save Configuration' }}
+          {{ saving ? 'Saving...' : hasChanges ? 'Save Configuration' : 'No Changes' }}
         </button>
       </div>
 
@@ -195,7 +195,7 @@ import { serviceColors } from '@/mocks/aiModels'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useNotification } from '@/composables/useNotification'
 
-type Capability = 'SORT' | 'CHAT' | 'VECTORIZE' | 'PIC2TEXT' | 'TEXT2PIC' | 'SOUND2TEXT' | 'TEXT2SOUND' | 'ANALYZE'
+type Capability = 'SORT' | 'CHAT' | 'VECTORIZE' | 'PIC2TEXT' | 'TEXT2PIC' | 'TEXT2VID' | 'SOUND2TEXT' | 'TEXT2SOUND' | 'ANALYZE'
 
 interface ModelsData {
   [key: string]: ModelInfo[]
@@ -208,6 +208,7 @@ const purposeLabels: Record<Capability, string> = {
   VECTORIZE: 'Embedding / Vectorization',
   PIC2TEXT: 'Vision (Image → Text)',
   TEXT2PIC: 'Image Generation (Text → Image)',
+  TEXT2VID: 'Video Generation (Text → Video)',
   SOUND2TEXT: 'Speech-to-Text',
   TEXT2SOUND: 'Text-to-Speech',
   ANALYZE: 'File Analysis'
@@ -222,6 +223,7 @@ const defaultConfig = ref<Record<Capability, number | null>>({
   VECTORIZE: null,
   PIC2TEXT: null,
   TEXT2PIC: null,
+  TEXT2VID: null,
   SOUND2TEXT: null,
   TEXT2SOUND: null,
   ANALYZE: null
@@ -230,6 +232,14 @@ const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig
 const selectedPurpose = ref<Capability | null>(null)
 const highlightedCapability = ref<Capability | 'ALL' | null>(null)
 const capabilityRefs = ref<Record<Capability, HTMLElement | null>>({} as Record<Capability, HTMLElement | null>)
+
+// Check if configuration has changed
+const hasChanges = computed(() => {
+  return Object.keys(defaultConfig.value).some((key) => {
+    const capability = key as Capability
+    return defaultConfig.value[capability] !== originalConfig.value[capability]
+  })
+})
 
 const { success, error: showError, warning, info } = useNotification()
 
@@ -250,6 +260,7 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
     'VECTORIZATION': 'VECTORIZE',
     'VISION': 'PIC2TEXT',
     'IMAGE': 'TEXT2PIC',
+    'VIDEO': 'TEXT2VID',
     'TRANSCRIPTION': 'SOUND2TEXT',
     'TTS': 'TEXT2SOUND',
     'VOICE': 'TEXT2SOUND',

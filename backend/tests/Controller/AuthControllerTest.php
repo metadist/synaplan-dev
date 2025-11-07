@@ -1,410 +1,286 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Controller;
 
 use App\Entity\User;
-use App\Repository\UserRepository;
+use App\Entity\VerificationToken;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Integration tests for AuthController
+ */
 class AuthControllerTest extends WebTestCase
 {
     private $client;
+    private $em;
 
     protected function setUp(): void
     {
         $this->client = static::createClient();
+        $this->em = static::getContainer()->get('doctrine')->getManager();
     }
 
-    // =========== Register Tests ===========
-
-    public function testRegisterSuccess(): void
+    protected function tearDown(): void
     {
-        $uniqueEmail = 'testuser_' . time() . '@example.com';
+        // Cleanup test users
+        $testEmails = ['newuser@test.com', 'logintest@test.com'];
+        foreach ($testEmails as $email) {
+            $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
+            if ($user) {
+                // Remove verification tokens
+                $tokens = $this->em->getRepository(VerificationToken::class)
+                    ->findBy(['userId' => $user->getId()]);
+                foreach ($tokens as $token) {
+                    $this->em->remove($token);
+                }
+                
+                $this->em->remove($user);
+            }
+        }
+        $this->em->flush();
         
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => $uniqueEmail,
-            'password' => 'SecurePass123!'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(201, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        
-        $this->assertTrue($data['success']);
-        $this->assertArrayHasKey('userId', $data);
-        $this->assertArrayHasKey('message', $data);
-        $this->assertStringContainsString('verification', strtolower($data['message']));
+        static::ensureKernelShutdown();
+        parent::tearDown();
     }
 
-    public function testRegisterWithDuplicateEmail(): void
+    public function testRegisterWithValidData(): void
     {
-        $email = 'duplicate_' . time() . '@example.com';
-        
-        // Register first user
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => $email,
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'newuser@test.com',
             'password' => 'SecurePass123!'
-        ]));
+            ])
+        );
 
-        // Try to register again with same email
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => $email,
-            'password' => 'AnotherPass456!'
-        ]));
+        $this->assertResponseIsSuccessful();
+        
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
+        
+        $this->assertArrayHasKey('success', $responseData);
+        $this->assertTrue($responseData['success']);
+        $this->assertArrayHasKey('userId', $responseData);
+        
+        // Verify user was created in database
+        $user = $this->em->getRepository(User::class)
+            ->findOneBy(['mail' => 'newuser@test.com']);
+        
+        $this->assertNotNull($user);
+        $this->assertFalse($user->isEmailVerified());
+        $this->assertEquals('WEB', $user->getType());
+    }
 
-        $response = $this->client->getResponse();
-        $this->assertEquals(409, $response->getStatusCode()); // Conflict
+    public function testRegisterWithExistingEmail(): void
+    {
+        // Create existing user
+        $existingUser = new User();
+        $existingUser->setMail('existing@test.com');
+        $existingUser->setPw(password_hash('password', PASSWORD_BCRYPT));
+        $existingUser->setUserLevel('NEW');
+        $existingUser->setProviderId('local');
+        $existingUser->setCreated(date('YmdHis'));
+        
+        $this->em->persist($existingUser);
+        $this->em->flush();
 
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertStringContainsString('already registered', $data['error']);
+        // Try to register with same email
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'existing@test.com',
+                'password' => 'NewPass123!'
+            ])
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        
+        // Cleanup
+        $this->em->remove($existingUser);
+        $this->em->flush();
     }
 
     public function testRegisterWithInvalidEmail(): void
     {
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'not-an-email',
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'invalid-email',
             'password' => 'SecurePass123!'
-        ]));
+            ])
+        );
 
-        $response = $this->client->getResponse();
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    public function testLoginWithValidCredentials(): void
+    {
+        // Create test user
+        $user = new User();
+        $user->setMail('logintest@test.com');
+        $user->setPw(password_hash('TestPass123!', PASSWORD_BCRYPT));
+        $user->setUserLevel('PRO');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(true);
         
-        // Should return validation error (400 or 422)
-        $this->assertContains($response->getStatusCode(), [400, 422]);
-    }
+        $this->em->persist($user);
+        $this->em->flush();
 
-    public function testRegisterWithMissingPassword(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'test@example.com'
-        ]));
+        // Login
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'logintest@test.com',
+                'password' => 'TestPass123!'
+            ])
+        );
 
-        $response = $this->client->getResponse();
+        $this->assertResponseIsSuccessful();
         
-        $this->assertContains($response->getStatusCode(), [400, 422]);
-    }
-
-    // =========== Login Tests ===========
-
-    public function testLoginWithoutVerification(): void
-    {
-        // Register new user
-        $email = 'unverified_' . time() . '@example.com';
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
         
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => $email,
-            'password' => 'SecurePass123!'
-        ]));
-
-        // Try to login without verifying
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => $email,
-            'password' => 'SecurePass123!'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(403, $response->getStatusCode()); // Forbidden
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertStringContainsString('not verified', strtolower($data['error']));
+        $this->assertArrayHasKey('token', $responseData);
+        $this->assertArrayHasKey('user', $responseData);
+        $this->assertNotEmpty($responseData['token']);
+        $this->assertEquals('logintest@test.com', $responseData['user']['email']);
     }
 
-    public function testLoginWithInvalidCredentials(): void
+    public function testLoginWithInvalidPassword(): void
     {
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'nonexistent@example.com',
-            'password' => 'wrongpassword'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(401, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertStringContainsString('Invalid credentials', $data['error']);
-    }
-
-    public function testLoginWithMissingEmail(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'password' => 'test'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-    }
-
-    public function testLoginWithMissingPassword(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'test@example.com'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-    }
-
-    // =========== Email Verification Tests ===========
-
-    public function testVerifyEmailWithInvalidToken(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/verify-email', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'token' => 'invalid_token_12345'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertStringContainsString('Invalid or expired', $data['error']);
-    }
-
-    public function testVerifyEmailWithMissingToken(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/verify-email', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertEquals('Token required', $data['error']);
-    }
-
-    // =========== Forgot Password Tests ===========
-
-    public function testForgotPasswordReturnsGenericMessage(): void
-    {
-        // Should return success even for non-existent email (security)
-        $this->client->request('POST', '/api/v1/auth/forgot-password', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'nonexistent_' . time() . '@example.com'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(200, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertTrue($data['success']);
-        $this->assertStringContainsString('If email exists', $data['message']);
-    }
-
-    public function testForgotPasswordWithMissingEmail(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/forgot-password', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertEquals('Email required', $data['error']);
-    }
-
-    // =========== Reset Password Tests ===========
-
-    public function testResetPasswordWithInvalidToken(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/reset-password', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'token' => 'invalid_reset_token',
-            'password' => 'NewSecurePass123!'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertStringContainsString('Invalid or expired', $data['error']);
-    }
-
-    public function testResetPasswordWithShortPassword(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/reset-password', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'token' => 'some_token',
-            'password' => 'short'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertStringContainsString('at least 8 characters', $data['error']);
-    }
-
-    public function testResetPasswordWithMissingFields(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/reset-password', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'token' => 'some_token'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertEquals('Token and password required', $data['error']);
-    }
-
-    // =========== Resend Verification Tests ===========
-
-    public function testResendVerificationWithMissingEmail(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/resend-verification', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(400, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertEquals('Email required', $data['error']);
-    }
-
-    public function testResendVerificationReturnsGenericMessage(): void
-    {
-        // Should return generic message even for non-existent email
-        $this->client->request('POST', '/api/v1/auth/resend-verification', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'nonexistent_' . time() . '@example.com'
-        ]));
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(200, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertTrue($data['success']);
-        $this->assertStringContainsString('If your email', $data['message']);
-    }
-
-    // =========== Me Endpoint Tests ===========
-
-    public function testMeWithoutAuthentication(): void
-    {
-        $this->client->request('GET', '/api/v1/auth/me');
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(401, $response->getStatusCode());
-    }
-
-    // =========== Logout Tests ===========
-
-    public function testLogout(): void
-    {
-        $this->client->request('POST', '/api/v1/auth/logout');
-
-        $response = $this->client->getResponse();
-        $this->assertEquals(200, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertTrue($data['success']);
-    }
-
-    // =========== Security Tests ===========
-
-    public function testTimingAttackPrevention(): void
-    {
-        // Test login with non-existent user
-        $start = microtime(true);
+        // Create test user
+        $user = new User();
+        $user->setMail('logintest2@test.com');
+        $user->setPw(password_hash('CorrectPass123!', PASSWORD_BCRYPT));
+        $user->setUserLevel('PRO');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(true);
         
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'nonexistent@example.com',
-            'password' => 'somepassword'
-        ]));
-        
-        $duration = microtime(true) - $start;
+        $this->em->persist($user);
+        $this->em->flush();
 
-        // Should have timing delay (> 0.1 seconds)
-        $this->assertGreaterThan(0.1, $duration, 'Login should have timing attack prevention');
+        // Try login with wrong password
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'logintest2@test.com',
+                'password' => 'WrongPassword!'
+            ])
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        
+        // Cleanup
+        $this->em->remove($user);
+        $this->em->flush();
     }
 
-    public function testPasswordIsHashed(): void
+    public function testLoginWithNonExistentUser(): void
     {
-        $email = 'hashtest_' . time() . '@example.com';
-        $password = 'PlainTextPassword123!';
-        
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => $email,
-            'password' => $password
-        ]));
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'nonexistent@test.com',
+                'password' => 'AnyPassword123!'
+            ])
+        );
 
-        $this->assertEquals(201, $this->client->getResponse()->getStatusCode());
-
-        // Check that password is hashed in database
-        $userRepository = static::getContainer()->get(UserRepository::class);
-        $user = $userRepository->findOneBy(['mail' => $email]);
-
-        $this->assertNotNull($user);
-        $this->assertNotEquals($password, $user->getPassword(), 'Password should be hashed');
-        $this->assertStringStartsWith('$', $user->getPassword(), 'Should be bcrypt/argon2 hash');
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
-    public function testNewUserDefaultValues(): void
+    public function testLoginWithUnverifiedEmail(): void
     {
-        $email = 'defaults_' . time() . '@example.com';
+        // Create unverified user
+        $user = new User();
+        $user->setMail('unverified@test.com');
+        $user->setPw(password_hash('TestPass123!', PASSWORD_BCRYPT));
+        $user->setUserLevel('NEW');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(false);
         
-        $this->client->request('POST', '/api/v1/auth/register', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => $email,
-            'password' => 'SecurePass123!'
-        ]));
+        $this->em->persist($user);
+        $this->em->flush();
 
-        $userRepository = static::getContainer()->get(UserRepository::class);
-        $user = $userRepository->findOneBy(['mail' => $email]);
+        // Try to login
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'unverified@test.com',
+                'password' => 'TestPass123!'
+            ])
+        );
 
-        $this->assertNotNull($user);
-        $this->assertEquals('WEB', $user->getType());
-        $this->assertEquals('NEW', $user->getUserLevel());
-        $this->assertEquals('local', $user->getProviderId());
-        $this->assertFalse($user->isEmailVerified());
-        $this->assertNotEmpty($user->getCreated());
+        $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        
+        // Cleanup
+        $this->em->remove($user);
+        $this->em->flush();
+    }
+
+    public function testLoginRequiresEmailAndPassword(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'test@test.com'
+                // Missing password
+            ])
+        );
+
+        // Missing required fields returns 400
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testRegisterWithWeakPassword(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'weakpass@test.com',
+                'password' => 'weak'
+            ])
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 }
-

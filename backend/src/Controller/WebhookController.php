@@ -9,6 +9,7 @@ use App\Service\RateLimitService;
 use App\Service\WhatsAppService;
 use App\Service\EmailChannelService;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,17 +18,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
-/**
- * Webhook Controller for External Channels
- * 
- * Handles incoming messages from:
- * - Email
- * - WhatsApp
- * - Other external services
- * 
- * Authentication: API Key (X-API-Key header or ?api_key query param)
- */
 #[Route('/api/v1/webhooks', name: 'api_webhooks_')]
+#[OA\Tag(name: 'Webhooks')]
 class WebhookController extends AbstractController
 {
     public function __construct(
@@ -40,27 +32,53 @@ class WebhookController extends AbstractController
         private string $whatsappWebhookVerifyToken
     ) {}
 
-    /**
-     * Email Webhook
-     * 
-     * POST /api/v1/webhooks/email
-     * 
-     * Handles emails sent to:
-     * - smart@synaplan.com (general)
-     * - smart+keyword@synaplan.com (specific chat context)
-     * 
-     * Body:
-     * {
-     *   "from": "user@example.com",
-     *   "to": "smart@synaplan.com" or "smart+keyword@synaplan.com",
-     *   "subject": "Hello",
-     *   "body": "Message text",
-     *   "message_id": "external-msg-123",
-     *   "in_reply_to": "previous-msg-id",
-     *   "attachments": [...]
-     * }
-     */
     #[Route('/email', name: 'email', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/webhooks/email',
+        summary: 'Email webhook endpoint',
+        description: 'Handles incoming emails for processing by AI assistant. Authentication via API Key required.',
+        tags: ['Webhooks']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['from', 'to', 'body'],
+            properties: [
+                new OA\Property(property: 'from', type: 'string', format: 'email', example: 'user@example.com'),
+                new OA\Property(property: 'to', type: 'string', format: 'email', example: 'smart@synaplan.com', description: 'Can include keyword: smart+keyword@synaplan.com'),
+                new OA\Property(property: 'subject', type: 'string', example: 'Question about AI'),
+                new OA\Property(property: 'body', type: 'string', example: 'What is machine learning?'),
+                new OA\Property(property: 'message_id', type: 'string', example: 'external-msg-123'),
+                new OA\Property(property: 'in_reply_to', type: 'string', example: 'previous-msg-id', nullable: true),
+                new OA\Property(
+                    property: 'attachments',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'filename', type: 'string'),
+                            new OA\Property(property: 'content_type', type: 'string'),
+                            new OA\Property(property: 'size', type: 'integer'),
+                            new OA\Property(property: 'url', type: 'string')
+                        ]
+                    )
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Email processed successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message_id', type: 'integer', example: 123),
+                new OA\Property(property: 'chat_id', type: 'integer', example: 456)
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid payload or missing fields')]
+    #[OA\Response(response: 401, description: 'Invalid API key')]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
     public function email(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);

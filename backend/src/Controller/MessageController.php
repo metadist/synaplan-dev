@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Message;
-use App\Entity\MessageFile;
+use App\Entity\File;
 use App\Entity\User;
 use App\AI\Service\AiFacade;
 use App\Service\AgainService;
@@ -124,7 +124,7 @@ class MessageController extends AbstractController
 
             // Link attached files to this message
             if (!empty($fileIds)) {
-                $messageFileRepo = $this->em->getRepository(MessageFile::class);
+                $messageFileRepo = $this->em->getRepository(File::class);
                 foreach ($fileIds as $fileId) {
                     $messageFile = $messageFileRepo->find($fileId);
                     if ($messageFile && $messageFile->getUserId() === $user->getId()) {
@@ -144,7 +144,7 @@ class MessageController extends AbstractController
             
             // Add file contents as context if files are attached
             if (!empty($fileIds)) {
-                $messageFileRepo = $this->em->getRepository(MessageFile::class);
+                $messageFileRepo = $this->em->getRepository(File::class);
                 $fileContents = [];
                 
                 foreach ($fileIds as $fileId) {
@@ -484,8 +484,8 @@ class MessageController extends AbstractController
             $relativePath = $storageResult['path'];
             $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
             
-            // Create MessageFile entity (NEW: separate entity for files)
-            $messageFile = new MessageFile();
+            // Create File entity (NEW: separate entity for files)
+            $messageFile = new File();
             $messageFile->setFilePath($relativePath);
             $messageFile->setFileType($fileExtension);
             $messageFile->setFileName($uploadedFile->getClientOriginalName());

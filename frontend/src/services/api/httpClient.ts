@@ -28,9 +28,23 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
     headers['Authorization'] = `Bearer ${token}`
   }
 
+  console.log('🌐 httpClient request:', {
+    url,
+    method: fetchOptions.method || 'GET',
+    hasToken: !!token,
+    bodyPreview: fetchOptions.body ? JSON.parse(fetchOptions.body as string) : null
+  })
+
   const response = await fetch(url, {
     ...fetchOptions,
     headers,
+  })
+
+  console.log('🌐 httpClient response:', {
+    url,
+    status: response.status,
+    statusText: response.statusText,
+    ok: response.ok
   })
 
   if (!response.ok) {

@@ -2,10 +2,10 @@
 
 namespace App\Service;
 
-use App\Entity\MessageFile;
+use App\Entity\File;
 use App\Entity\User;
 use App\Entity\Config;
-use App\Repository\MessageFileRepository;
+use App\Repository\FileRepository;
 use App\Repository\ConfigRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
 class StorageQuotaService
 {
     public function __construct(
-        private MessageFileRepository $messageFileRepository,
+        private FileRepository $fileRepository,
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger
@@ -63,9 +63,9 @@ class StorageQuotaService
      */
     public function getStorageUsage(User $user): int
     {
-        $qb = $this->messageFileRepository->createQueryBuilder('mf');
-        $qb->select('SUM(mf.fileSize) as total')
-           ->where('mf.userId = :userId')
+        $qb = $this->fileRepository->createQueryBuilder('f');
+        $qb->select('SUM(f.fileSize) as total')
+           ->where('f.userId = :userId')
            ->setParameter('userId', $user->getId());
         
         $result = $qb->getQuery()->getSingleScalarResult();

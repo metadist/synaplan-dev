@@ -133,6 +133,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $model = $options['model'];
+            $modelFeatures = $options['modelFeatures'] ?? [];
+            $supportsReasoning = in_array('reasoning', $modelFeatures, true);
             
             // Check if model exists before attempting to use it
             $availableModels = $this->getAvailableModels();
@@ -154,7 +156,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             
             $this->logger->info('🔵 Ollama streaming chat START', [
                 'model' => $model,
-                'message_count' => count($messages)
+                'message_count' => count($messages),
+                'supportsReasoning' => $supportsReasoning
             ]);
 
             // Build prompt from messages (Ollama Completions API style)
@@ -174,7 +177,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             
             $this->logger->info('🟡 Ollama: Prompt built', ['length' => strlen($prompt)]);
 
-            // Use completions API with streaming (like old code)
+            // Use completions API with streaming
             $stream = $this->client->completions()->createStreamed([
                 'model' => $model,
                 'prompt' => $prompt,
@@ -186,11 +189,22 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $fullResponse = '';
             
             foreach ($stream as $completion) {
-                // Extract response content (like old code: $completion->response)
+                // Extract response content
                 $textChunk = $completion->response ?? '';
+                
+                // Sanitize UTF-8 to prevent "Malformed UTF-8 characters" errors
+                if (!empty($textChunk)) {
+                    // Remove invalid UTF-8 characters
+                    $textChunk = mb_convert_encoding($textChunk, 'UTF-8', 'UTF-8');
+                    // Alternative: use iconv for more aggressive cleaning
+                    // $textChunk = iconv('UTF-8', 'UTF-8//IGNORE', $textChunk);
+                }
                 
                 if (!empty($textChunk)) {
                     $fullResponse .= $textChunk;
+                    
+                    // Send chunk as-is (including <think> tags if present)
+                    // Frontend will parse <think> tags from the accumulated content
                     $callback($textChunk);
                     $chunkCount++;
                     
