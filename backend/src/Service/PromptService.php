@@ -87,13 +87,15 @@ class PromptService
     /**
      * Save metadata for a prompt
      * 
-     * @param int $promptId Prompt ID
+     * @param Prompt $prompt The Prompt entity
      * @param array $metadata Metadata as key-value pairs
      */
-    public function saveMetadataForPrompt(int $promptId, array $metadata): void
+    public function saveMetadataForPrompt(Prompt $prompt, array $metadata): void
     {
-        // Ensure all pending changes are flushed first
-        $this->em->flush();
+        $promptId = $prompt->getId();
+        if (!$promptId) {
+            throw new \InvalidArgumentException('Prompt must have an ID before saving metadata');
+        }
         
         // Delete existing metadata
         $existing = $this->promptMetaRepository->findBy(['promptId' => $promptId]);
@@ -109,7 +111,7 @@ class PromptService
         // Save new metadata
         foreach ($metadata as $key => $value) {
             $meta = new \App\Entity\PromptMeta();
-            $meta->setPromptId($promptId);
+            $meta->setPrompt($prompt);  // ✅ Use setPrompt() instead of setPromptId()
             $meta->setMetaKey($key);
             
             // Convert booleans to string "0" or "1"

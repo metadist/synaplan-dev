@@ -5,17 +5,23 @@ namespace App\Tests\Unit;
 use App\Service\Message\Handler\ChatHandler;
 use App\AI\Service\AiFacade;
 use App\Repository\PromptRepository;
+use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
+use App\Service\PromptService;
 use App\Entity\Message;
 use App\Entity\Prompt;
+use App\Entity\Model;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class ChatHandlerTest extends TestCase
 {
     private AiFacade $aiFacade;
     private PromptRepository $promptRepository;
+    private PromptService $promptService;
     private ModelConfigService $modelConfigService;
+    private ModelRepository $modelRepository;
     private LoggerInterface $logger;
     private ChatHandler $handler;
 
@@ -23,13 +29,17 @@ class ChatHandlerTest extends TestCase
     {
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->promptRepository = $this->createMock(PromptRepository::class);
+        $this->promptService = $this->createMock(PromptService::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->modelRepository = $this->createMock(ModelRepository::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
             $this->promptRepository,
+            $this->promptService,
             $this->modelConfigService,
+            $this->modelRepository,
             $this->logger
         );
     }
@@ -299,6 +309,57 @@ class ChatHandlerTest extends TestCase
             $message,
             [],
             ['topic' => 'CHAT', 'language' => 'en'],
+            $streamCallback
+        );
+    }
+
+    public function testHandleStreamLoadsPromptMetadataForTaskPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('What do you know about Cursor Ultra?');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        // Mock PromptService to return prompt data with metadata
+        $promptMock = $this->createMock(Prompt::class);
+        $promptMock->method('getPrompt')->willReturn('You are an AI assistant with knowledge about Cristian Grosu.');
+        
+        $this->promptService
+            ->expects($this->once())
+            ->method('getPromptWithMetadata')
+            ->with('cristian', 1, 'en')
+            ->willReturn([
+                'prompt' => $promptMock,
+                'metadata' => [
+                    'aiModel' => -1,
+                    'tool_internet_search' => true,
+                    'tool_files_search' => true,
+                    'tool_url_screenshot' => false
+                ]
+            ]);
+
+        $this->modelConfigService->method('getDefaultModel')->willReturn(30);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getFeatures')->willReturn([]);
+        $model->method('getJson')->willReturn(['supportsStreaming' => true]);
+        $this->modelRepository->method('find')->willReturn($model);
+
+        $streamCallback = function($chunk) {};
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturn(['provider' => 'openai', 'model' => 'gpt-4.1']);
+
+        // Test passes if RAG context loading doesn't throw exception (graceful degradation)
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'cristian', 'language' => 'en'],
             $streamCallback
         );
     }

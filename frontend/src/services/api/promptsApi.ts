@@ -76,14 +76,21 @@ class PromptsApi {
    * Create a new user-specific prompt
    */
   async createPrompt(request: CreatePromptRequest): Promise<TaskPrompt> {
-    const data = await httpClient<{ success: boolean; prompt: TaskPrompt }>(
-      '/api/v1/prompts',
-      {
-        method: 'POST',
-        body: JSON.stringify(request)
-      }
-    )
-    return data.prompt
+    console.log('📤 promptsApi.createPrompt called with:', request)
+    try {
+      const data = await httpClient<{ success: boolean; prompt: TaskPrompt }>(
+        '/api/v1/prompts',
+        {
+          method: 'POST',
+          body: JSON.stringify(request)
+        }
+      )
+      console.log('✅ promptsApi.createPrompt response:', data)
+      return data.prompt
+    } catch (error) {
+      console.error('❌ promptsApi.createPrompt error:', error)
+      throw error
+    }
   }
 
   /**
@@ -190,6 +197,12 @@ class PromptsApi {
         body: JSON.stringify({ messageId })
       }
     )
+  }
+  /**
+   * List all prompts (alias for getPrompts for consistency)
+   */
+  async listPrompts(language: string = 'en'): Promise<TaskPrompt[]> {
+    return this.getPrompts(language)
   }
 }
 

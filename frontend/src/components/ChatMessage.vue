@@ -309,15 +309,16 @@
       >
         <!-- Left: AI Model Badges + timestamp -->
         <div class="flex items-center gap-1 min-w-0 flex-wrap">
-          <!-- Topic Badge (assistant only) - Ultra compact -->
+          <!-- Topic Badge (assistant only) - Ultra compact + Clickable -->
           <template v-if="role === 'assistant' && topic">
-            <div
-              class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 leading-tight"
-              :title="`Topic: ${topic}`"
+            <router-link
+              :to="`/config/task-prompts?topic=${topic}`"
+              class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors leading-tight cursor-pointer"
+              :title="`Topic: ${topic} - Click to view prompt`"
             >
               <Icon icon="mdi:tag" class="w-2.5 h-2.5" />
               <span class="uppercase tracking-tight">{{ topic.substring(0, 8) }}</span>
-            </div>
+            </router-link>
           </template>
           
           <!-- AI Model Badges (assistant only) -->

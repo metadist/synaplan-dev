@@ -144,11 +144,6 @@ services:
     App\Service\AgainService: ~
     App\Service\Message\AgainHandler: ~
 
-    # CORS Listener (fallback if NelmioCorsBundle not working)
-    App\EventListener\CorsListener:
-        tags:
-            - { name: kernel.event_subscriber }
-
     # File Processing Services
     App\Service\File\TikaClient:
         arguments:

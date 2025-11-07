@@ -216,7 +216,7 @@ class PromptController extends AbstractController
         Request $request,
         #[CurrentUser] ?User $user,
         \App\Repository\RagDocumentRepository $ragRepository,
-        \App\Repository\MessageRepository $messageRepository
+        \App\Repository\FileRepository $fileRepository
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -227,39 +227,39 @@ class PromptController extends AbstractController
         // Get all RAG documents for this user
         $ragDocs = $ragRepository->findBy(['userId' => $user->getId()]);
         
-        // Group by message
-        $filesByMessage = [];
+        // Group by file (using messageId which now references BFILES.BID)
+        $filesByFileId = [];
         foreach ($ragDocs as $doc) {
-            $messageId = $doc->getMessageId();
-            if (!isset($filesByMessage[$messageId])) {
-                $message = $messageRepository->find($messageId);
-                if ($message) {
-                    $fileName = basename($message->getFilePath() ?? 'Unknown File');
+            $fileId = $doc->getMessageId(); // Actually references File.id now
+            if (!isset($filesByFileId[$fileId])) {
+                $file = $fileRepository->find($fileId);
+                if ($file) {
+                    $fileName = $file->getFileName();
                     
                     // Apply search filter
                     if (!empty($searchQuery) && stripos($fileName, $searchQuery) === false) {
                         continue;
                     }
                     
-                    $filesByMessage[$messageId] = [
-                        'messageId' => $messageId,
+                    $filesByFileId[$fileId] = [
+                        'messageId' => $fileId, // Keep as messageId for frontend compatibility
                         'fileName' => $fileName,
                         'chunks' => 0,
                         'currentGroupKey' => $doc->getGroupKey(),
-                        'uploadedAt' => $message->getTimestamp() 
-                            ? date('Y-m-d\TH:i:s\Z', $message->getTimestamp())
+                        'uploadedAt' => $file->getCreatedAt() 
+                            ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
                             : null
                     ];
                 }
             }
-            if (isset($filesByMessage[$messageId])) {
-                $filesByMessage[$messageId]['chunks']++;
+            if (isset($filesByFileId[$fileId])) {
+                $filesByFileId[$fileId]['chunks']++;
             }
         }
         
         return $this->json([
             'success' => true,
-            'files' => array_values($filesByMessage)
+            'files' => array_values($filesByFileId)
         ]);
     }
 
@@ -381,77 +381,113 @@ class PromptController extends AbstractController
         Request $request,
         #[CurrentUser] ?User $user
     ): JsonResponse {
-        if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        try {
+            if (!$user) {
+                $this->logger->error('PromptController::create - No user authenticated');
+                return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            }
 
-        $data = json_decode($request->getContent(), true);
-        
-        // Validate required fields
-        if (empty($data['topic']) || empty($data['shortDescription']) || empty($data['prompt'])) {
+            $data = json_decode($request->getContent(), true);
+            
+            $this->logger->info('🔵 CREATE PROMPT REQUEST', [
+                'data' => $data,
+                'user_id' => $user->getId()
+            ]);
+            
+            // Validate required fields
+            if (empty($data['topic']) || empty($data['shortDescription']) || empty($data['prompt'])) {
+                $this->logger->warning('PromptController::create - Missing required fields', ['data' => $data]);
+                return $this->json([
+                    'error' => 'Missing required fields: topic, shortDescription, prompt'
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            $topic = trim($data['topic']);
+            $shortDescription = trim($data['shortDescription']);
+            $promptContent = trim($data['prompt']);
+            $language = $data['language'] ?? 'en';
+            $selectionRules = isset($data['selectionRules']) ? trim($data['selectionRules']) : null;
+            $metadata = $data['metadata'] ?? [];
+
+            // Prevent creating tool prompts (reserved for system)
+            if (str_starts_with($topic, 'tools:')) {
+                return $this->json([
+                    'error' => 'Cannot create prompts with "tools:" prefix - reserved for system'
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Check if user already has a prompt with this topic
+            $existingPrompt = $this->promptRepository->findByTopic($topic, $user->getId());
+            if ($existingPrompt) {
+                return $this->json([
+                    'error' => 'You already have a prompt with this topic. Use PUT /api/v1/prompts/{id} to update it.'
+                ], Response::HTTP_CONFLICT);
+            }
+
+            // Create new prompt
+            $prompt = new Prompt();
+            $prompt->setOwnerId($user->getId());
+            $prompt->setTopic($topic);
+            $prompt->setShortDescription($shortDescription);
+            $prompt->setPrompt($promptContent);
+            $prompt->setLanguage($language);
+            $prompt->setSelectionRules($selectionRules);
+
+            $this->em->persist($prompt);
+            $this->em->flush();
+            
+            // Refresh to ensure ID is populated
+            $this->em->refresh($prompt);
+            
+            $this->logger->info('🟢 PROMPT CREATED', [
+                'prompt_id' => $prompt->getId(),
+                'topic' => $topic,
+                'has_metadata' => !empty($metadata)
+            ]);
+
+            // Save metadata (AI model, tools)
+            if (!empty($metadata)) {
+                if (!$prompt->getId()) {
+                    throw new \RuntimeException('Prompt ID is null after flush and refresh!');
+                }
+                
+                $this->logger->info('🔵 SAVING METADATA', [
+                    'prompt_id' => $prompt->getId(),
+                    'metadata' => $metadata
+                ]);
+                $this->promptService->saveMetadataForPrompt($prompt, $metadata);
+                $this->logger->info('🟢 METADATA SAVED');
+            }
+
+            $this->logger->info('User created custom prompt', [
+                'user_id' => $user->getId(),
+                'prompt_id' => $prompt->getId(),
+                'topic' => $topic
+            ]);
+
             return $this->json([
-                'error' => 'Missing required fields: topic, shortDescription, prompt'
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        $topic = trim($data['topic']);
-        $shortDescription = trim($data['shortDescription']);
-        $promptContent = trim($data['prompt']);
-        $language = $data['language'] ?? 'en';
-        $selectionRules = isset($data['selectionRules']) ? trim($data['selectionRules']) : null;
-        $metadata = $data['metadata'] ?? [];
-
-        // Prevent creating tool prompts (reserved for system)
-        if (str_starts_with($topic, 'tools:')) {
+                'success' => true,
+                'message' => 'Prompt created successfully',
+                'prompt' => [
+                    'id' => $prompt->getId(),
+                    'topic' => $prompt->getTopic(),
+                    'name' => $this->formatPromptName($topic, $shortDescription, false),
+                    'shortDescription' => $prompt->getShortDescription(),
+                    'prompt' => $prompt->getPrompt(),
+                    'language' => $prompt->getLanguage(),
+                    'isDefault' => false
+                ]
+            ], Response::HTTP_CREATED);
+        } catch (\Throwable $e) {
+            $this->logger->error('❌ PromptController::create - Exception', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return $this->json([
-                'error' => 'Cannot create prompts with "tools:" prefix - reserved for system'
-            ], Response::HTTP_BAD_REQUEST);
+                'error' => 'Failed to create prompt: ' . $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Check if user already has a prompt with this topic
-        $existingPrompt = $this->promptRepository->findByTopic($topic, $user->getId(), $language);
-        if ($existingPrompt) {
-            return $this->json([
-                'error' => 'You already have a prompt with this topic. Use PUT /api/v1/prompts/{id} to update it.'
-            ], Response::HTTP_CONFLICT);
-        }
-
-        // Create new prompt
-        $prompt = new Prompt();
-        $prompt->setOwnerId($user->getId());
-        $prompt->setTopic($topic);
-        $prompt->setShortDescription($shortDescription);
-        $prompt->setPrompt($promptContent);
-        $prompt->setLanguage($language);
-        $prompt->setSelectionRules($selectionRules);
-
-        $this->em->persist($prompt);
-        $this->em->flush();
-
-        // Save metadata (AI model, tools)
-        if (!empty($metadata)) {
-            $this->promptService->saveMetadataForPrompt($prompt->getId(), $metadata);
-        }
-
-        $this->logger->info('User created custom prompt', [
-            'user_id' => $user->getId(),
-            'prompt_id' => $prompt->getId(),
-            'topic' => $topic
-        ]);
-
-        return $this->json([
-            'success' => true,
-            'message' => 'Prompt created successfully',
-            'prompt' => [
-                'id' => $prompt->getId(),
-                'topic' => $prompt->getTopic(),
-                'name' => $this->formatPromptName($topic, $shortDescription, false),
-                'shortDescription' => $prompt->getShortDescription(),
-                'prompt' => $prompt->getPrompt(),
-                'language' => $prompt->getLanguage(),
-                'isDefault' => false
-            ]
-        ], Response::HTTP_CREATED);
     }
 
     /**
@@ -564,7 +600,7 @@ class PromptController extends AbstractController
                     'prompt_id' => $prompt->getId(),
                     'metadata' => $data['metadata']
                 ]);
-                $this->promptService->saveMetadataForPrompt($prompt->getId(), $data['metadata']);
+                $this->promptService->saveMetadataForPrompt($prompt, $data['metadata']);
                 $this->logger->info('Metadata saved successfully', ['prompt_id' => $prompt->getId()]);
             } catch (\Exception $e) {
                 $this->logger->error('Failed to save metadata', [
@@ -725,7 +761,7 @@ class PromptController extends AbstractController
         string $topic,
         #[CurrentUser] ?User $user,
         \App\Repository\RagDocumentRepository $ragRepository,
-        \App\Repository\MessageRepository $messageRepository
+        \App\Repository\FileRepository $fileRepository
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -746,31 +782,31 @@ class PromptController extends AbstractController
             'groupKey' => $groupKey
         ]);
         
-        // Group by message (each message = one file)
-        $filesByMessage = [];
+        // Group by file (messageId now references BFILES.BID)
+        $filesByFileId = [];
         foreach ($ragDocs as $doc) {
-            $messageId = $doc->getMessageId();
-            if (!isset($filesByMessage[$messageId])) {
-                $message = $messageRepository->find($messageId);
-                if ($message) {
-                    $filesByMessage[$messageId] = [
-                        'messageId' => $messageId,
-                        'fileName' => basename($message->getFilePath() ?? 'Unknown File'),
+            $fileId = $doc->getMessageId(); // Actually references File.id now
+            if (!isset($filesByFileId[$fileId])) {
+                $file = $fileRepository->find($fileId);
+                if ($file) {
+                    $filesByFileId[$fileId] = [
+                        'messageId' => $fileId, // Keep as messageId for frontend compatibility
+                        'fileName' => $file->getFileName(),
                         'chunks' => 0,
-                        'uploadedAt' => $message->getTimestamp() 
-                            ? date('Y-m-d\TH:i:s\Z', $message->getTimestamp())
+                        'uploadedAt' => $file->getCreatedAt() 
+                            ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
                             : null
                     ];
                 }
             }
-            if (isset($filesByMessage[$messageId])) {
-                $filesByMessage[$messageId]['chunks']++;
+            if (isset($filesByFileId[$fileId])) {
+                $filesByFileId[$fileId]['chunks']++;
             }
         }
         
         return $this->json([
             'success' => true,
-            'files' => array_values($filesByMessage),
+            'files' => array_values($filesByFileId),
             'groupKey' => $groupKey
         ]);
     }

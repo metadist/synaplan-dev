@@ -186,6 +186,7 @@ class ChatHandler implements MessageHandlerInterface
         if ($topic !== 'general' && !empty($message->getText())) {
             try {
                 // Inject VectorSearchService only when needed
+                /** @phpstan-ignore-next-line */
                 $vectorSearchService = $this->aiFacade->getContainer()->get(\App\Service\RAG\VectorSearchService::class);
                 
                 $groupKey = "TASKPROMPT:{$topic}";

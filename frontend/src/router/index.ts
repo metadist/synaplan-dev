@@ -90,7 +90,7 @@ const router = createRouter({
         {
           path: '/tools/chat-widget',
           name: 'tools-chat-widget',
-          component: () => import('../views/ToolsView.vue'),
+          component: () => import('../views/WidgetsView.vue'),
           meta: { requiresAuth: true, helpId: 'tools.chatWidget' }
         },
         {

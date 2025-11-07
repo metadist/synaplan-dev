@@ -231,7 +231,20 @@ export const useHistoryStore = defineStore('history', () => {
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map((m: any) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
-          const parts = parseContentWithThinking(m.text || '')
+          
+          // Parse text - handle both plain text and JSON format
+          let messageText = m.text || ''
+          try {
+            // If text is a JSON object with BTEXT property, extract BTEXT
+            const parsed = JSON.parse(messageText)
+            if (parsed && typeof parsed === 'object' && 'BTEXT' in parsed) {
+              messageText = parsed.BTEXT || ''
+            }
+          } catch (e) {
+            // Not JSON, use as-is
+          }
+          
+          const parts = parseContentWithThinking(messageText)
           
           // Add generated file (image/video/audio) as part if present
           if (m.file && m.file.path) {

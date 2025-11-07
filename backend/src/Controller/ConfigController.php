@@ -349,9 +349,9 @@ class ConfigController extends AbstractController
                     break;
                 }
             }
-            
-            if (!$available) {
-                $message = "API key not configured for {$service}";
+                
+                if (!$available) {
+                    $message = "API key not configured for {$service}";
                 $envVar = $envVars[0] ?? null; // Use first one for setup instructions
             }
         } else {

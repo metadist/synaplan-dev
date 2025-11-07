@@ -186,24 +186,23 @@ class StreamController extends AbstractController
                 $this->em->persist($incomingMessage);
                 $this->em->flush(); // Flush first so message has an ID
                 
-                // Attach multiple files if uploaded (NEW: File entities)
+                // Attach multiple files if uploaded (NEW: File entities with ManyToMany)
                 if (!empty($fileIdArray)) {
                     $fileCount = 0;
                     foreach ($fileIdArray as $fileId) {
-                        $messageFile = $this->em->getRepository(File::class)->find($fileId);
+                        $file = $this->em->getRepository(File::class)->find($fileId);
                         // Accept files in any status (uploaded, extracted, vectorized)
-                        if ($messageFile && $messageFile->getUserId() === $user->getId()) {
-                            // Associate file with message
-                            $messageFile->setMessageId($incomingMessage->getId());
-                            $this->em->persist($messageFile);
+                        if ($file && $file->getUserId() === $user->getId()) {
+                            // Associate file with message using ManyToMany relationship
+                            $incomingMessage->addFile($file);
                             $fileCount++;
                             
                             $this->logger->info('StreamController: File attached to message', [
                                 'message_id' => $incomingMessage->getId(),
                                 'file_id' => $fileId,
-                                'file_path' => $messageFile->getFilePath(),
-                                'file_type' => $messageFile->getFileType(),
-                                'file_status' => $messageFile->getStatus()
+                                'file_path' => $file->getFilePath(),
+                                'file_type' => $file->getFileType(),
+                                'file_status' => $file->getStatus()
                             ]);
                         }
                     }
@@ -289,13 +288,16 @@ class StreamController extends AbstractController
                 $reasoningBuffer = '';
                 $hasReasoningStarted = false;
                 
+                // ✨ NEW: JSON detection and parsing
+                $jsonBuffer = '';
+                $isBufferingJson = false;
+                
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
                     // Stream callback - AI streams TEXT directly or structured data (reasoning)
-                    function($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted) {
+                    function($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson) {
                         if (connection_aborted()) {
-                            error_log('🔴 StreamController: Connection aborted');
-                            return;
+                            throw new \RuntimeException('Client disconnected');
                         }
                         
                         // Handle structured chunk (reasoning models)
@@ -336,7 +338,60 @@ class StreamController extends AbstractController
                                 $hasReasoningStarted = false;
                             }
                             
-                            // Legacy string chunks (includes <think> tags from models)
+                            // ✨ JSON detection and buffering during streaming
+                            // Detect and buffer JSON responses
+                            if (is_string($chunk) && !empty(trim($chunk))) {
+                                // Start buffering if this is the FIRST chunk and it starts with {
+                                if (!$isBufferingJson && $chunkCount === 0 && str_starts_with(trim($chunk), '{')) {
+                                    $isBufferingJson = true;
+                                    $jsonBuffer = $chunk;
+                                    $chunkCount++;
+                                    return; // Don't send yet, buffer it
+                                }
+                            }
+                            
+                            if ($isBufferingJson) {
+                                $jsonBuffer .= $chunk;
+                                
+                                // Check if JSON is complete (has closing brace)
+                                if (str_contains($jsonBuffer, '}')) {
+                                    // Try to find the complete JSON object
+                                    $trimmed = trim($jsonBuffer);
+                                    
+                                    // Find last closing brace position
+                                    $lastBrace = strrpos($trimmed, '}');
+                                    if ($lastBrace !== false) {
+                                        $potentialJson = substr($trimmed, 0, $lastBrace + 1);
+                                        
+                                        // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
+                                        $potentialJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $potentialJson);
+                                        $potentialJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $potentialJson);
+                                        $potentialJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $potentialJson);
+                                        
+                                        try {
+                                            $jsonData = json_decode($potentialJson, true, 512, JSON_THROW_ON_ERROR);
+                                            
+                                            // Extract BTEXT and send ONLY that
+                                            if (isset($jsonData['BTEXT'])) {
+                                                $extractedText = $jsonData['BTEXT'];
+                                                $responseText .= $extractedText;
+                                                $this->sendSSE('data', ['chunk' => $extractedText]);
+                                                
+                                                $isBufferingJson = false;
+                                                $jsonBuffer = '';
+                                                return;
+                                            }
+                                        } catch (\JsonException $e) {
+                                            // JSON not valid yet, keep buffering
+                                            return;
+                                        }
+                                    }
+                                }
+                                
+                                return; // Keep buffering
+                            }
+                            
+                            // Normal text chunk (not JSON)
                             $responseText .= $chunk;
                             
                             // Log if we detect <think> tags
@@ -525,7 +580,28 @@ class StreamController extends AbstractController
                 $outgoingMessage->setFileType($fileType);
                 $outgoingMessage->setTopic($classification['topic']);
                 $outgoingMessage->setLanguage($classification['language']);
-                $outgoingMessage->setText($responseText); // Pure TEXT, not JSON
+                
+                // ✨ Parse JSON response if AI responded in JSON format (fallback for non-streamed parsing)
+                $finalText = $responseText;
+                if (str_starts_with(trim($responseText), '{')) {
+                    // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
+                    $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $responseText);
+                    $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $cleanedJson);
+                    $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
+                    
+                    try {
+                        $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+                        
+                        // Extract BTEXT as main content
+                        if (isset($jsonData['BTEXT'])) {
+                            $finalText = $jsonData['BTEXT'];
+                        }
+                    } catch (\JsonException $e) {
+                        // Not valid JSON or extraction failed, use content as-is
+                    }
+                }
+                
+                $outgoingMessage->setText($finalText); // Pure TEXT, not JSON
                 $outgoingMessage->setDirection('OUT');
                 $outgoingMessage->setStatus('complete');
 
@@ -668,6 +744,14 @@ class StreamController extends AbstractController
 
                 $this->sendSSE('error', $errorData);
             } catch (\Exception $e) {
+                // Don't send error if client disconnected intentionally
+                if ($e->getMessage() === 'Client disconnected') {
+                    $this->logger->info('Stream stopped - client disconnected', [
+                        'user_id' => $user->getId(),
+                    ]);
+                    return; // Silently stop
+                }
+                
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),
                     'error' => $e->getMessage(),
