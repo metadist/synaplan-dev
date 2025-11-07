@@ -153,7 +153,7 @@ import WidgetCreationWizard from '@/components/widgets/WidgetCreationWizard.vue'
 import WidgetEditorModal from '@/components/widgets/WidgetEditorModal.vue'
 import EmbedCodeDialog from '@/components/widgets/EmbedCodeDialog.vue'
 
-const { success, showError } = useNotification()
+const { success, error } = useNotification()
 const { confirm } = useDialog()
 
 const loading = ref(false)
@@ -172,8 +172,8 @@ const loadWidgets = async () => {
   loading.value = true
   try {
     widgets.value = await widgetsApi.listWidgets()
-  } catch (error: any) {
-    showError(error.message || 'Failed to load widgets')
+  } catch (err: any) {
+    error(err.message || 'Failed to load widgets')
   } finally {
     loading.value = false
   }
@@ -228,8 +228,8 @@ const handleSave = async (data: any) => {
     
     currentWidget.value = null
     await loadWidgets()
-  } catch (error: any) {
-    showError(error.message || 'Failed to save widget')
+  } catch (err: any) {
+    error(err.message || 'Failed to save widget')
   }
 }
 
@@ -243,8 +243,8 @@ const showEmbed = async (widget: widgetsApi.Widget) => {
     embedCode.value = data.embedCode
     wordpressShortcode.value = data.wordpressShortcode
     showEmbedModal.value = true
-  } catch (error: any) {
-    showError(error.message || 'Failed to load embed code')
+  } catch (err: any) {
+    error(err.message || 'Failed to load embed code')
   }
 }
 
@@ -267,8 +267,8 @@ const confirmDelete = async (widget: widgetsApi.Widget) => {
       await widgetsApi.deleteWidget(widget.widgetId)
       success('Widget deleted successfully')
       await loadWidgets()
-    } catch (error: any) {
-      showError(error.message || 'Failed to delete widget')
+    } catch (err: any) {
+      error(err.message || 'Failed to delete widget')
     }
   }
 }

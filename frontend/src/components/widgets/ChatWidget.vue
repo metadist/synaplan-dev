@@ -247,7 +247,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -261,6 +261,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 interface Props {
+  widgetId: string
   primaryColor?: string
   iconColor?: string
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
@@ -304,6 +305,9 @@ const unreadCount = ref(0)
 const messagesContainer = ref<HTMLElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const messageCount = ref(0)
+const sessionId = ref<string>('')
+const isSending = ref(false)
+const chatId = ref<number | null>(null)
 
 const isMobile = computed(() => window.innerWidth < 768)
 
@@ -318,7 +322,7 @@ const positionClass = computed(() => {
 })
 
 const canSend = computed(() => {
-  return !limitReached.value && (inputMessage.value.trim() !== '' || selectedFile.value !== null)
+  return !limitReached.value && !isSending.value && (inputMessage.value.trim() !== '' || selectedFile.value !== null)
 })
 
 const showLimitWarning = computed(() => {
@@ -370,6 +374,7 @@ const removeFile = () => {
 const sendMessage = async () => {
   if (!canSend.value) return
 
+  // Handle file upload
   if (selectedFile.value) {
     messages.value.push({
       id: Date.now().toString(),
@@ -383,27 +388,127 @@ const sendMessage = async () => {
     messageCount.value++
   }
 
+  // Handle text message
   if (inputMessage.value.trim()) {
+    const userInput = inputMessage.value
+    
+    // Add user message to UI
     messages.value.push({
       id: Date.now().toString(),
       role: 'user',
       type: 'text',
-      content: inputMessage.value,
+      content: userInput,
       timestamp: new Date()
     })
     messageCount.value++
     
-    const userInput = inputMessage.value
     inputMessage.value = ''
-    
     await scrollToBottom()
     
+    // Send to API if not at limit
     if (!limitReached.value) {
+      isSending.value = true
       isTyping.value = true
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000))
-      isTyping.value = false
       
-      addBotMessage(generateResponse(userInput))
+      // Create temporary assistant message for streaming
+      const assistantMessageId = Date.now().toString()
+      messages.value.push({
+        id: assistantMessageId,
+        role: 'assistant',
+        type: 'text',
+        content: '',
+        timestamp: new Date()
+      })
+      
+      try {
+        // Use normal stream API with widget headers
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+        const url = new URL(`${apiUrl}/api/v1/messages/stream`)
+        url.searchParams.set('message', userInput)
+        url.searchParams.set('chatId', chatId.value?.toString() || '0')
+        url.searchParams.set('trackId', Date.now().toString())
+        
+        const response = await fetch(url.toString(), {
+          headers: {
+            'X-Widget-Id': props.widgetId,
+            'X-Widget-Session': sessionId.value
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        
+        const reader = response.body?.getReader()
+        if (!reader) {
+          throw new Error('No response body')
+        }
+        
+        const decoder = new TextDecoder()
+        let buffer = ''
+        
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const jsonStr = line.slice(5).trim()
+              try {
+                const data = JSON.parse(jsonStr)
+                
+                // Handle chunk
+                if (data.chunk) {
+                  const lastMessage = messages.value[messages.value.length - 1]
+                  if (lastMessage && lastMessage.id === assistantMessageId) {
+                    lastMessage.content += data.chunk
+                    isTyping.value = false
+                    scrollToBottom()
+                  }
+                }
+                
+                // Handle completion
+                if (data.status === 'complete') {
+                  if (data.chatId) {
+                    chatId.value = data.chatId
+                  }
+                  isSending.value = false
+                }
+                
+                // Handle error
+                if (data.error) {
+                  console.error('Stream error:', data)
+                  const lastMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId)
+                  if (lastMessageIndex !== -1) {
+                    messages.value.splice(lastMessageIndex, 1)
+                  }
+                  addBotMessage('Sorry, I encountered an error. Please try again.')
+                  isSending.value = false
+                  isTyping.value = false
+                  break
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e, jsonStr)
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to send message:', error)
+        // Remove the empty assistant message and show error
+        const lastMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId)
+        if (lastMessageIndex !== -1) {
+          messages.value.splice(lastMessageIndex, 1)
+        }
+        addBotMessage('Sorry, I encountered an error. Please try again.')
+      } finally {
+        isTyping.value = false
+        isSending.value = false
+      }
     }
   }
 }
@@ -424,17 +529,6 @@ const addBotMessage = (text: string) => {
   scrollToBottom()
 }
 
-const generateResponse = (_input: string): string => {
-  const responses = [
-    'Thank you for your message. Our AI is processing your request.',
-    'I understand. Let me help you with that.',
-    'That\'s a great question! Here\'s what I can tell you...',
-    'I\'m here to assist you. Could you provide more details?',
-    'Based on your input, I recommend the following steps...'
-  ]
-  return responses[Math.floor(Math.random() * responses.length)]
-}
-
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
@@ -451,6 +545,34 @@ const formatFileSize = (bytes: number): string => {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
+
+// Load session ID from localStorage on mount
+onMounted(() => {
+  const storageKey = `synaplan_widget_session_${props.widgetId}`
+  const storedSessionId = localStorage.getItem(storageKey)
+  if (storedSessionId) {
+    sessionId.value = storedSessionId
+  } else {
+    // Generate new session ID
+    sessionId.value = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    localStorage.setItem(storageKey, sessionId.value)
+  }
+  
+  // Load chatId if exists
+  const chatIdKey = `synaplan_widget_chatid_${props.widgetId}`
+  const storedChatId = localStorage.getItem(chatIdKey)
+  if (storedChatId) {
+    chatId.value = parseInt(storedChatId, 10)
+  }
+})
+
+// Save chatId to localStorage when it changes
+watch(chatId, (newChatId) => {
+  if (newChatId) {
+    const chatIdKey = `synaplan_widget_chatid_${props.widgetId}`
+    localStorage.setItem(chatIdKey, newChatId.toString())
+  }
+})
 
 // Auto-open
 if (props.autoOpen) {
