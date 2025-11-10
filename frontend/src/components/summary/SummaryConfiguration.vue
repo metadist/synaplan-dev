@@ -177,7 +177,7 @@
           <div class="w-full border-t border-light-border/30 dark:border-dark-border/20"></div>
         </div>
         <div class="relative flex justify-center text-xs txt-secondary">
-          <span class="px-3 bg-light-surface dark:bg-dark-surface">{{ $t('summary.orPasteText') }}</span>
+          <span class="px-4 py-1 bg-[var(--bg-card)]">{{ $t('summary.orPasteText') }}</span>
         </div>
       </div>
 

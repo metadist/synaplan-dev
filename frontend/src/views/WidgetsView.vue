@@ -107,7 +107,7 @@
                   class="px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
                   :title="$t('widgets.delete')"
                 >
-                  <Icon icon="heroicons:trash" class="w-4 h-4 text-red-500" />
+                  <Icon icon="heroicons:trash" class="w-4 h-4 text-red-500 dark:text-red-400" />
                 </button>
               </div>
             </div>

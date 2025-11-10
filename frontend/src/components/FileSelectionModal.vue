@@ -118,15 +118,15 @@
                     <span>•</span>
                     <span
                       :class="{
-                        'text-green-600': file.status === 'vectorized',
-                        'text-yellow-600': file.status === 'extracted',
-                        'text-gray-600': file.status === 'uploaded'
+                        'text-green-600 dark:text-green-400': file.status === 'vectorized',
+                        'text-yellow-600 dark:text-yellow-400': file.status === 'extracted',
+                        'text-gray-600 dark:text-gray-400': file.status === 'uploaded'
                       }"
                     >
                       {{ $t(`files.status_${file.status}`) }}
                     </span>
                     <span v-if="file.is_attached">•</span>
-                    <span v-if="file.is_attached" class="text-blue-600">
+                    <span v-if="file.is_attached" class="text-blue-600 dark:text-blue-400">
                       {{ $t('files.attached') }}
                     </span>
                   </div>
