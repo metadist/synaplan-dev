@@ -44,3 +44,5 @@ README_SETUP.md
 ###> lexik/jwt-authentication-bundle ###
 /config/jwt/*.pem
 ###< lexik/jwt-authentication-bundle ###
+
+backend/public/uploads/
