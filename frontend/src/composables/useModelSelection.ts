@@ -1,5 +1,6 @@
 import { computed, type ComputedRef } from 'vue'
 import { useAiConfigStore, type AIModel } from '@/stores/aiConfig'
+import type { AgainData as BackendAgainData } from '@/types/ai-models'
 
 export interface ModelOption {
   provider: string
@@ -9,33 +10,6 @@ export interface ModelOption {
   quality?: number
   rating?: number
   description?: string
-}
-
-export interface AgainData {
-  eligible?: Array<{
-    id: number
-    service: string
-    name: string
-    providerId: number
-    description?: string
-    quality?: number
-    rating?: number
-    tag?: string
-    label?: string
-  }>
-  predictedNext?: {
-    id: number
-    service: string
-    name: string
-    providerId: number
-    description?: string
-    quality?: number
-    rating?: number
-    tag?: string
-    label?: string
-  }
-  current_model_id?: number | null
-  tag?: string
 }
 
 /**
@@ -51,17 +25,51 @@ export interface AgainData {
  * Round-Robin: Recommends next model in BRANKING-sorted list (not the current one)
  */
 export function useModelSelection(
-  againData?: ComputedRef<AgainData | null | undefined>,
+  againData?: ComputedRef<BackendAgainData | null | undefined>,
   files?: ComputedRef<any[] | undefined>,
   currentProvider?: ComputedRef<string | undefined>,
-  currentModelName?: ComputedRef<string | undefined>
+  currentModelName?: ComputedRef<string | undefined>,
+  mediaHint?: ComputedRef<'image' | 'video' | 'audio' | 'chat' | null | undefined>
 ) {
   const aiConfigStore = useAiConfigStore()
+
+  /**
+   * Resolve preferred tag based on backend-provided Again data
+   * Falls back from direct tag → predicted model tag → first eligible tag
+   */
+  const preferredTag = computed((): string | null => {
+    const tagSources: Array<string | undefined> = [
+      againData?.value?.tag,
+      againData?.value?.predictedNext?.tag,
+      againData?.value?.eligible?.[0]?.tag
+    ]
+
+    for (const tag of tagSources) {
+      if (tag && tag.trim().length > 0) {
+        return tag.toUpperCase()
+      }
+    }
+
+    return null
+  })
 
   /**
    * Detect media type from message files
    */
   const mediaType = computed((): 'image' | 'video' | 'audio' | 'chat' => {
+    const tag = preferredTag.value
+    if (tag) {
+      if (tag === 'TEXT2PIC' || tag === 'IMAGE' || tag === 'TEXT_TO_IMAGE') return 'image'
+      if (tag === 'TEXT2VID' || tag === 'VIDEO' || tag === 'TEXT_TO_VIDEO') return 'video'
+      if (tag === 'TEXT2SOUND' || tag === 'AUDIO' || tag === 'TEXT_TO_AUDIO') return 'audio'
+      if (tag === 'CHAT') return 'chat'
+    }
+
+    const hint = mediaHint?.value
+    if (hint === 'image' || hint === 'video' || hint === 'audio' || hint === 'chat') {
+      return hint
+    }
+
     if (!files?.value || files.value.length === 0) {
       return 'chat'
     }
@@ -91,6 +99,14 @@ export function useModelSelection(
    * Searches across ALL tags to find the current model
    */
   const currentModelId = computed((): number | null => {
+    const backendCurrentModelId =
+      againData?.value?.currentModelId ??
+      ((againData?.value as unknown as { current_model_id?: number | null })?.current_model_id ?? null)
+
+    if (typeof backendCurrentModelId === 'number' && backendCurrentModelId > 0) {
+      return backendCurrentModelId
+    }
+
     if (!currentProvider?.value || !currentModelName?.value) {
       return null
     }
@@ -145,6 +161,30 @@ export function useModelSelection(
       }))
   })
 
+  const currentModelIndex = computed((): number => {
+    const options = modelOptions.value
+    if (options.length === 0) return -1
+
+    const id = currentModelId.value
+    if (id) {
+      const byId = options.findIndex((m: ModelOption) => m.id === id)
+      if (byId !== -1) return byId
+    }
+
+    if (currentProvider?.value && currentModelName?.value) {
+      const providerLower = currentProvider.value.toLowerCase()
+      const modelLower = currentModelName.value.toLowerCase()
+      const byName = options.findIndex(
+        (m: ModelOption) =>
+          m.provider.toLowerCase() === providerLower &&
+          m.model.toLowerCase() === modelLower
+      )
+      if (byName !== -1) return byName
+    }
+
+    return -1
+  })
+
   /**
    * Get the predicted/recommended next model using Round-Robin
    * - Finds current model in sorted list
@@ -154,22 +194,33 @@ export function useModelSelection(
   const predictedModel = computed((): ModelOption | null => {
     const options = modelOptions.value
     if (options.length === 0) return null
-    if (options.length === 1) return options[0] // Only one model available
-    
-    // Try to find current model in the filtered options for this media type
-    const currentId = currentModelId.value
-    if (currentId) {
-      const currentIndex = options.findIndex((m: ModelOption) => m.id === currentId)
-      if (currentIndex !== -1) {
-        // Found current model - return NEXT one (Round-Robin)
-        const nextIndex = (currentIndex + 1) % options.length
-        console.log('🔄 Round-Robin: Current index', currentIndex, '→ Next index', nextIndex)
-        return options[nextIndex]
+
+    // Backend-provided recommendation
+    const backendNextId = againData?.value?.predictedNext?.id
+    if (backendNextId) {
+      const backendMatch = options.find((m: ModelOption) => m.id === backendNextId)
+      if (backendMatch) {
+        return backendMatch
       }
     }
-    
-    // Fallback: Return highest-rated model (first in sorted list)
-    console.log('⭐ Fallback: Using highest-rated model')
+
+    if (options.length === 1) {
+      return options[0] // Only one model available
+    }
+
+    const currentIndex = currentModelIndex.value
+    if (currentIndex !== -1) {
+      const nextIndex = (currentIndex + 1) % options.length
+      console.log('🔄 Round-Robin: Current index', currentIndex, '→ Next index', nextIndex)
+      return options[nextIndex]
+    }
+
+    // No match found for current model: fallback to second-best if available
+    if (options.length > 1) {
+      console.log('⭐ Fallback: Using second-highest-rated model')
+      return options[1]
+    }
+
     return options[0]
   })
 

@@ -22,8 +22,9 @@ services:
       context: .
       dockerfile: _docker/backend/Dockerfile
     container_name: synaplan-backend
-    env_file:
-      - backend/.env
+    # Note: .env file is optional - will be auto-created from .env.example on first start
+    # env_file:
+    #   - backend/.env
     ports:
       - "8000:80"
     volumes:
