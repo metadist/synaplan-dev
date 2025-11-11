@@ -56,6 +56,7 @@ security:
         
         # Public widget endpoints (no auth required - embedded on external websites)
         - { path: ^/api/v1/widget/[^/]+/config, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/widget/[^/]+/history, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/widget/[^/]+/message, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/messages/stream, roles: PUBLIC_ACCESS }
         - { path: ^/api, methods: [OPTIONS], roles: PUBLIC_ACCESS }

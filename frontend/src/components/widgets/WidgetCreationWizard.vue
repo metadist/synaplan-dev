@@ -300,30 +300,65 @@
               {{ $t('widgets.livePreview') }}
             </h3>
 
-            <div class="surface-chip rounded-lg p-6 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative min-h-[500px]">
-              <!-- Preview Background -->
-              <div class="absolute inset-0 opacity-5 pointer-events-none">
-                <div class="w-full h-full bg-gradient-to-br from-[var(--brand)] to-transparent"></div>
+            <div>
+              <label class="block text-sm font-medium txt-primary mb-2">
+                {{ $t('widgets.websitePreviewLabel') }}
+              </label>
+              <input
+                v-model="previewWebsite"
+                type="text"
+                :placeholder="$t('widgets.websitePreviewPlaceholder')"
+                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              />
+              <p class="text-xs txt-secondary mt-1.5 flex items-start gap-1">
+                <Icon icon="heroicons:information-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{{ $t('widgets.websitePreviewHelp') }}</span>
+              </p>
+            </div>
+
+            <div
+              class="surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative overflow-hidden min-h-[520px] lg:min-h-[720px] min-w-[320px]"
+            >
+              <div class="absolute inset-0 bg-white dark:bg-slate-900">
+                <iframe
+                  v-if="sanitizedPreviewUrl"
+                  :src="sanitizedPreviewUrl"
+                  class="w-full h-full border-0 scale-[0.75] origin-top-left lg:scale-100 lg:origin-center"
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                ></iframe>
+                <div v-else class="w-full h-full flex items-center justify-center text-sm txt-secondary px-6 text-center">
+                  <div>
+                    <Icon icon="heroicons:globe-alt" class="w-8 h-8 mx-auto mb-2 opacity-60" />
+                    <p>{{ $t('widgets.websitePreviewEmpty') }}</p>
+                  </div>
+                </div>
               </div>
 
-              <!-- Live Widget Preview -->
-              <ChatWidget
-                v-if="previewWidget"
-                :widget-id="previewWidget.widgetId"
-                :primary-color="formData.config.primaryColor"
-                :icon-color="formData.config.iconColor"
-                :position="formData.config.position"
-                :auto-open="formData.config.autoOpen"
-                :auto-message="formData.config.autoMessage"
-                :message-limit="formData.config.messageLimit"
-                :max-file-size="formData.config.maxFileSize"
-                :default-theme="formData.config.defaultTheme"
-                :is-preview="false"
-              />
-              <div v-else class="flex items-center justify-center h-full txt-secondary">
-                <div class="text-center">
+              <div class="absolute inset-0 pointer-events-none flex items-end justify-end p-4">
+                <div class="pointer-events-auto w-[90%] max-w-[420px]">
+                  <ChatWidget
+                    v-if="previewWidget"
+                    :widget-id="previewWidget.widgetId"
+                    :primary-color="formData.config.primaryColor"
+                    :icon-color="formData.config.iconColor"
+                    :position="formData.config.position"
+                    :auto-open="formData.config.autoOpen"
+                    :auto-message="formData.config.autoMessage"
+                    :message-limit="formData.config.messageLimit"
+                    :max-file-size="formData.config.maxFileSize"
+                    :default-theme="formData.config.defaultTheme"
+                    :is-preview="true"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="!previewWidget"
+                class="absolute inset-0 flex items-center justify-center bg-black/10 dark:bg-black/30 backdrop-blur-sm"
+              >
+                <div class="text-center txt-secondary">
                   <Icon icon="heroicons:arrow-path" class="w-8 h-8 animate-spin mx-auto mb-2" />
-                  <p class="text-sm">Loading preview...</p>
+                  <p class="text-sm">{{ $t('widgets.loadingPreview') }}</p>
                 </div>
               </div>
             </div>
@@ -396,6 +431,12 @@ const creating = ref(false)
 const taskPrompts = ref<any[]>([])
 const previewWidget = ref<widgetsApi.Widget | null>(null)
 const isCreatingPreview = ref(false)
+const previewWebsite = ref('')
+const sanitizedPreviewUrl = computed(() => {
+  const url = previewWebsite.value.trim()
+  if (!url) return ''
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+})
 
 // Filter out system prompts - only show custom prompts for widgets
 const customTaskPrompts = computed(() => {
@@ -409,7 +450,14 @@ const steps = [
   { label: 'Review', icon: 'heroicons:check-circle' }
 ]
 
-const formData = ref<widgetsApi.CreateWidgetRequest>({
+type WidgetConfig = Required<NonNullable<widgetsApi.CreateWidgetRequest['config']>>
+interface WidgetFormData {
+  name: string
+  taskPromptTopic: string
+  config: WidgetConfig
+}
+
+const formData = ref<WidgetFormData>({
   name: '',
   taskPromptTopic: '',
   config: {

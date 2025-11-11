@@ -664,6 +664,17 @@ const normalizeServerMessage = (raw: any): Message => {
 }
 
 const loadConversationHistory = async () => {
+  if (props.isPreview) {
+    historyLoaded.value = true
+    ensureAutoMessage()
+    return
+  }
+
+  if (!props.widgetId) {
+    historyLoaded.value = true
+    return
+  }
+
   if (!sessionId.value || historyLoaded.value || isLoadingHistory.value) {
     return
   }
