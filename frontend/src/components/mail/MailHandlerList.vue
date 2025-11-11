@@ -68,7 +68,7 @@
           </div>
           <button
             @click.stop="$emit('delete', handler.id)"
-            class="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-500 dark:text-red-400 transition-all"
+            class="icon-ghost icon-ghost--danger opacity-0 group-hover:opacity-100 transition-all"
             :aria-label="$t('mail.deleteHandler')"
           >
             <TrashIcon class="w-4 h-4" />

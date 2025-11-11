@@ -290,14 +290,14 @@
                       />
                       <button
                         @click="saveGroupKey(file.id)"
-                        class="p-1 rounded hover:bg-green-500/10 text-green-600 dark:text-green-400"
+                        class="icon-ghost icon-ghost--success"
                         title="Save"
                       >
                         <Icon icon="heroicons:check" class="w-4 h-4" />
                       </button>
                       <button
                         @click="cancelEditGroupKey"
-                        class="p-1 rounded hover:bg-red-500/10 text-red-500 dark:text-red-400"
+                        class="icon-ghost icon-ghost--danger"
                         title="Cancel"
                       >
                         <Icon icon="heroicons:x-mark" class="w-4 h-4" />
@@ -375,7 +375,7 @@
                     </button>
                     <button
                       @click="downloadFile(file.id, file.filename)"
-                      class="p-2 rounded hover:bg-blue-500/10 text-blue-500 transition-colors"
+                      class="icon-ghost icon-ghost--info"
                       title="Download file"
                     >
                       <ArrowDownTrayIcon class="w-4 h-4" />
@@ -383,7 +383,7 @@
                     <!-- Share button removed - MessageFile doesn't support public sharing -->
                     <button
                       @click="deleteFile(file.id)"
-                      class="p-2 rounded hover:bg-red-500/10 text-red-500 transition-colors"
+                      class="icon-ghost icon-ghost--danger"
                       title="Delete file"
                     >
                       <TrashIcon class="w-4 h-4" />
