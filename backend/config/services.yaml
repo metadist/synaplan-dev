@@ -177,6 +177,10 @@ services:
         tags:
             - { name: 'controller.service_arguments' }
 
+    App\Controller\WidgetPublicController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     App\Service\File\PdfRasterizer:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'

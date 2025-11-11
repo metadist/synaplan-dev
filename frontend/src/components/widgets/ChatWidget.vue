@@ -1,5 +1,7 @@
 <template>
-  <div :class="[isPreview ? 'absolute' : 'fixed', 'z-[9999]', positionClass]">
+  <div
+    :class="[isPreview ? 'absolute' : 'fixed', 'z-[9999]', positionClass]"
+  >
     <!-- Chat Button -->
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
@@ -37,18 +39,19 @@
     >
       <div
         v-if="isOpen"
-        :class="[
-          'flex flex-col overflow-hidden shadow-2xl',
-          isMobile && !isPreview ? 'fixed inset-0' : 'rounded-2xl w-[400px] h-[600px]'
-        ]"
+        :class="['flex flex-col overflow-hidden shadow-2xl', ...chatWindowClasses]"
         :style="{
-          backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff'
+          backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
+          ...chatWindowStyle
         }"
       >
         <!-- Header -->
         <div
           :style="{ backgroundColor: primaryColor }"
           class="flex items-center justify-between px-4 py-3"
+          :class="{
+            'pt-[calc(env(safe-area-inset-top,0px)+12px)]': isMobile && !isPreview
+          }"
         >
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
@@ -110,13 +113,27 @@
                 ? { backgroundColor: primaryColor, color: iconColor }
                 : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
             >
-              <p
-                v-if="message.type === 'text'"
-                class="text-sm whitespace-pre-wrap break-words"
-                :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937') }"
-              >
-                {{ message.content }}
-              </p>
+              <template v-if="message.type === 'text'">
+                <div
+                  v-if="message.role === 'assistant' && message.content === '' && isTyping"
+                  class="space-y-2"
+                >
+                  <div
+                    class="h-3 w-32 rounded animate-pulse"
+                    :class="widgetTheme === 'dark' ? 'bg-white/20' : 'bg-black/10'"
+                  />
+                  <div
+                    class="h-3 w-24 rounded animate-pulse"
+                    :class="widgetTheme === 'dark' ? 'bg-white/15' : 'bg-black/5'"
+                  />
+                </div>
+                <p
+                  v-else
+                  class="text-sm whitespace-pre-wrap break-words"
+                  :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937') }"
+                  v-html="renderMessageContent(message.content)"
+                />
+              </template>
               <div v-else-if="message.type === 'file'" class="flex items-center gap-2">
                 <DocumentIcon class="w-5 h-5" :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937') }" />
                 <span class="text-sm" :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937') }">
@@ -173,7 +190,26 @@
         </div>
 
         <!-- Input Area -->
-        <div class="border-t p-3" :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }">
+        <div
+          class="border-t p-3"
+          :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
+        >
+          <div v-if="fileUploadError" class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <div class="flex items-start gap-2">
+              <XCircleIcon class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p class="text-xs text-red-600 dark:text-red-400">{{ fileUploadError }}</p>
+            </div>
+          </div>
+
+          <div v-if="allowFileUploads && fileLimitReached" class="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <div class="flex items-start gap-2">
+              <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p class="text-xs text-amber-600 dark:text-amber-400">
+                {{ $t('widget.fileUploadLimitReached') }}
+              </p>
+            </div>
+          </div>
+
           <div v-if="selectedFile" class="mb-2 flex items-center gap-2 p-2 rounded-lg" :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }">
             <DocumentIcon class="w-5 h-5" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }" />
             <span class="text-sm flex-1 truncate" :style="{ color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937' }">{{ selectedFile.name }}</span>
@@ -197,21 +233,23 @@
           </div>
 
           <div class="flex items-end gap-2">
-            <input
-              ref="fileInput"
-              type="file"
-              @change="handleFileSelect"
-              accept="image/*,.pdf,.doc,.docx,.txt"
-              class="hidden"
-            />
-            <button
-              @click="fileInput?.click()"
-              :disabled="limitReached"
-              class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-              :aria-label="$t('widget.attachFile')"
-            >
-              <PaperClipIcon class="w-5 h-5" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }" />
-            </button>
+            <template v-if="allowFileUploads">
+              <input
+                ref="fileInput"
+                type="file"
+                @change="handleFileSelect"
+                accept="image/*,.pdf,.doc,.docx,.txt"
+                class="hidden"
+              />
+              <button
+                @click="fileInput?.click()"
+                :disabled="limitReached || fileLimitReached"
+                class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                :aria-label="$t('widget.attachFile')"
+              >
+                <PaperClipIcon class="w-5 h-5" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }" />
+              </button>
+            </template>
             <textarea
               v-model="inputMessage"
               @keydown.enter.exact.prevent="sendMessage"
@@ -243,7 +281,13 @@
         </div>
 
         <!-- Powered By -->
-        <div class="px-4 py-2 text-center border-t" :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }">
+        <div
+          class="px-4 py-2 text-center border-t"
+          :class="{
+            'pb-[calc(env(safe-area-inset-bottom,0px)+12px)]': isMobile && !isPreview
+          }"
+          :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
+        >
           <p class="text-xs" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }">
             Powered by <span class="font-semibold" :style="{ color: primaryColor }">synaplan</span>
           </p>
@@ -267,6 +311,8 @@ import {
   XCircleIcon,
   ArrowPathIcon
 } from '@heroicons/vue/24/outline'
+import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   widgetId: string
@@ -281,6 +327,8 @@ interface Props {
   isPreview?: boolean
   widgetTitle?: string
   apiUrl?: string
+  allowFileUpload?: boolean
+  fileUploadLimit?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -293,7 +341,9 @@ const props = withDefaults(defineProps<Props>(), {
   maxFileSize: 10,
   defaultTheme: 'light',
   isPreview: false,
-  widgetTitle: ''
+  widgetTitle: '',
+  allowFileUpload: false,
+  fileUploadLimit: 3
 })
 
 interface Message {
@@ -322,7 +372,49 @@ const chatId = ref<number | null>(null)
 const historyLoaded = ref(false)
 const isLoadingHistory = ref(false)
 
-const isMobile = computed(() => window.innerWidth < 768)
+const isMobile = ref(false)
+const { t } = useI18n()
+
+const allowFileUploads = computed(() => !!props.allowFileUpload && !props.isPreview)
+const fileUploadLimit = computed(() => props.fileUploadLimit ?? 0)
+const fileUploadCount = ref(0)
+const uploadingFile = ref(false)
+const fileUploadError = ref<string | null>(null)
+const fileLimitReached = computed(() => {
+  if (!allowFileUploads.value) return false
+  const limit = fileUploadLimit.value
+  if (limit <= 0) {
+    return true
+  }
+  return fileUploadCount.value >= limit
+})
+
+const updateIsMobile = () => {
+  if (typeof window === 'undefined') return
+  isMobile.value = window.matchMedia('(max-width: 768px)').matches
+}
+
+const chatWindowClasses = computed(() => {
+  if (isMobile.value && !props.isPreview) {
+    return ['fixed inset-0 rounded-none w-screen h-screen']
+  }
+  return ['rounded-2xl w-full max-w-[420px]']
+})
+
+const chatWindowStyle = computed(() => {
+  if (isMobile.value && !props.isPreview) {
+    return {
+      width: '100vw',
+      height: '100vh'
+    }
+  }
+
+  return {
+    width: props.isPreview ? 'min(100%, 380px)' : 'min(90vw, 420px)',
+    height: props.isPreview ? 'min(80vh, 520px)' : 'min(80vh, 640px)'
+  }
+})
+
 
 const positionClass = computed(() => {
   const positions = {
@@ -335,7 +427,15 @@ const positionClass = computed(() => {
 })
 
 const canSend = computed(() => {
-  return !limitReached.value && !isSending.value && (inputMessage.value.trim() !== '' || selectedFile.value !== null)
+  const hasText = inputMessage.value.trim() !== ''
+  const hasFile = allowFileUploads.value && selectedFile.value !== null
+  if (!hasText && !hasFile) {
+    return false
+  }
+  if (uploadingFile.value) {
+    return false
+  }
+  return !limitReached.value && !isSending.value
 })
 
 const resolveApiUrl = () => props.apiUrl || import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -385,6 +485,18 @@ const toggleTheme = () => {
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
+  fileUploadError.value = null
+
+  if (!allowFileUploads.value) {
+    target.value = ''
+    return
+  }
+
+  if (fileLimitReached.value) {
+    fileUploadError.value = t('widget.fileUploadLimitReached')
+    target.value = ''
+    return
+  }
   
   if (file) {
     const fileSizeMB = file.size / (1024 * 1024)
@@ -403,117 +515,185 @@ const handleFileSelect = (event: Event) => {
 
 const removeFile = () => {
   selectedFile.value = null
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
 }
 
 const sendMessage = async () => {
-  if (!canSend.value) return
+  if (!canSend.value || uploadingFile.value) return
 
-  // Handle file upload
-  if (selectedFile.value) {
-    messages.value.push({
-      id: Date.now().toString(),
-      role: 'user',
-      type: 'file',
-      content: selectedFile.value.name,
-      fileName: selectedFile.value.name,
-      timestamp: new Date()
-    })
-    selectedFile.value = null
-    messageCount.value++
-  }
+  const fileIds: number[] = []
+  fileUploadError.value = null
 
-  // Handle text message
-  if (inputMessage.value.trim()) {
-    const userInput = inputMessage.value
-    
-    // Add user message to UI
-    messages.value.push({
-      id: Date.now().toString(),
-      role: 'user',
-      type: 'text',
-      content: userInput,
-      timestamp: new Date()
-    })
-    messageCount.value++
-    
-    inputMessage.value = ''
-    await scrollToBottom()
-    
-    // Send to API if not at limit
-    if (!limitReached.value) {
-      isSending.value = true
-      isTyping.value = true
-      
-      // Create temporary assistant message for streaming
-      const assistantMessageId = Date.now().toString()
+  // Upload file if selected
+  if (allowFileUploads.value && selectedFile.value) {
+    if (fileLimitReached.value) {
+      fileUploadError.value = t('widget.fileUploadLimitReached')
+      return
+    }
+
+    try {
+      uploadingFile.value = true
+      fileUploadError.value = null
+
+      const uploadResult = await uploadWidgetFile(props.widgetId, sessionId.value, selectedFile.value)
+
+      fileIds.push(uploadResult.id)
+      fileUploadCount.value += 1
+
       messages.value.push({
-        id: assistantMessageId,
-        role: 'assistant',
-        type: 'text',
-        content: '',
+        id: `file-${uploadResult.id}`,
+        role: 'user',
+        type: 'file',
+        content: selectedFile.value.name,
+        fileName: selectedFile.value.name,
         timestamp: new Date()
       })
-      
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-        const response = await fetch(`${apiUrl}/api/v1/widget/${props.widgetId}/message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            sessionId: sessionId.value,
-            text: userInput,
-            chatId: chatId.value || undefined
-          })
-        })
-        
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          throw new Error(error.error || `HTTP ${response.status}`)
-        }
 
-        // Legacy API responded with SSE; new endpoint returns complete response JSON
-        const data = await response.json()
+      selectedFile.value = null
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
+    } catch (error: any) {
+      console.error('Widget file upload failed:', error)
+      fileUploadError.value = error?.message || t('widget.fileUploadFailed')
+      return
+    } finally {
+      uploadingFile.value = false
+    }
+  }
 
-        if (data.error) {
-          throw new Error(data.error)
-        }
+  const trimmedInput = inputMessage.value.trim()
+  let userMessage = trimmedInput
 
-        if (data.chatId) {
-          chatId.value = data.chatId
-          const key = getChatStorageKey()
-          if (key) {
-            localStorage.setItem(key, data.chatId.toString())
+  if (!userMessage && fileIds.length > 0) {
+    userMessage = t('widget.fileUploadDefaultMessage')
+  }
+
+  if (!userMessage) {
+    return
+  }
+
+  messages.value.push({
+    id: Date.now().toString(),
+    role: 'user',
+    type: 'text',
+    content: userMessage,
+    timestamp: new Date()
+  })
+  messageCount.value++
+
+  inputMessage.value = ''
+  await scrollToBottom()
+
+  if (limitReached.value) {
+    return
+  }
+
+  isSending.value = true
+  isTyping.value = true
+
+  const assistantMessageId = Date.now().toString()
+  messages.value.push({
+    id: assistantMessageId,
+    role: 'assistant',
+    type: 'text',
+    content: '',
+    timestamp: new Date()
+  })
+
+  try {
+    const result = await sendWidgetMessage(
+      props.widgetId,
+      userMessage,
+      sessionId.value,
+      {
+        chatId: chatId.value ?? undefined,
+        fileIds,
+        apiUrl: resolveApiUrl(),
+        onChunk: async (chunk: string) => {
+          if (!chunk) return
+          if (isTyping.value) {
+            isTyping.value = false
           }
-          if (!historyLoaded.value) {
-            await loadConversationHistory()
-          }
-        }
-
-        if (data.messageId && data.response) {
           const lastMessage = messages.value[messages.value.length - 1]
           if (lastMessage && lastMessage.id === assistantMessageId) {
-            lastMessage.content = data.response
-            isTyping.value = false
-            scrollToBottom()
+            lastMessage.content += chunk
+            await scrollToBottom()
           }
         }
+      }
+    )
 
-        isSending.value = false
-      } catch (error) {
-        console.error('Failed to send message:', error)
-        // Remove the empty assistant message and show error
+    if (result.chatId && result.chatId > 0) {
+      chatId.value = result.chatId
+      const key = getChatStorageKey()
+      if (key) {
+        localStorage.setItem(key, result.chatId.toString())
+      }
+      if (!historyLoaded.value) {
+        await loadConversationHistory()
+      }
+    }
+
+    if (typeof result.remainingUploads === 'number') {
+      const limit = fileUploadLimit.value
+      if (limit > 0) {
+        fileUploadCount.value = Math.max(0, limit - result.remainingUploads)
+      }
+    }
+
+    const lastMessage = messages.value[messages.value.length - 1]
+    if (lastMessage && lastMessage.id === assistantMessageId) {
+      if (!lastMessage.content || lastMessage.content.length === 0) {
+        if (result.text && result.text.length > 0) {
+          lastMessage.content = result.text
+        } else if (!props.isPreview) {
+          await loadConversationHistory(true)
+          await scrollToBottom()
+          return
+        } else {
+          lastMessage.content = t('widget.defaultAssistantReply')
+        }
+      }
+      await scrollToBottom()
+    }
+
+    isTyping.value = false
+  } catch (error) {
+    console.error('Failed to send message:', error)
+    const lastMessage = messages.value.find(m => m.id === assistantMessageId)
+    let recovered = false
+
+    if (!props.isPreview) {
+      try {
+        await loadConversationHistory(true)
+        const latestMessage = messages.value[messages.value.length - 1]
+        if (latestMessage && latestMessage.role === 'assistant' && latestMessage.content.trim().length > 0) {
+          recovered = true
+        }
+      } catch (historyError) {
+        console.error('Failed to recover conversation history:', historyError)
+      }
+    }
+
+    if (!recovered) {
+      if (lastMessage && lastMessage.content.trim().length > 0) {
+        isTyping.value = false
+      } else {
         const lastMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId)
         if (lastMessageIndex !== -1) {
           messages.value.splice(lastMessageIndex, 1)
         }
-        addBotMessage('Sorry, I encountered an error. Please try again.')
-      } finally {
-        isTyping.value = false
-        isSending.value = false
+        addBotMessage(t('widget.sendFailed'))
       }
+    } else {
+      await scrollToBottom()
     }
+  } finally {
+    isTyping.value = false
+    isSending.value = false
   }
 }
 
@@ -591,6 +771,11 @@ const startNewConversation = () => {
   inputMessage.value = ''
   selectedFile.value = null
   fileSizeError.value = false
+  fileUploadError.value = null
+  fileUploadCount.value = 0
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
   messageCount.value = 0
   unreadCount.value = 0
   isTyping.value = false
@@ -663,8 +848,23 @@ const normalizeServerMessage = (raw: any): Message => {
   }
 }
 
-const loadConversationHistory = async () => {
-  if (!sessionId.value || historyLoaded.value || isLoadingHistory.value) {
+const loadConversationHistory = async (force = false) => {
+  if (props.isPreview) {
+    historyLoaded.value = true
+    ensureAutoMessage()
+    return
+  }
+
+  if (!props.widgetId) {
+    historyLoaded.value = true
+    return
+  }
+
+  if (!sessionId.value || isLoadingHistory.value) {
+    return
+  }
+
+  if (historyLoaded.value && !force) {
     return
   }
 
@@ -673,7 +873,9 @@ const loadConversationHistory = async () => {
   try {
     const baseUrl = resolveApiUrl()
     const params = new URLSearchParams({ sessionId: sessionId.value })
-    const response = await fetch(`${baseUrl}/api/v1/widget/${props.widgetId}/history?${params.toString()}`)
+    const response = await fetch(`${baseUrl}/api/v1/widget/${props.widgetId}/history?${params.toString()}`, {
+      headers: buildWidgetHeaders(false)
+    })
 
     if (!response.ok) {
       throw new Error(`History request failed with status ${response.status}`)
@@ -695,8 +897,12 @@ const loadConversationHistory = async () => {
 
       if (data.session && typeof data.session.messageCount === 'number') {
         messageCount.value = data.session.messageCount
+        if (typeof data.session.fileCount === 'number') {
+          fileUploadCount.value = data.session.fileCount
+        }
       } else if (loadedMessages.length > 0) {
         messageCount.value = loadedMessages.filter((m: Message) => m.role === 'user').length
+        fileUploadCount.value = 0
       }
     }
   } catch (error) {
@@ -710,8 +916,87 @@ const loadConversationHistory = async () => {
   }
 }
 
+const escapeHtml = (value: string): string => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+const applyInlineFormatting = (text: string): string => {
+  return text
+    .replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
+    .replace(/(\*|_)(.+?)\1/g, '<em>$2</em>')
+    .replace(/~~(.+?)~~/g, '<del>$1</del>')
+    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-xs">$1</code>')
+    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" class="underline" target="_blank" rel="noopener noreferrer">$1</a>')
+}
+
+const renderMessageContent = (value: string): string => {
+  if (!value) {
+    return ''
+  }
+
+  const lines = value.split(/\r?\n/)
+  const htmlParts: string[] = []
+  let inList = false
+
+  const closeListIfNeeded = () => {
+    if (inList) {
+      htmlParts.push('</ul>')
+      inList = false
+    }
+  }
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim()
+
+    if (trimmed === '') {
+      closeListIfNeeded()
+      htmlParts.push('<br>')
+      continue
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
+    if (headingMatch) {
+      closeListIfNeeded()
+      const level = headingMatch[1].length
+      const content = applyInlineFormatting(escapeHtml(headingMatch[2]))
+      const sizeClass = level <= 2 ? 'text-base' : 'text-sm'
+      htmlParts.push(`<div class="font-semibold ${sizeClass} mt-2">${content}</div>`)
+      continue
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      if (!inList) {
+        inList = true
+        htmlParts.push('<ul class="list-disc pl-5 space-y-1 my-2">')
+      }
+      const item = trimmed.replace(/^[-*]\s+/, '')
+      const content = applyInlineFormatting(escapeHtml(item))
+      htmlParts.push(`<li>${content}</li>`)
+      continue
+    }
+
+    closeListIfNeeded()
+    const content = applyInlineFormatting(escapeHtml(rawLine))
+    htmlParts.push(`<p class="mb-2 last:mb-0">${content}</p>`)
+  }
+
+  closeListIfNeeded()
+  return htmlParts.join('')
+}
+
 // Load session ID from localStorage on mount
 onMounted(() => {
+  updateIsMobile()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateIsMobile)
+    window.addEventListener('orientationchange', updateIsMobile)
+  }
+
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
   window.addEventListener('synaplan-widget-close', handleCloseEvent)
   window.addEventListener('synaplan-widget-new-chat', handleNewChatEvent)
@@ -741,6 +1026,11 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateIsMobile)
+    window.removeEventListener('orientationchange', updateIsMobile)
+  }
+
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
   window.removeEventListener('synaplan-widget-close', handleCloseEvent)
   window.removeEventListener('synaplan-widget-new-chat', handleNewChatEvent)
@@ -772,5 +1062,17 @@ watch(isOpen, (newVal) => {
     scrollToBottom()
   }
 })
+
+function buildWidgetHeaders(includeContentType = true) {
+  const headers: Record<string, string> = {}
+  headers['Accept'] = 'application/json'
+  if (includeContentType) {
+    headers['Content-Type'] = 'application/json'
+  }
+  if (typeof window !== 'undefined' && window.location?.host) {
+    headers['X-Widget-Host'] = window.location.host
+  }
+  return headers
+}
 </script>
 

@@ -89,10 +89,15 @@ class VectorSearchService
                 r.BGROUPKEY as group_key,
                 VEC_DISTANCE_COSINE(r.BEMBED, VEC_FromText(:query_vector)) as distance,
                 m.BTEXT as message_text,
-                m.BFILEPATH as file_path,
-                m.BFILETYPE as file_type
+                m.BFILEPATH as message_file_path,
+                m.BFILETYPE as message_file_type,
+                f.BFILENAME as file_name,
+                f.BFILEPATH as file_path,
+                f.BFILEMIME as file_mime,
+                f.BFILETEXT as file_text
             FROM BRAG r
-            INNER JOIN BMESSAGES m ON r.BMID = m.BID
+            LEFT JOIN BMESSAGES m ON r.BMID = m.BID
+            LEFT JOIN BFILES f ON r.BMID = f.BID
             WHERE r.BUID = :user_id
         ';
 

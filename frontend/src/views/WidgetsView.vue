@@ -152,9 +152,11 @@ import { useDialog } from '@/composables/useDialog'
 import WidgetCreationWizard from '@/components/widgets/WidgetCreationWizard.vue'
 import WidgetEditorModal from '@/components/widgets/WidgetEditorModal.vue'
 import EmbedCodeDialog from '@/components/widgets/EmbedCodeDialog.vue'
+import { useI18n } from 'vue-i18n'
 
 const { success, error } = useNotification()
 const { confirm } = useDialog()
+const { t } = useI18n()
 
 const loading = ref(false)
 const widgets = ref<widgetsApi.Widget[]>([])
@@ -199,7 +201,7 @@ const closeWizard = () => {
 const handleWidgetCreated = async () => {
   showWizard.value = false
   await loadWidgets()
-  success('Widget created successfully! 🎉')
+  success(t('widgets.createSuccess'))
 }
 
 /**
@@ -222,8 +224,13 @@ const editWidget = (widget: widgetsApi.Widget) => {
 const handleSave = async (data: any) => {
   try {
     if (currentWidget.value) {
+      console.log('🔧 WidgetsView handleSave:', {
+        widgetId: currentWidget.value.widgetId,
+        data: data,
+        allowedDomains: data.config?.allowedDomains
+      })
       await widgetsApi.updateWidget(currentWidget.value.widgetId, data)
-      success('Widget updated successfully')
+      success(t('widgets.updateSuccess'))
     }
     
     currentWidget.value = null
@@ -252,20 +259,18 @@ const showEmbed = async (widget: widgetsApi.Widget) => {
  * Confirm delete
  */
 const confirmDelete = async (widget: widgetsApi.Widget) => {
-  const confirmed = await confirm(
-    'Delete Widget?',
-    `Are you sure you want to delete "${widget.name}"? This action cannot be undone.`,
-    {
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      variant: 'danger'
-    }
-  )
+  const confirmed = await confirm({
+    title: t('widgets.deleteTitle'),
+    message: t('widgets.deleteDescription', { name: widget.name }),
+    confirmText: t('widgets.deleteConfirm'),
+    cancelText: t('common.cancel'),
+    danger: true
+  })
 
   if (confirmed) {
     try {
       await widgetsApi.deleteWidget(widget.widgetId)
-      success('Widget deleted successfully')
+      success(t('widgets.deleteSuccess'))
       await loadWidgets()
     } catch (err: any) {
       error(err.message || 'Failed to delete widget')

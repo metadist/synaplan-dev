@@ -31,6 +31,9 @@ interface WidgetConfig {
   maxFileSize?: number
   widgetTitle?: string
   isPreview?: boolean
+  allowedDomains?: string[]
+  allowFileUpload?: boolean
+  fileUploadLimit?: number
 }
 
 /**
@@ -73,6 +76,9 @@ class SynaplanWidget {
       widgetTitle: 'Chat Support',
       isPreview: false,
       apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+      allowedDomains: [],
+      allowFileUpload: false,
+      fileUploadLimit: 3,
       ...config
     }
 
@@ -117,10 +123,15 @@ class SynaplanWidget {
     }
 
     try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json'
+      }
+      if (typeof window !== 'undefined' && window.location?.host) {
+        headers['X-Widget-Host'] = window.location.host
+      }
+
       const response = await fetch(`${apiBase}/api/v1/widget/${this.config.widgetId}/config`, {
-        headers: {
-          Accept: 'application/json'
-        }
+        headers
       })
 
       if (!response.ok) {
@@ -146,6 +157,9 @@ class SynaplanWidget {
         autoMessage: remoteConfig.autoMessage ?? this.config.autoMessage,
         messageLimit: typeof remoteConfig.messageLimit === 'number' ? remoteConfig.messageLimit : this.config.messageLimit,
         maxFileSize: typeof remoteConfig.maxFileSize === 'number' ? remoteConfig.maxFileSize : this.config.maxFileSize,
+        allowedDomains: Array.isArray(remoteConfig.allowedDomains) ? remoteConfig.allowedDomains : this.config.allowedDomains,
+        allowFileUpload: typeof remoteConfig.allowFileUpload === 'boolean' ? remoteConfig.allowFileUpload : this.config.allowFileUpload,
+        fileUploadLimit: typeof remoteConfig.fileUploadLimit === 'number' ? remoteConfig.fileUploadLimit : this.config.fileUploadLimit,
         apiUrl: apiBase
       }
 
@@ -182,6 +196,8 @@ class SynaplanWidget {
       maxFileSize: this.config.maxFileSize,
       widgetTitle: this.config.widgetTitle,
       apiUrl: this.config.apiUrl,
+      allowFileUpload: this.config.allowFileUpload,
+      fileUploadLimit: this.config.fileUploadLimit,
       isPreview: false
     })
 

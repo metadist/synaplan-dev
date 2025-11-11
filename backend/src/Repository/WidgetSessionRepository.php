@@ -106,6 +106,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
                 ws.BWIDGETID AS widget_id,
                 ws.BSESSIONID AS session_id,
                 ws.BMESSAGECOUNT AS message_count,
+                ws.BFILECOUNT AS file_count,
                 ws.BLASTMESSAGE AS last_message,
                 ws.BCREATED AS created,
                 ws.BEXPIRES AS expires,
