@@ -94,6 +94,16 @@ class MessageProcessor
                     'language' => 'en', // Default, could be enhanced
                     'source' => 'widget'
                 ];
+
+                if (!empty($options['rag_group_key'])) {
+                    $classification['rag_group_key'] = $options['rag_group_key'];
+                }
+                if (!empty($options['rag_limit'])) {
+                    $classification['rag_limit'] = (int) $options['rag_limit'];
+                }
+                if (isset($options['rag_min_score'])) {
+                    $classification['rag_min_score'] = (float) $options['rag_min_score'];
+                }
             } elseif ($isAgainRequest) {
                 // Skip classification for "Again" - use specified model directly
                 $this->logger->info('MessageProcessor: Skipping classification (Again request)', [

@@ -26,6 +26,9 @@ class WidgetSession
     #[ORM\Column(name: 'BMESSAGECOUNT', type: 'integer')]
     private int $messageCount = 0;
 
+    #[ORM\Column(name: 'BFILECOUNT', type: 'integer')]
+    private int $fileCount = 0;
+
     #[ORM\Column(name: 'BLASTMESSAGE', type: 'bigint')]
     private int $lastMessage = 0;
 
@@ -85,6 +88,23 @@ class WidgetSession
     public function incrementMessageCount(): self
     {
         $this->messageCount++;
+        return $this;
+    }
+
+    public function getFileCount(): int
+    {
+        return $this->fileCount;
+    }
+
+    public function setFileCount(int $fileCount): self
+    {
+        $this->fileCount = $fileCount;
+        return $this;
+    }
+
+    public function incrementFileCount(): self
+    {
+        $this->fileCount++;
         return $this;
     }
 

@@ -11,6 +11,7 @@ use App\Repository\FileRepository;
 #[ORM\Entity(repositoryClass: FileRepository::class)]
 #[ORM\Table(name: 'BFILES')]
 #[ORM\Index(columns: ['BUSERID'], name: 'idx_file_user')]
+#[ORM\Index(columns: ['BUSERSESSIONID'], name: 'idx_file_session')]
 #[ORM\Index(columns: ['BFILETYPE'], name: 'idx_file_type')]
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
 class File
@@ -22,6 +23,13 @@ class File
 
     #[ORM\Column(name: 'BUSERID', type: 'bigint')]
     private int $userId;
+
+    /**
+     * For widget uploads: BUSERID=0, BUSERSESSIONID=session_id from BWIDGET_SESSIONS
+     * For regular user uploads: BUSERID=user_id, BUSERSESSIONID=null
+     */
+    #[ORM\Column(name: 'BUSERSESSIONID', type: 'bigint', nullable: true)]
+    private ?int $userSessionId = null;
 
     #[ORM\Column(name: 'BFILEPATH', length: 255)]
     private string $filePath = '';
@@ -155,6 +163,17 @@ class File
     public function setCreatedAt(int $createdAt): self
     {
         $this->createdAt = $createdAt;
+        return $this;
+    }
+
+    public function getUserSessionId(): ?int
+    {
+        return $this->userSessionId;
+    }
+
+    public function setUserSessionId(?int $userSessionId): self
+    {
+        $this->userSessionId = $userSessionId;
         return $this;
     }
 }

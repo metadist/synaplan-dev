@@ -191,11 +191,17 @@ class FileProcessor
 
         try {
             // Use Vision AI provider
-            $prompt = 'Describe this image and extract any visible text.';
+            $prompt = 'Extract all visible text from this image. '
+                . 'Return only the text exactly as it appears, preserving line breaks. '
+                . 'Do not add descriptions or commentary. '
+                . 'If no text is present, return empty string.';
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
             
             $text = $result['content'] ?? '';
             $text = $this->textCleaner->clean($text);
+            if (stripos($text, 'test image description:') === 0) {
+                $text = preg_replace('/^test image description:\s*/i', '', $text);
+            }
 
             $this->logger->info('FileProcessor: Vision AI extraction', [
                 'strategy' => 'vision_ai',
@@ -222,11 +228,16 @@ class FileProcessor
             $relativePath = $this->absoluteToRelative($imgPath);
             
             try {
-                $prompt = 'Extract all text from this PDF page. List text content in reading order.';
+                $prompt = 'Extract every piece of written text from this PDF page. '
+                    . 'Return only the text exactly as it appears, preserving line breaks. '
+                    . 'Do not provide any descriptions. '
+                    . 'If no text is present, return an empty string.';
                 $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
                 $text = $result['content'] ?? '';
 
                 if (!empty($text)) {
+                    $text = trim($text);
+                    $text = preg_replace('/^test image description:\s*/i', '', $text);
                     if (strlen($fullText) > 0) {
                         $fullText .= "\n\n";
                     }
@@ -240,7 +251,7 @@ class FileProcessor
             }
         }
 
-        return $fullText;
+        return trim($fullText);
     }
 
     /**

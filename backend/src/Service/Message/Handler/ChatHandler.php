@@ -54,7 +54,10 @@ class ChatHandler implements MessageHandlerInterface
             unset($classification['search_results']);
         }
 
-        $ragContext = $this->loadRagContext($message, $topic);
+        $ragGroupKey = $classification['rag_group_key'] ?? null;
+        $ragLimit = isset($classification['rag_limit']) ? max(1, (int) $classification['rag_limit']) : 5;
+        $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.3;
+        $ragContext = $this->loadRagContext($message, $topic, $ragGroupKey, $ragLimit, $ragMinScore);
 
         // Determine model: Again override > prompt metadata > classification override > DB default
         $modelId = null;
@@ -221,24 +224,50 @@ class ChatHandler implements MessageHandlerInterface
         // ✨ NEW: Load RAG context for task prompt (if files are associated)
         $ragContext = '';
         $ragResultsCount = 0;
-        
-        if ($topic !== 'general' && !empty($message->getText())) {
+
+        $ragGroupKey = $options['rag_group_key'] ?? ($classification['rag_group_key'] ?? null);
+        $ragLimit = isset($options['rag_limit']) ? max(1, (int) $options['rag_limit']) : 5;
+        $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.3;
+
+        if (!$ragGroupKey && $topic !== 'general') {
+            $ragGroupKey = "TASKPROMPT:{$topic}";
+        }
+
+        $ragResults = [];
+
+        if (!empty($message->getText()) && $ragGroupKey) {
             try {
-                error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic);
-                
-                $groupKey = "TASKPROMPT:{$topic}";
-                error_log('🔍 ChatHandler: Searching RAG with groupKey: ' . $groupKey . ', query: ' . substr($message->getText(), 0, 100));
-                
+                error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic . ' (groupKey: ' . $ragGroupKey . ')');
+
                 $ragResults = $this->vectorSearchService->semanticSearch(
                     $message->getText(),
                     $message->getUserId(),
-                    $groupKey,  // ✨ Filter by Task Prompt!
-                    limit: 3,  // Top 3 most relevant chunks
-                    minScore: 0.6  // Only include if similarity > 60%
+                    $ragGroupKey,
+                    limit: $ragLimit,
+                    minScore: $ragMinScore
                 );
-                
+
                 error_log('🔍 ChatHandler: RAG search returned ' . count($ragResults) . ' results');
-                
+
+                if (empty($ragResults) && $topic !== 'general') {
+                    $fallbackGroupKey = "TASKPROMPT:{$topic}";
+                    if ($fallbackGroupKey !== $ragGroupKey) {
+                        error_log('🔄 ChatHandler: RAG fallback search with groupKey: ' . $fallbackGroupKey);
+                        $ragResults = $this->vectorSearchService->semanticSearch(
+                            $message->getText(),
+                            $message->getUserId(),
+                            $fallbackGroupKey,
+                            limit: $ragLimit,
+                            minScore: $ragMinScore
+                        );
+                        error_log('🔍 ChatHandler: RAG fallback returned ' . count($ragResults) . ' results');
+
+                        if (!empty($ragResults)) {
+                            $ragGroupKey = $fallbackGroupKey;
+                        }
+                    }
+                }
+
                 if (!empty($ragResults)) {
                     $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
                     foreach ($ragResults as $idx => $result) {
@@ -251,27 +280,34 @@ class ChatHandler implements MessageHandlerInterface
                     }
                     $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
                     $ragResultsCount = count($ragResults);
-                    
+
                     error_log('🔍 ChatHandler: RAG context loaded, total length: ' . strlen($ragContext));
-                    
+
                     $this->logger->info('ChatHandler: RAG context loaded', [
                         'topic' => $topic,
                         'chunks_found' => $ragResultsCount,
-                        'user_id' => $message->getUserId()
+                        'user_id' => $message->getUserId(),
+                        'group_key' => $ragGroupKey
                     ]);
                 }
             } catch (\Throwable $e) {
                 error_log('❌ ChatHandler: RAG context loading failed: ' . $e->getMessage());
                 error_log('❌ Stack trace: ' . $e->getTraceAsString());
-                
+
                 $this->logger->warning('ChatHandler: RAG context loading failed', [
                     'topic' => $topic,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'group_key' => $ragGroupKey
                 ]);
                 // Continue without RAG context
             }
         } else {
-            error_log('🔍 ChatHandler: Skipping RAG - topic: ' . $topic . ', text empty: ' . (empty($message->getText()) ? 'yes' : 'no'));
+            error_log(sprintf(
+                '🔍 ChatHandler: Skipping RAG - groupKey: %s, topic: %s, text empty: %s',
+                $ragGroupKey ?? 'none',
+                $topic,
+                empty($message->getText()) ? 'yes' : 'no'
+            ));
         }
 
         // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default
@@ -535,31 +571,65 @@ class ChatHandler implements MessageHandlerInterface
      * Build messages for non-streaming (JSON format)
      * Like old system: topicPrompt with $stream = false
      */
-    private function loadRagContext(Message $message, string $topic): string
+    private function loadRagContext(
+        Message $message,
+        string $topic,
+        ?string $groupKey = null,
+        int $limit = 5,
+        float $minScore = 0.3
+    ): string
     {
-        if ($topic === 'general' || empty($message->getText())) {
-            $this->logger->debug('ChatHandler: Skipping RAG context (general topic or empty text)', [
+        if (empty($message->getText())) {
+            $this->logger->debug('ChatHandler: Skipping RAG context (empty text)', [
                 'topic' => $topic,
-                'has_text' => !empty($message->getText())
+                'has_text' => false
             ]);
             return '';
         }
 
-        try {
-            error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic);
+        if (!$groupKey) {
+            if ($topic === 'general') {
+                $this->logger->debug('ChatHandler: Skipping RAG context (general topic, no group key)', [
+                    'topic' => $topic
+                ]);
+                return '';
+            }
 
             $groupKey = "TASKPROMPT:{$topic}";
+        }
+
+        try {
+            error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic . ' (groupKey: ' . $groupKey . ')');
             error_log('🔍 ChatHandler: Searching RAG with groupKey: ' . $groupKey . ', query: ' . substr($message->getText(), 0, 100));
 
             $ragResults = $this->vectorSearchService->semanticSearch(
                 $message->getText(),
                 $message->getUserId(),
                 $groupKey,
-                limit: 3,
-                minScore: 0.6
+                limit: $limit,
+                minScore: $minScore
             );
 
             error_log('🔍 ChatHandler: RAG search returned ' . count($ragResults) . ' results');
+
+            if (empty($ragResults) && $topic !== 'general') {
+                $fallbackGroupKey = "TASKPROMPT:{$topic}";
+                if ($fallbackGroupKey !== $groupKey) {
+                    error_log('🔄 ChatHandler: RAG fallback search with groupKey: ' . $fallbackGroupKey);
+                    $ragResults = $this->vectorSearchService->semanticSearch(
+                        $message->getText(),
+                        $message->getUserId(),
+                        $fallbackGroupKey,
+                        limit: $limit,
+                        minScore: $minScore
+                    );
+                    error_log('🔍 ChatHandler: RAG fallback returned ' . count($ragResults) . ' results');
+
+                    if (!empty($ragResults)) {
+                        $groupKey = $fallbackGroupKey;
+                    }
+                }
+            }
 
             if (empty($ragResults)) {
                 return '';
@@ -579,7 +649,8 @@ class ChatHandler implements MessageHandlerInterface
             $this->logger->info('ChatHandler: RAG context loaded', [
                 'topic' => $topic,
                 'chunks_found' => count($ragResults),
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
+                'group_key' => $groupKey
             ]);
 
             return $ragContext;
@@ -589,7 +660,8 @@ class ChatHandler implements MessageHandlerInterface
 
             $this->logger->warning('ChatHandler: RAG context loading failed', [
                 'topic' => $topic,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'group_key' => $groupKey
             ]);
 
             return '';

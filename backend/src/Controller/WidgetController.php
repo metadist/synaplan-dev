@@ -85,6 +85,7 @@ class WidgetController extends AbstractController
                 'taskPromptTopic' => $widget->getTaskPromptTopic(),
                 'status' => $widget->getStatus(),
                 'config' => $widget->getConfig(),
+                'allowedDomains' => $widget->getAllowedDomains(),
                 'isActive' => $this->widgetService->isWidgetActive($widget),
                 'created' => $widget->getCreated(),
                 'updated' => $widget->getUpdated()
@@ -140,6 +141,8 @@ class WidgetController extends AbstractController
                 $data['config'] ?? []
             );
 
+            $widget->syncAllowedDomainsFromConfig();
+
             return $this->json([
                 'success' => true,
                 'message' => 'Widget created successfully',
@@ -150,6 +153,7 @@ class WidgetController extends AbstractController
                     'taskPromptTopic' => $widget->getTaskPromptTopic(),
                     'status' => $widget->getStatus(),
                     'config' => $widget->getConfig(),
+                    'allowedDomains' => $widget->getAllowedDomains(),
                     'created' => $widget->getCreated(),
                     'updated' => $widget->getUpdated()
                 ]
@@ -214,6 +218,7 @@ class WidgetController extends AbstractController
                 'taskPromptTopic' => $widget->getTaskPromptTopic(),
                 'status' => $widget->getStatus(),
                 'config' => $widget->getConfig(),
+                'allowedDomains' => $widget->getAllowedDomains(),
                 'isActive' => $this->widgetService->isWidgetActive($widget),
                 'created' => $widget->getCreated(),
                 'updated' => $widget->getUpdated(),
@@ -259,13 +264,19 @@ class WidgetController extends AbstractController
             }
 
             if (isset($data['config'])) {
+                error_log('🔧 Config received: ' . json_encode($data['config']));
+                error_log('🔧 allowedDomains in config: ' . json_encode($data['config']['allowedDomains'] ?? []));
                 $this->widgetService->updateWidget($widget, $data['config']);
             }
 
             if (isset($data['status']) && in_array($data['status'], ['active', 'inactive'])) {
                 $widget->setStatus($data['status']);
-                $this->em->flush();
             }
+
+            // Always flush after updates
+            $this->em->flush();
+            
+            error_log('🔧 After flush - allowedDomains: ' . json_encode($widget->getAllowedDomains()));
 
             return $this->json([
                 'success' => true,
