@@ -667,27 +667,6 @@ class ModelFixtures extends Fixture
             ],
             // ==================== GOOGLE MODELS ====================
             [
-                'id' => 33,
-                'service' => 'Google',
-                'name' => 'ImaGen 3.0',
-                'tag' => 'text2pic',
-                'selectable' => 1,
-                'active' => 1,
-                'providerId' => 'imagen-3.0-generate-002',
-                'priceIn' => 0,
-                'inUnit' => '-',
-                'priceOut' => 0.3,
-                'outUnit' => 'perpic',
-                'quality' => 9,
-                'rating' => 1,
-                'json' => [
-                    'description' => 'Google Imagen 3.0',
-                    'params' => [
-                        'model' => 'imagen-3.0-generate-002'
-                    ]
-                ]
-            ],
-            [
                 'id' => 37,
                 'service' => 'Google',
                 'name' => 'Gemini 2.0 Flash',
@@ -769,27 +748,6 @@ class ModelFixtures extends Fixture
                     'prompt' => 'Describe the image in detail. Extract any text you see.',
                     'params' => [
                         'model' => 'gemini-2.5-pro-preview-06-05'
-                    ]
-                ]
-            ],
-            [
-                'id' => 71,
-                'service' => 'Google',
-                'name' => 'Gemini 2.5 Flash Image',
-                'tag' => 'text2pic',
-                'selectable' => 1,
-                'active' => 1,
-                'providerId' => 'gemini-2.5-flash-image-preview',
-                'priceIn' => 0.3,
-                'inUnit' => '-',
-                'priceOut' => 0.039,
-                'outUnit' => 'perpic',
-                'quality' => 9,
-                'rating' => 1,
-                'json' => [
-                    'description' => 'Google newest image generation and editing model (aka Nano-Banana). Low latency, multi-image fusion, character consistency and precise editing. All outputs are watermarked with SynthID.',
-                    'params' => [
-                        'model' => 'gemini-2.5-flash-image-preview'
                     ]
                 ]
             ],

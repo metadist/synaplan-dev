@@ -8,6 +8,7 @@ use App\Repository\ModelRepository;
 use App\AI\Service\AiFacade;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
+use App\Service\RAG\VectorSearchService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -25,11 +26,10 @@ class ChatHandler implements MessageHandlerInterface
         private PromptService $promptService,
         private ModelConfigService $modelConfigService,
         private ModelRepository $modelRepository,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private VectorSearchService $vectorSearchService
     ) {}
     
-    // VectorSearchService will be injected as needed
-
     public function getName(): string
     {
         return 'chat';
@@ -43,47 +43,55 @@ class ChatHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
-        // System Prompt laden
-        $systemPrompt = $this->getSystemPrompt($message->getUserId(), $classification['language']);
+        $topic = $classification['topic'] ?? 'general';
+        $language = $classification['language'] ?? 'en';
 
-        // Conversation History bauen
-        $messages = $this->buildMessages($systemPrompt, $thread, $message);
+        $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $language);
+        $promptMetadata = $promptData['metadata'] ?? [];
 
-        // Get model - Priority: User-selected (Again) > Classification override > DB default
+        $searchResults = $classification['search_results'] ?? null;
+        if (array_key_exists('search_results', $classification)) {
+            unset($classification['search_results']);
+        }
+
+        $ragContext = $this->loadRagContext($message, $topic);
+
+        // Determine model: Again override > prompt metadata > classification override > DB default
         $modelId = null;
         $provider = null;
         $modelName = null;
-        
-        // 1. Check if user explicitly selected a model (e.g., via "Again" function)
+
         if (isset($classification['model_id']) && $classification['model_id']) {
-            $modelId = $classification['model_id'];
+            $modelId = (int) $classification['model_id'];
             $this->logger->info('ChatHandler: Using user-selected model (Again)', [
                 'model_id' => $modelId,
                 'user_id' => $message->getUserId()
             ]);
-        }
-        // 2. Check if classification provides a model override
-        elseif (isset($classification['override_model_id']) && $classification['override_model_id']) {
-            $modelId = $classification['override_model_id'];
+        } elseif (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0) {
+            $modelId = (int) $promptMetadata['aiModel'];
+            $this->logger->info('ChatHandler: Using prompt metadata model', [
+                'model_id' => $modelId,
+                'topic' => $topic,
+                'user_id' => $message->getUserId()
+            ]);
+        } elseif (isset($classification['override_model_id']) && $classification['override_model_id']) {
+            $modelId = (int) $classification['override_model_id'];
             $this->logger->info('ChatHandler: Using classification override model', [
                 'model_id' => $modelId,
                 'user_id' => $message->getUserId()
             ]);
-        }
-        // 3. Fall back to user's default model from DB
-        else {
+        } else {
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
             $this->logger->info('ChatHandler: Using DB default model', [
                 'model_id' => $modelId,
                 'user_id' => $message->getUserId()
             ]);
         }
-        
-        // Resolve model ID to provider + model name
+
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
-            
+
             $this->logger->info('ChatHandler: Resolved model', [
                 'model_id' => $modelId,
                 'provider' => $provider,
@@ -91,7 +99,38 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // AI aufrufen
+        $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
+        if ($promptData && isset($promptData['prompt'])) {
+            $systemPrompt = $promptData['prompt']->getPrompt();
+            $this->logger->info('ChatHandler: Using custom prompt content', [
+                'topic' => $topic,
+                'prompt_length' => strlen($systemPrompt)
+            ]);
+        }
+
+        if (!empty($ragContext)) {
+            $systemPrompt .= $ragContext;
+            $this->logger->info('ChatHandler: RAG context appended to system prompt', [
+                'topic' => $topic,
+                'rag_context_length' => strlen($ragContext)
+            ]);
+        }
+
+        if ($modelId) {
+            $model = $this->modelRepository->find($modelId);
+            if ($model) {
+                $json = $model->getJson();
+                if (isset($json['supportsStreaming']) && $json['supportsStreaming'] === false) {
+                    $systemPrompt = null;
+                }
+            }
+        }
+
+        $messages = $this->buildMessages($systemPrompt, $thread, $message, [
+            'search_results' => $searchResults,
+            'rag_context' => $ragContext
+        ]);
+
         $response = $this->aiFacade->chat(
             $messages,
             $message->getUserId(),
@@ -187,14 +226,10 @@ class ChatHandler implements MessageHandlerInterface
             try {
                 error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic);
                 
-                // Inject VectorSearchService only when needed
-                /** @phpstan-ignore-next-line */
-                $vectorSearchService = $this->aiFacade->getContainer()->get(\App\Service\RAG\VectorSearchService::class);
-                
                 $groupKey = "TASKPROMPT:{$topic}";
                 error_log('🔍 ChatHandler: Searching RAG with groupKey: ' . $groupKey . ', query: ' . substr($message->getText(), 0, 100));
                 
-                $ragResults = $vectorSearchService->search(
+                $ragResults = $this->vectorSearchService->semanticSearch(
                     $message->getText(),
                     $message->getUserId(),
                     $groupKey,  // ✨ Filter by Task Prompt!
@@ -500,11 +535,76 @@ class ChatHandler implements MessageHandlerInterface
      * Build messages for non-streaming (JSON format)
      * Like old system: topicPrompt with $stream = false
      */
-    private function buildMessages(string $systemPrompt, array $thread, Message $currentMessage): array
+    private function loadRagContext(Message $message, string $topic): string
     {
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt]
-        ];
+        if ($topic === 'general' || empty($message->getText())) {
+            $this->logger->debug('ChatHandler: Skipping RAG context (general topic or empty text)', [
+                'topic' => $topic,
+                'has_text' => !empty($message->getText())
+            ]);
+            return '';
+        }
+
+        try {
+            error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic);
+
+            $groupKey = "TASKPROMPT:{$topic}";
+            error_log('🔍 ChatHandler: Searching RAG with groupKey: ' . $groupKey . ', query: ' . substr($message->getText(), 0, 100));
+
+            $ragResults = $this->vectorSearchService->semanticSearch(
+                $message->getText(),
+                $message->getUserId(),
+                $groupKey,
+                limit: 3,
+                minScore: 0.6
+            );
+
+            error_log('🔍 ChatHandler: RAG search returned ' . count($ragResults) . ' results');
+
+            if (empty($ragResults)) {
+                return '';
+            }
+
+            $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
+            foreach ($ragResults as $idx => $result) {
+                $ragContext .= sprintf(
+                    "[Source %d] %s\n",
+                    $idx + 1,
+                    trim($result['chunk_text'])
+                );
+                error_log('🔍 ChatHandler: RAG chunk ' . ($idx + 1) . ': ' . substr($result['chunk_text'], 0, 100) . '...');
+            }
+            $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
+
+            $this->logger->info('ChatHandler: RAG context loaded', [
+                'topic' => $topic,
+                'chunks_found' => count($ragResults),
+                'user_id' => $message->getUserId()
+            ]);
+
+            return $ragContext;
+        } catch (\Throwable $e) {
+            error_log('❌ ChatHandler: RAG context loading failed: ' . $e->getMessage());
+            error_log('❌ Stack trace: ' . $e->getTraceAsString());
+
+            $this->logger->warning('ChatHandler: RAG context loading failed', [
+                'topic' => $topic,
+                'error' => $e->getMessage()
+            ]);
+
+            return '';
+        }
+    }
+
+    private function buildMessages(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
+    {
+        $messages = [];
+        if ($systemPrompt !== null) {
+            $messages[] = [
+                'role' => 'system',
+                'content' => $systemPrompt
+            ];
+        }
 
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
@@ -529,6 +629,21 @@ class ChatHandler implements MessageHandlerInterface
             'BFILETEXT' => $currentMessage->getFileText() ?: '',
         ];
         
+        $ragContext = $options['rag_context'] ?? '';
+        if ($systemPrompt === null && !empty($ragContext)) {
+            $msgArr['BTEXT'] .= "\n\n" . trim($ragContext);
+        }
+
+        if (isset($options['search_results']) && !empty($options['search_results']['results'])) {
+            $searchContext = $this->formatSearchResultsForPrompt($options['search_results']);
+            $msgArr['BTEXT'] .= "\n\n" . $searchContext;
+
+            $this->logger->info('ChatHandler: Web search results appended to BTEXT', [
+                'results_count' => count($options['search_results']['results']),
+                'query' => $options['search_results']['query'] ?? ''
+            ]);
+        }
+
         $messages[] = [
             'role' => 'user',
             'content' => json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),

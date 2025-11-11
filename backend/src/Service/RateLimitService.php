@@ -169,17 +169,31 @@ class RateLimitService
         if (isset($limits['MONTHLY'])) {
             $monthlyCheck = $this->checkTimeframeLimit($user, $action, $limits['MONTHLY'], 2592000); // 30 days
             if (!$monthlyCheck['allowed']) {
+                if (isset($hourlyCheck)) {
+                    $monthlyCheck['hourly'] = $hourlyCheck;
+                }
                 return $monthlyCheck;
             }
+
+            if (isset($hourlyCheck)) {
+                $monthlyCheck['hourly'] = $hourlyCheck;
+            }
+
+            return $monthlyCheck;
         }
 
-        // Both passed or no limits
+        if (isset($hourlyCheck)) {
+            return $hourlyCheck;
+        }
+
+        // No limits configured
         return [
             'allowed' => true,
-            'limit' => $limits['MONTHLY'] ?? $limits['HOURLY'] ?? PHP_INT_MAX,
+            'limit' => PHP_INT_MAX,
             'used' => 0,
-            'remaining' => $limits['MONTHLY'] ?? $limits['HOURLY'] ?? PHP_INT_MAX,
-            'resets_at' => time() + 3600 // Next hour
+            'remaining' => PHP_INT_MAX,
+            'resets_at' => null,
+            'type' => 'unlimited'
         ];
     }
 

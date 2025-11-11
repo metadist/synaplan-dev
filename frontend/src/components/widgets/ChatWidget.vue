@@ -55,11 +55,18 @@
               <ChatBubbleLeftRightIcon class="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 class="text-white font-semibold">{{ $t('widget.title') }}</h3>
+              <h3 class="text-white font-semibold">{{ widgetTitle || $t('widget.title') }}</h3>
               <p class="text-white/80 text-xs">{{ $t('widget.subtitle') }}</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <button
+              @click="startNewConversation"
+              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              aria-label="Start new chat"
+            >
+              <ArrowPathIcon class="w-5 h-5 text-white" />
+            </button>
             <button
               @click="toggleTheme"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
@@ -247,7 +254,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -257,7 +264,8 @@ import {
   SunIcon,
   MoonIcon,
   ExclamationTriangleIcon,
-  XCircleIcon
+  XCircleIcon,
+  ArrowPathIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -271,6 +279,8 @@ interface Props {
   maxFileSize?: number
   defaultTheme?: 'light' | 'dark'
   isPreview?: boolean
+  widgetTitle?: string
+  apiUrl?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -282,7 +292,8 @@ const props = withDefaults(defineProps<Props>(), {
   messageLimit: 50,
   maxFileSize: 10,
   defaultTheme: 'light',
-  isPreview: false
+  isPreview: false,
+  widgetTitle: ''
 })
 
 interface Message {
@@ -308,6 +319,8 @@ const messageCount = ref(0)
 const sessionId = ref<string>('')
 const isSending = ref(false)
 const chatId = ref<number | null>(null)
+const historyLoaded = ref(false)
+const isLoadingHistory = ref(false)
 
 const isMobile = computed(() => window.innerWidth < 768)
 
@@ -325,6 +338,8 @@ const canSend = computed(() => {
   return !limitReached.value && !isSending.value && (inputMessage.value.trim() !== '' || selectedFile.value !== null)
 })
 
+const resolveApiUrl = () => props.apiUrl || import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 const showLimitWarning = computed(() => {
   const warningThreshold = props.messageLimit * 0.8
   return messageCount.value >= warningThreshold && messageCount.value < props.messageLimit
@@ -334,13 +349,32 @@ const limitReached = computed(() => {
   return messageCount.value >= props.messageLimit
 })
 
-const toggleChat = () => {
-  isOpen.value = !isOpen.value
-  if (isOpen.value) {
+const ensureAutoMessage = () => {
+  if (!historyLoaded.value) return
+  if (messages.value.length === 0 && props.autoMessage) {
+    addBotMessage(props.autoMessage)
+  }
+}
+
+const openChat = () => {
+  if (!isOpen.value) {
+    isOpen.value = true
     unreadCount.value = 0
-    if (messages.value.length === 0 && props.autoMessage) {
-      addBotMessage(props.autoMessage)
-    }
+    ensureAutoMessage()
+  }
+}
+
+const closeChat = () => {
+  if (isOpen.value) {
+    isOpen.value = false
+  }
+}
+
+const toggleChat = () => {
+  if (isOpen.value) {
+    closeChat()
+  } else {
+    openChat()
   }
 }
 
@@ -421,82 +455,52 @@ const sendMessage = async () => {
       })
       
       try {
-        // Use normal stream API with widget headers
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-        const url = new URL(`${apiUrl}/api/v1/messages/stream`)
-        url.searchParams.set('message', userInput)
-        url.searchParams.set('chatId', chatId.value?.toString() || '0')
-        url.searchParams.set('trackId', Date.now().toString())
-        
-        const response = await fetch(url.toString(), {
+        const response = await fetch(`${apiUrl}/api/v1/widget/${props.widgetId}/message`, {
+          method: 'POST',
           headers: {
-            'X-Widget-Id': props.widgetId,
-            'X-Widget-Session': sessionId.value
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sessionId: sessionId.value,
+            text: userInput,
+            chatId: chatId.value || undefined
+          })
         })
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
+          const error = await response.json().catch(() => ({}))
+          throw new Error(error.error || `HTTP ${response.status}`)
         }
-        
-        const reader = response.body?.getReader()
-        if (!reader) {
-          throw new Error('No response body')
+
+        // Legacy API responded with SSE; new endpoint returns complete response JSON
+        const data = await response.json()
+
+        if (data.error) {
+          throw new Error(data.error)
         }
-        
-        const decoder = new TextDecoder()
-        let buffer = ''
-        
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          
-          for (const line of lines) {
-            if (line.startsWith('data:')) {
-              const jsonStr = line.slice(5).trim()
-              try {
-                const data = JSON.parse(jsonStr)
-                
-                // Handle chunk
-                if (data.chunk) {
-                  const lastMessage = messages.value[messages.value.length - 1]
-                  if (lastMessage && lastMessage.id === assistantMessageId) {
-                    lastMessage.content += data.chunk
-                    isTyping.value = false
-                    scrollToBottom()
-                  }
-                }
-                
-                // Handle completion
-                if (data.status === 'complete') {
-                  if (data.chatId) {
-                    chatId.value = data.chatId
-                  }
-                  isSending.value = false
-                }
-                
-                // Handle error
-                if (data.error) {
-                  console.error('Stream error:', data)
-                  const lastMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId)
-                  if (lastMessageIndex !== -1) {
-                    messages.value.splice(lastMessageIndex, 1)
-                  }
-                  addBotMessage('Sorry, I encountered an error. Please try again.')
-                  isSending.value = false
-                  isTyping.value = false
-                  break
-                }
-              } catch (e) {
-                console.error('Failed to parse SSE data:', e, jsonStr)
-              }
-            }
+
+        if (data.chatId) {
+          chatId.value = data.chatId
+          const key = getChatStorageKey()
+          if (key) {
+            localStorage.setItem(key, data.chatId.toString())
+          }
+          if (!historyLoaded.value) {
+            await loadConversationHistory()
           }
         }
+
+        if (data.messageId && data.response) {
+          const lastMessage = messages.value[messages.value.length - 1]
+          if (lastMessage && lastMessage.id === assistantMessageId) {
+            lastMessage.content = data.response
+            isTyping.value = false
+            scrollToBottom()
+          }
+        }
+
+        isSending.value = false
       } catch (error) {
         console.error('Failed to send message:', error)
         // Remove the empty assistant message and show error
@@ -546,38 +550,220 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
+const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
+const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+
+const removeChatStorageKeys = (sessionToClear?: string) => {
+  const legacyKey = `synaplan_widget_chatid_${props.widgetId}`
+  const prefix = `synaplan_widget_chatid_${props.widgetId}_`
+
+  if (sessionToClear) {
+    localStorage.removeItem(`${prefix}${sessionToClear}`)
+  } else {
+    for (let idx = localStorage.length - 1; idx >= 0; idx -= 1) {
+      const key = localStorage.key(idx)
+      if (key && key.startsWith(prefix)) {
+        localStorage.removeItem(key)
+      }
+    }
+  }
+
+  localStorage.removeItem(legacyKey)
+}
+
+const startNewConversation = () => {
+  const storageKey = getSessionStorageKey()
+  const previousSession = sessionId.value || localStorage.getItem(storageKey) || undefined
+  const newSessionId = createSessionId()
+
+  sessionId.value = newSessionId
+  localStorage.setItem(storageKey, newSessionId)
+
+  if (previousSession) {
+    removeChatStorageKeys(previousSession)
+  } else {
+    removeChatStorageKeys()
+  }
+
+  chatId.value = null
+  messages.value = []
+  inputMessage.value = ''
+  selectedFile.value = null
+  fileSizeError.value = false
+  messageCount.value = 0
+  unreadCount.value = 0
+  isTyping.value = false
+  historyLoaded.value = false
+
+  if (isOpen.value) {
+    ensureAutoMessage()
+  }
+
+  window.dispatchEvent(new CustomEvent('synaplan-widget-session-changed', {
+    detail: {
+      widgetId: props.widgetId,
+      sessionId: newSessionId
+    }
+  }))
+
+  loadConversationHistory()
+}
+
+const handleOpenEvent = (event: Event) => {
+  const detail = (event as CustomEvent).detail
+  if (detail?.widgetId && detail.widgetId !== props.widgetId) {
+    return
+  }
+  openChat()
+}
+
+const handleCloseEvent = (event: Event) => {
+  const detail = (event as CustomEvent).detail
+  if (detail?.widgetId && detail.widgetId !== props.widgetId) {
+    return
+  }
+  closeChat()
+}
+
+const handleNewChatEvent = (event: Event) => {
+  const detail = (event as CustomEvent).detail
+  if (detail?.widgetId && detail.widgetId !== props.widgetId) {
+    return
+  }
+  startNewConversation()
+}
+
+const normalizeServerMessage = (raw: any): Message => {
+  let content = raw.text ?? ''
+  if (typeof content === 'string') {
+    try {
+      const parsed = JSON.parse(content)
+      if (parsed && typeof parsed === 'object') {
+        if ('BTEXT' in parsed && typeof parsed.BTEXT === 'string') {
+          content = parsed.BTEXT
+        } else if ('content' in parsed && typeof parsed.content === 'string') {
+          content = parsed.content
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  const role = raw.direction === 'IN' ? 'user' : 'assistant'
+  const timestampSeconds = typeof raw.timestamp === 'number' ? raw.timestamp : Date.now() / 1000
+
+  return {
+    id: String(raw.id ?? crypto.randomUUID()),
+    role,
+    type: 'text',
+    content,
+    timestamp: new Date(timestampSeconds * 1000)
+  }
+}
+
+const loadConversationHistory = async () => {
+  if (!sessionId.value || historyLoaded.value || isLoadingHistory.value) {
+    return
+  }
+
+  isLoadingHistory.value = true
+
+  try {
+    const baseUrl = resolveApiUrl()
+    const params = new URLSearchParams({ sessionId: sessionId.value })
+    const response = await fetch(`${baseUrl}/api/v1/widget/${props.widgetId}/history?${params.toString()}`)
+
+    if (!response.ok) {
+      throw new Error(`History request failed with status ${response.status}`)
+    }
+
+    const data = await response.json()
+    if (data.success) {
+      if (data.chatId) {
+        chatId.value = data.chatId
+      }
+
+      const loadedMessages = Array.isArray(data.messages)
+        ? data.messages.map((msg: any) => normalizeServerMessage(msg))
+        : []
+
+      if (loadedMessages.length > 0) {
+        messages.value = loadedMessages
+      }
+
+      if (data.session && typeof data.session.messageCount === 'number') {
+        messageCount.value = data.session.messageCount
+      } else if (loadedMessages.length > 0) {
+        messageCount.value = loadedMessages.filter((m: Message) => m.role === 'user').length
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load widget history:', error)
+  } finally {
+    historyLoaded.value = true
+    isLoadingHistory.value = false
+    if (isOpen.value) {
+      ensureAutoMessage()
+    }
+  }
+}
+
 // Load session ID from localStorage on mount
 onMounted(() => {
-  const storageKey = `synaplan_widget_session_${props.widgetId}`
-  const storedSessionId = localStorage.getItem(storageKey)
-  if (storedSessionId) {
-    sessionId.value = storedSessionId
-  } else {
-    // Generate new session ID
-    sessionId.value = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem(storageKey, sessionId.value)
+  window.addEventListener('synaplan-widget-open', handleOpenEvent)
+  window.addEventListener('synaplan-widget-close', handleCloseEvent)
+  window.addEventListener('synaplan-widget-new-chat', handleNewChatEvent)
+
+  const storageKey = getSessionStorageKey()
+  let currentSessionId = localStorage.getItem(storageKey)
+  if (!currentSessionId) {
+    currentSessionId = createSessionId()
+    localStorage.setItem(storageKey, currentSessionId)
   }
-  
-  // Load chatId if exists
-  const chatIdKey = `synaplan_widget_chatid_${props.widgetId}`
-  const storedChatId = localStorage.getItem(chatIdKey)
+  sessionId.value = currentSessionId
+
+  const sessionAwareKey = getChatStorageKeyForSession(currentSessionId)
+  const legacyKey = `synaplan_widget_chatid_${props.widgetId}`
+  const storedChatId = localStorage.getItem(sessionAwareKey) ?? localStorage.getItem(legacyKey)
   if (storedChatId) {
     chatId.value = parseInt(storedChatId, 10)
+    if (!localStorage.getItem(sessionAwareKey)) {
+      localStorage.setItem(sessionAwareKey, storedChatId)
+    }
+    if (localStorage.getItem(legacyKey)) {
+      localStorage.removeItem(legacyKey)
+    }
   }
+
+  loadConversationHistory()
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('synaplan-widget-open', handleOpenEvent)
+  window.removeEventListener('synaplan-widget-close', handleCloseEvent)
+  window.removeEventListener('synaplan-widget-new-chat', handleNewChatEvent)
+})
+
+const getChatStorageKey = () => {
+  if (!sessionId.value) return null
+  return getChatStorageKeyForSession(sessionId.value)
+}
 
 // Save chatId to localStorage when it changes
 watch(chatId, (newChatId) => {
-  if (newChatId) {
-    const chatIdKey = `synaplan_widget_chatid_${props.widgetId}`
-    localStorage.setItem(chatIdKey, newChatId.toString())
+  if (!newChatId) return
+  const key = getChatStorageKey()
+  if (key) {
+    localStorage.setItem(key, newChatId.toString())
   }
 })
 
 // Auto-open
 if (props.autoOpen) {
   setTimeout(() => {
-    toggleChat()
+    openChat()
   }, 3000)
 }
 

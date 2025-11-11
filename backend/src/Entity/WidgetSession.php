@@ -29,6 +29,9 @@ class WidgetSession
     #[ORM\Column(name: 'BLASTMESSAGE', type: 'bigint')]
     private int $lastMessage = 0;
 
+    #[ORM\Column(name: 'BCHATID', type: 'bigint', nullable: true)]
+    private ?int $chatId = null;
+
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
     private int $created;
 
@@ -100,6 +103,17 @@ class WidgetSession
     public function updateLastMessage(): self
     {
         return $this->setLastMessage(time());
+    }
+
+    public function getChatId(): ?int
+    {
+        return $this->chatId;
+    }
+
+    public function setChatId(?int $chatId): self
+    {
+        $this->chatId = $chatId;
+        return $this;
     }
 
     public function getCreated(): int

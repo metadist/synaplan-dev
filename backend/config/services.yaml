@@ -141,9 +141,9 @@ services:
     # reCAPTCHA Service
     App\Service\RecaptchaService:
         arguments:
-            $secretKey: '%env(default::RECAPTCHA_SECRET_KEY)%'
-            $enabled: '%env(default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
-            $minScore: '%env(default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
+            $secretKey: '%env(string:default::RECAPTCHA_SECRET_KEY)%'
+            $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
+            $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
 
     # Again Service (for model suggestions)
     App\Service\AgainService: ~

@@ -10,6 +10,17 @@ export interface Chat {
   updatedAt: string
   messageCount?: number
   isShared?: boolean
+  widgetSession?: WidgetSessionInfo | null
+}
+
+export interface WidgetSessionInfo {
+  widgetId: string
+  widgetName: string | null
+  sessionId: string
+  messageCount: number
+  lastMessage: number | null
+  created: number
+  expires: number
 }
 
 export const useChatsStore = defineStore('chats', () => {
@@ -17,6 +28,11 @@ export const useChatsStore = defineStore('chats', () => {
   const activeChatId = ref<number | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  const normalizeChat = (chat: any): Chat => ({
+    ...chat,
+    widgetSession: chat.widgetSession ?? null
+  } as Chat)
 
   const activeChat = computed(() => {
     return chats.value.find(c => c.id === activeChatId.value) || null
@@ -44,7 +60,7 @@ export const useChatsStore = defineStore('chats', () => {
       }
 
       const data = await response.json()
-      chats.value = data.chats || []
+      chats.value = (data.chats || []).map((chat: any) => normalizeChat(chat))
       
       // Auto-select first chat if none selected
       if (chats.value.length > 0 && !activeChatId.value) {
@@ -82,7 +98,7 @@ export const useChatsStore = defineStore('chats', () => {
       }
 
       const data = await response.json()
-      const newChat = data.chat
+      const newChat = normalizeChat(data.chat)
       
       chats.value.unshift(newChat)
       activeChatId.value = newChat.id

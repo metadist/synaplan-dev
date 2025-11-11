@@ -78,6 +78,8 @@ class MessageProcessor
             $sortingModelName = null;
             $conversationHistory = [];
             
+            $promptMetadata = [];
+
             if ($hasFixedPrompt) {
                 // Widget Mode: Use fixed task prompt, no classification needed
                 $this->logger->info('MessageProcessor: Using fixed task prompt (Widget mode)', [
@@ -351,8 +353,22 @@ class MessageProcessor
      * @param callable|null $statusCallback Callback for status updates
      * @return array Processing result
      */
-    public function process(Message $message, ?callable $statusCallback = null): array
+    /**
+     * Process a message with status callbacks
+     * 
+     * @param Message $message The message to process
+     * @param array $options Processing options (e.g., fixed_task_prompt, model_id)
+     * @param callable|null $statusCallback Callback for status updates
+     * @return array Processing result
+     */
+    public function process(Message $message, array $options = [], ?callable $statusCallback = null): array
     {
+        // Backward compatibility: allow passing callback as 2nd argument
+        if (is_callable($options) && $statusCallback === null) {
+            $statusCallback = $options;
+            $options = [];
+        }
+
         $this->notify($statusCallback, 'started', 'Message processing started');
 
         try {
@@ -367,20 +383,27 @@ class MessageProcessor
             }
 
             // Step 2: Classification (Sorting)
-            // Get sorting model info to display during classification
-            $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+            $sortingModelId = null;
             $sortingProvider = null;
             $sortingModelName = null;
-            if ($sortingModelId) {
-                $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
+            $isAgainRequest = isset($options['model_id']) && $options['model_id'];
+            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
+            $languageOverride = $options['language'] ?? null;
+
+            if (!$hasFixedPrompt && !$isAgainRequest) {
+                // Get sorting model info to display during classification
+                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+                if ($sortingModelId) {
+                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
+                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
+                }
+                
+                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
+                    'model_id' => $sortingModelId,
+                    'provider' => $sortingProvider,
+                    'model_name' => $sortingModelName
+                ]);
             }
-            
-            $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                'model_id' => $sortingModelId,
-                'provider' => $sortingProvider,
-                'model_name' => $sortingModelName
-            ]);
             
             // Get conversation history for context - NON-STREAMING VERSION
             // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
@@ -408,21 +431,156 @@ class MessageProcessor
                 ]);
             }
 
-            $classification = $this->classifier->classify($message, $conversationHistory);
-            
-            $this->notify($statusCallback, 'classified', sprintf(
-                'Topic: %s, Language: %s, Source: %s',
-                $classification['topic'],
-                $classification['language'],
-                $classification['source']
-            ), [
-                'topic' => $classification['topic'],
-                'language' => $classification['language'],
-                'source' => $classification['source'],
-                'model_id' => $classification['model_id'] ?? null,
-                'provider' => $classification['provider'] ?? null,
-                'model_name' => $classification['model_name'] ?? null
-            ]);
+            if ($hasFixedPrompt) {
+                $this->logger->info('MessageProcessor: Using fixed task prompt (Widget mode)', [
+                    'task_prompt' => $options['fixed_task_prompt']
+                ]);
+
+                $classification = [
+                    'topic' => $options['fixed_task_prompt'],
+                    'language' => $languageOverride ?? 'en',
+                    'source' => 'widget',
+                    'intent' => 'chat',
+                ];
+
+                $this->notify($statusCallback, 'classified', 'Using widget task prompt (skipped classification)', [
+                    'topic' => $classification['topic'],
+                    'language' => $classification['language'],
+                    'source' => $classification['source'],
+                ]);
+            } elseif ($isAgainRequest) {
+                $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
+                    'specified_model_id' => $options['model_id']
+                ]);
+
+                $classification = [
+                    'topic' => 'chat',
+                    'language' => $languageOverride ?? 'en',
+                    'source' => 'chat',
+                    'model_id' => $options['model_id'],
+                    'intent' => 'chat',
+                ];
+
+                $this->notify($statusCallback, 'classified', 'Using previously selected model (skipped classification)', [
+                    'topic' => $classification['topic'],
+                    'language' => $classification['language'],
+                    'source' => $classification['source'],
+                    'model_id' => $classification['model_id'],
+                ]);
+            } else {
+                $classification = $this->classifier->classify($message, $conversationHistory);
+                
+                $this->notify($statusCallback, 'classified', sprintf(
+                    'Topic: %s, Language: %s, Source: %s',
+                    $classification['topic'],
+                    $classification['language'],
+                    $classification['source']
+                ), [
+                    'topic' => $classification['topic'],
+                    'language' => $classification['language'],
+                    'source' => $classification['source'],
+                    'model_id' => $classification['model_id'] ?? null,
+                    'provider' => $classification['provider'] ?? null,
+                    'model_name' => $classification['model_name'] ?? null
+                ]);
+            }
+
+            if (isset($classification['prompt_metadata']) && is_array($classification['prompt_metadata'])) {
+                $promptMetadata = $classification['prompt_metadata'];
+            }
+
+            if (empty($promptMetadata) && !empty($classification['topic'])) {
+                $promptData = $this->promptService->getPromptWithMetadata($classification['topic'], $message->getUserId());
+                if ($promptData) {
+                    $promptMetadata = $promptData['metadata'] ?? [];
+                    $classification['prompt_metadata'] = $promptMetadata;
+                }
+            }
+
+            if (!empty($promptMetadata)) {
+                $options['prompt_metadata'] = $promptMetadata;
+            }
+
+            $searchResults = null;
+            $shouldSearch = isset($options['force_web_search']) ? (bool) $options['force_web_search'] : false;
+
+            if (!$shouldSearch && ($promptMetadata['tool_internet'] ?? false)) {
+                $this->logger->info('MessageProcessor: Prompt metadata requests internet search', [
+                    'topic' => $classification['topic'] ?? 'unknown'
+                ]);
+                $shouldSearch = true;
+            }
+
+            if (!$shouldSearch && isset($classification['web_search'])) {
+                $shouldSearch = (bool) $classification['web_search'];
+
+                if ($shouldSearch) {
+                    $this->logger->info('🤖 AI Classifier activated web search automatically', [
+                        'message_id' => $message->getId(),
+                        'classification' => $classification
+                    ]);
+                }
+            }
+
+            if (!$shouldSearch && isset($classification['source'])) {
+                $source = $classification['source'];
+                $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
+            }
+
+            if ($shouldSearch && $this->braveSearchService->isEnabled()) {
+                $this->notify($statusCallback, 'searching', 'Searching the web...');
+
+                try {
+                    $searchQuery = $this->searchQueryGenerator->generate(
+                        $message->getText(),
+                        $message->getUserId()
+                    );
+
+                    $language = $classification['language'] ?? 'en';
+                    $country = strtolower($language);
+
+                    $this->logger->info('🔍 Performing web search', [
+                        'original_question' => $message->getText(),
+                        'optimized_query' => $searchQuery,
+                        'language' => $language,
+                        'country' => $country,
+                        'message_id' => $message->getId()
+                    ]);
+
+                    $searchResults = $this->braveSearchService->search($searchQuery, [
+                        'country' => $country,
+                        'search_lang' => $language
+                    ]);
+
+                    if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
+                        $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
+
+                        $this->notify($statusCallback, 'search_complete', sprintf(
+                            'Found %d web results',
+                            count($searchResults['results'])
+                        ), [
+                            'results_count' => count($searchResults['results'])
+                        ]);
+                    } else {
+                        $this->logger->warning('No search results found or repository not available', [
+                            'query' => $searchQuery,
+                            'has_repository' => $this->searchResultRepository !== null
+                        ]);
+                        $searchResults = null;
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->error('Web search failed', [
+                        'error' => $e->getMessage(),
+                        'message_id' => $message->getId()
+                    ]);
+
+                    $this->notify($statusCallback, 'search_failed', 'Web search failed, continuing without results');
+                }
+            }
+
+            if ($searchResults) {
+                $classification['search_results'] = $searchResults;
+            }
 
             // Step 3: Inference (AI Response)
             // Get chat model info to display during generation
@@ -447,11 +605,16 @@ class MessageProcessor
                 'model' => $response['metadata']['model'] ?? 'unknown',
             ]);
 
+            if (isset($classification['search_results'])) {
+                unset($classification['search_results']);
+            }
+
             return [
                 'success' => true,
                 'response' => $response,
                 'classification' => $classification,
-                'preprocessing' => $preprocessed
+                'preprocessing' => $preprocessed,
+                'search_results' => $searchResults
             ];
 
         } catch (\App\AI\Exception\ProviderException $e) {

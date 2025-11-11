@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\WidgetSession;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\DBAL\ArrayParameterType;
 
 /**
  * @extends ServiceEntityRepository<WidgetSession>
@@ -84,6 +85,41 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->setParameter('widgetId', $widgetId)
             ->getQuery()
             ->getSingleScalarResult() ?? 0;
+    }
+
+    /**
+     * Fetch widget sessions mapped to the provided chat IDs.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function findSessionsByChatIds(array $chatIds): array
+    {
+        if (empty($chatIds)) {
+            return [];
+        }
+
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT 
+                ws.BCHATID AS chat_id,
+                ws.BWIDGETID AS widget_id,
+                ws.BSESSIONID AS session_id,
+                ws.BMESSAGECOUNT AS message_count,
+                ws.BLASTMESSAGE AS last_message,
+                ws.BCREATED AS created,
+                ws.BEXPIRES AS expires,
+                w.BNAME AS widget_name
+            FROM BWIDGET_SESSIONS ws
+            LEFT JOIN BWIDGETS w ON w.BWIDGETID = ws.BWIDGETID
+            WHERE ws.BCHATID IN (:chat_ids)
+        ';
+
+        return $conn->executeQuery(
+            $sql,
+            ['chat_ids' => $chatIds],
+            ['chat_ids' => ArrayParameterType::INTEGER]
+        )->fetchAllAssociative();
     }
 }
 

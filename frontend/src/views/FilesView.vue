@@ -290,14 +290,14 @@
                       />
                       <button
                         @click="saveGroupKey(file.id)"
-                        class="p-1 rounded hover:bg-green-500/10 text-green-600"
+                        class="p-1 rounded hover:bg-green-500/10 text-green-600 dark:text-green-400"
                         title="Save"
                       >
                         <Icon icon="heroicons:check" class="w-4 h-4" />
                       </button>
                       <button
                         @click="cancelEditGroupKey"
-                        class="p-1 rounded hover:bg-red-500/10 text-red-500"
+                        class="p-1 rounded hover:bg-red-500/10 text-red-500 dark:text-red-400"
                         title="Cancel"
                       >
                         <Icon icon="heroicons:x-mark" class="w-4 h-4" />

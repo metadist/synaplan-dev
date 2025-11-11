@@ -53,39 +53,46 @@ echo "✅ Database schema ready!"
 FIXTURES_MARKER="/var/www/html/var/.fixtures_loaded"
 
 if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
-    # Check if users actually exist in database (not just marker file)
-    # If table doesn't exist, command will fail and we get 0
-    USER_COUNT=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM user" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
-    USER_COUNT=${USER_COUNT:-0}  # Default to 0 if empty
-    
-    if [ "$USER_COUNT" -eq 0 ]; then
-        echo "🌱 Loading test data (current users: $USER_COUNT)..."
-        
-        # Ensure schema is complete
-        echo "   Updating database schema..."
-        php bin/console doctrine:schema:update --force --complete || true
-        
-        # Load fixtures
-        echo "   Loading fixtures..."
-        if php bin/console doctrine:fixtures:load --no-interaction 2>&1 | tee /tmp/fixtures.log; then
-            if grep -q "loading App" /tmp/fixtures.log; then
-                touch "$FIXTURES_MARKER"
-                echo ""
-                echo "✅ Fixtures loaded successfully!"
-                echo "   👤 Admin: admin@synaplan.com / admin123"
-                echo "   👤 Demo: demo@synaplan.com / demo123"
-                echo "   👤 Test: test@example.com / test123"
-            else
-                echo "⚠️  Fixtures might have failed - check logs"
-            fi
-        else
-            echo "❌ Fixtures loading failed!"
-            echo "   Please run manually: docker compose exec backend php bin/console doctrine:fixtures:load"
-        fi
-    else
-        echo "✅ Fixtures already loaded ($USER_COUNT users)"
+    if [ -f "$FIXTURES_MARKER" ]; then
+        echo "✅ Fixtures already loaded (marker present)"
         echo "   👤 Login: admin@synaplan.com / admin123"
         echo "   💡 To reload: rm backend/var/.fixtures_loaded && docker compose restart backend"
+    else
+        # Check if users actually exist in database (not just marker file)
+        # If table doesn't exist, command will fail and we get 0
+        USER_COUNT=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
+        USER_COUNT=${USER_COUNT:-0}  # Default to 0 if empty
+        
+        if [ "$USER_COUNT" -eq 0 ]; then
+            echo "🌱 Loading test data (current users: $USER_COUNT)..."
+            
+            # Ensure schema is complete
+            echo "   Updating database schema..."
+            php bin/console doctrine:schema:update --force --complete || true
+            
+            # Load fixtures
+            echo "   Loading fixtures..."
+            if php bin/console doctrine:fixtures:load --no-interaction 2>&1 | tee /tmp/fixtures.log; then
+                if grep -q "loading App" /tmp/fixtures.log; then
+                    touch "$FIXTURES_MARKER"
+                    echo ""
+                    echo "✅ Fixtures loaded successfully!"
+                    echo "   👤 Admin: admin@synaplan.com / admin123"
+                    echo "   👤 Demo: demo@synaplan.com / demo123"
+                    echo "   👤 Test: test@example.com / test123"
+                else
+                    echo "⚠️  Fixtures might have failed - check logs"
+                fi
+            else
+                echo "❌ Fixtures loading failed!"
+                echo "   Please run manually: docker compose exec backend php bin/console doctrine:fixtures:load"
+            fi
+        else
+            touch "$FIXTURES_MARKER"
+            echo "✅ Fixtures already loaded ($USER_COUNT users)"
+            echo "   👤 Login: admin@synaplan.com / admin123"
+            echo "   💡 To reload: rm backend/var/.fixtures_loaded && docker compose restart backend"
+        fi
     fi
 fi
 

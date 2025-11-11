@@ -50,6 +50,12 @@
             {{ isToolDisabled('web-search') ? getToolMessage('web-search') : $t('chatInput.tools.webSearchDesc') }}
           </div>
         </div>
+        <Transition name="check-fade">
+          <CheckIcon 
+            v-if="isToolActive('web-search')" 
+            class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
+          />
+        </Transition>
       </button>
 
       <!-- Image Generation Tool -->
@@ -86,6 +92,12 @@
             {{ isToolDisabled('image-gen') ? getToolMessage('image-gen') : $t('chatInput.tools.imageGenDesc') }}
           </div>
         </div>
+        <Transition name="check-fade">
+          <CheckIcon 
+            v-if="isToolActive('image-gen')" 
+            class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
+          />
+        </Transition>
       </button>
 
       <!-- Code Interpreter Tool -->
@@ -105,6 +117,12 @@
           <div class="text-sm font-medium">{{ $t('chatInput.tools.codeInterpreter') }}</div>
           <div class="text-xs txt-secondary">{{ $t('chatInput.tools.codeInterpreterDesc') }}</div>
         </div>
+        <Transition name="check-fade">
+          <CheckIcon 
+            v-if="isToolActive('code-interpreter')" 
+            class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
+          />
+        </Transition>
       </button>
 
       <div class="border-t border-light-border dark:border-dark-border my-1"></div>
@@ -129,7 +147,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { WrenchScrewdriverIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { commandsData as commands, type Command } from '@/stores/commands'
 import { getFeaturesStatus, type Feature } from '@/services/featuresService'
@@ -251,3 +269,23 @@ const handleClickOutside = (e: MouseEvent) => {
 onMounted(() => document.addEventListener('click', handleClickOutside))
 onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 </script>
+
+<style scoped>
+.check-fade-enter-active {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.check-fade-leave-active {
+  transition: all 0.2s ease-in;
+}
+
+.check-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.5) rotate(-90deg);
+}
+
+.check-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+</style>

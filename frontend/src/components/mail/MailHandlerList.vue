@@ -53,8 +53,8 @@
               <EnvelopeIcon
                 :class="[
                   'w-6 h-6',
-                  handler.status === 'active' ? 'text-green-500' :
-                  handler.status === 'error' ? 'text-red-500' :
+                  handler.status === 'active' ? 'text-green-500 dark:text-green-400' :
+                  handler.status === 'error' ? 'text-red-500 dark:text-red-400' :
                   'txt-secondary'
                 ]"
               />
@@ -68,7 +68,7 @@
           </div>
           <button
             @click.stop="$emit('delete', handler.id)"
-            class="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-500 transition-all"
+            class="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-500 dark:text-red-400 transition-all"
             :aria-label="$t('mail.deleteHandler')"
           >
             <TrashIcon class="w-4 h-4" />
@@ -94,17 +94,17 @@
           <div
             :class="[
               'flex items-center gap-1.5 text-xs font-medium',
-              handler.status === 'active' ? 'text-green-500' :
-              handler.status === 'error' ? 'text-red-500' :
+              handler.status === 'active' ? 'text-green-500 dark:text-green-400' :
+              handler.status === 'error' ? 'text-red-500 dark:text-red-400' :
               'txt-secondary'
             ]"
           >
             <div
               :class="[
                 'w-2 h-2 rounded-full',
-                handler.status === 'active' ? 'bg-green-500' :
-                handler.status === 'error' ? 'bg-red-500' :
-                'bg-gray-500'
+                handler.status === 'active' ? 'bg-green-500 dark:bg-green-400' :
+                handler.status === 'error' ? 'bg-red-500 dark:bg-red-400' :
+                'bg-gray-500 dark:bg-gray-400'
               ]"
             ></div>
             {{ $t(`mail.status.${handler.status}`) }}

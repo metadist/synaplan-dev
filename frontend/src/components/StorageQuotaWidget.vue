@@ -44,8 +44,8 @@
     </div>
 
     <!-- Warning/Upgrade Message -->
-    <div v-if="percentage > 80" class="mt-3 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
-      <p class="text-xs txt-orange">
+    <div v-if="percentage > 80" class="mt-3 p-2 rounded-lg bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/30 dark:border-orange-500/40">
+      <p class="text-xs text-orange-600 dark:text-orange-400">
         <Icon icon="mdi:alert" class="inline w-4 h-4 mr-1" />
         {{ percentage >= 100 
           ? $t('storage.limitReached') 
@@ -100,9 +100,9 @@ const storageIcon = computed(() => {
 })
 
 const storageIconColor = computed(() => {
-  if (percentage.value >= 100) return 'text-red-500'
-  if (percentage.value >= 80) return 'text-orange-500'
-  return 'text-green-500'
+  if (percentage.value >= 100) return 'text-red-500 dark:text-red-400'
+  if (percentage.value >= 80) return 'text-orange-500 dark:text-orange-400'
+  return 'text-green-500 dark:text-green-400'
 })
 
 const progressBarColor = computed(() => {
@@ -133,9 +133,4 @@ defineExpose({
 })
 </script>
 
-<style scoped>
-.txt-orange {
-  color: #f97316;
-}
-</style>
 
