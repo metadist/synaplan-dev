@@ -323,6 +323,12 @@ class OpenAIProvider implements
         try {
             $model = $options['model'] ?? 'dall-e-3';
             
+            // GPT-Image-1 uses Chat Completions API with special modalities
+            if ($model === 'gpt-image-1') {
+                return $this->generateImageWithGptImage1($prompt, $options);
+            }
+            
+            // DALL-E models use Images API
             $requestOptions = [
                 'model' => $model,
                 'prompt' => $prompt,
@@ -366,6 +372,122 @@ class OpenAIProvider implements
 
             throw new ProviderException(
                 'OpenAI image generation error: ' . $e->getMessage(),
+                'openai'
+            );
+        }
+    }
+    
+    /**
+     * Generate image using gpt-image-1 via Image Generations API
+     * @see https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
+     */
+    private function generateImageWithGptImage1(string $prompt, array $options = []): array
+    {
+        try {
+            $this->logger->info('OpenAI: Generating image with gpt-image-1', [
+                'prompt_length' => strlen($prompt)
+            ]);
+            
+            $requestBody = [
+                'model' => 'gpt-image-1',
+                'prompt' => $prompt,
+                'n' => $options['n'] ?? 1,
+                'size' => $options['size'] ?? '1024x1024',
+            ];
+            
+            if (isset($options['quality'])) {
+                $quality = $options['quality'];
+                
+                // Map legacy values to supported ones
+                $qualityMap = [
+                    'standard' => 'medium',
+                    'hd' => 'high',
+                ];
+                if (isset($qualityMap[strtolower((string) $quality)])) {
+                    $quality = $qualityMap[strtolower((string) $quality)];
+                }
+                
+                $quality = strtolower((string) $quality);
+                $allowedQualities = ['low', 'medium', 'high', 'auto'];
+                if (!in_array($quality, $allowedQualities, true)) {
+                    $this->logger->warning('OpenAI gpt-image-1: Unsupported quality value, defaulting to high', [
+                        'provided' => $options['quality']
+                    ]);
+                    $quality = 'high';
+                }
+                
+                $requestBody['quality'] = $quality;
+            }
+            if (isset($options['background'])) {
+                $requestBody['background'] = $options['background'];
+            }
+            
+            $ch = curl_init('https://api.openai.com/v1/images/generations');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $this->apiKey,
+                ],
+                CURLOPT_POSTFIELDS => json_encode($requestBody),
+                CURLOPT_TIMEOUT => 120,
+            ]);
+            
+            $responseBody = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                throw new \Exception('cURL error: ' . $curlError);
+            }
+            
+            if ($httpCode !== 200) {
+                $this->logger->error('OpenAI gpt-image-1: HTTP error', [
+                    'http_code' => $httpCode,
+                    'response' => substr((string) $responseBody, 0, 500)
+                ]);
+                throw new \Exception('HTTP ' . $httpCode . ': ' . $responseBody);
+            }
+            
+            $response = json_decode((string) $responseBody, true);
+            if (!$response || !isset($response['data'])) {
+                throw new \Exception('Failed to parse JSON response');
+            }
+            
+            $images = [];
+            foreach ($response['data'] as $item) {
+                $base64 = $item['b64_json'] ?? null;
+                $url = $item['url'] ?? null;
+                
+                if (!$url && $base64) {
+                    $url = 'data:image/png;base64,' . $base64;
+                }
+                
+                $images[] = [
+                    'url' => $url,
+                    'b64_json' => $base64,
+                    'revised_prompt' => $item['revised_prompt'] ?? null,
+                ];
+            }
+            
+            if (empty($images)) {
+                $this->logger->error('OpenAI gpt-image-1: No images in response', [
+                    'response' => $responseBody
+                ]);
+                throw new ProviderException(
+                    'gpt-image-1 returned no images. Response format may have changed.',
+                    'openai'
+                );
+            }
+            
+            return $images;
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            throw new ProviderException(
+                'OpenAI gpt-image-1 error: ' . $e->getMessage(),
                 'openai'
             );
         }

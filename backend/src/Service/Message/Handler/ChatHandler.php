@@ -185,11 +185,15 @@ class ChatHandler implements MessageHandlerInterface
         
         if ($topic !== 'general' && !empty($message->getText())) {
             try {
+                error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic);
+                
                 // Inject VectorSearchService only when needed
                 /** @phpstan-ignore-next-line */
                 $vectorSearchService = $this->aiFacade->getContainer()->get(\App\Service\RAG\VectorSearchService::class);
                 
                 $groupKey = "TASKPROMPT:{$topic}";
+                error_log('🔍 ChatHandler: Searching RAG with groupKey: ' . $groupKey . ', query: ' . substr($message->getText(), 0, 100));
+                
                 $ragResults = $vectorSearchService->search(
                     $message->getText(),
                     $message->getUserId(),
@@ -197,6 +201,8 @@ class ChatHandler implements MessageHandlerInterface
                     limit: 3,  // Top 3 most relevant chunks
                     minScore: 0.6  // Only include if similarity > 60%
                 );
+                
+                error_log('🔍 ChatHandler: RAG search returned ' . count($ragResults) . ' results');
                 
                 if (!empty($ragResults)) {
                     $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
@@ -206,9 +212,12 @@ class ChatHandler implements MessageHandlerInterface
                             $idx + 1,
                             trim($result['chunk_text'])
                         );
+                        error_log('🔍 ChatHandler: RAG chunk ' . ($idx + 1) . ': ' . substr($result['chunk_text'], 0, 100) . '...');
                     }
                     $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
                     $ragResultsCount = count($ragResults);
+                    
+                    error_log('🔍 ChatHandler: RAG context loaded, total length: ' . strlen($ragContext));
                     
                     $this->logger->info('ChatHandler: RAG context loaded', [
                         'topic' => $topic,
@@ -217,12 +226,17 @@ class ChatHandler implements MessageHandlerInterface
                     ]);
                 }
             } catch (\Throwable $e) {
+                error_log('❌ ChatHandler: RAG context loading failed: ' . $e->getMessage());
+                error_log('❌ Stack trace: ' . $e->getTraceAsString());
+                
                 $this->logger->warning('ChatHandler: RAG context loading failed', [
                     'topic' => $topic,
                     'error' => $e->getMessage()
                 ]);
                 // Continue without RAG context
             }
+        } else {
+            error_log('🔍 ChatHandler: Skipping RAG - topic: ' . $topic . ', text empty: ' . (empty($message->getText()) ? 'yes' : 'no'));
         }
 
         // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default

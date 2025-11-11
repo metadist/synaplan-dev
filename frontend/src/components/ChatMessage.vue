@@ -313,12 +313,13 @@
           <template v-if="role === 'assistant' && topic">
             <router-link
               :to="`/config/task-prompts?topic=${topic}`"
-              class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors leading-tight cursor-pointer"
+              class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors leading-tight cursor-pointer max-w-[9rem]"
               :title="`Topic: ${topic} - Click to view prompt`"
             >
               <Icon icon="mdi:tag" class="w-2.5 h-2.5" />
-              <span class="uppercase tracking-tight">{{ topic.substring(0, 8) }}</span>
+              <span class="uppercase tracking-tight truncate">{{ topic }}</span>
             </router-link>
+            <span v-if="aiModels" class="text-txt-secondary/40 text-xs mx-0.5">·</span>
           </template>
           
           <!-- AI Model Badges (assistant only) -->
@@ -422,7 +423,7 @@
                   type="button"
                   :class="[
                     'dropdown-item',
-                    selectedModel.model === option.model && selectedModel.provider === option.provider
+                    selectedModel && selectedModel.model === option.model && selectedModel.provider === option.provider
                       ? 'dropdown-item--active'
                       : ''
                   ]"
@@ -432,6 +433,12 @@
                     <div class="text-sm font-medium">{{ option.label }}</div>
                     <div class="text-xs txt-secondary">{{ option.provider }}</div>
                   </div>
+                  <span
+                    v-if="selectedModel && selectedModel.model === option.model && selectedModel.provider === option.provider"
+                    class="ml-2 text-[10px] uppercase tracking-wide text-brand font-semibold"
+                  >
+                    Aktiv
+                  </span>
                 </button>
               </div>
             </Transition>
@@ -617,6 +624,13 @@ const hasImageContent = computed(() => props.parts.some(p => p.type === 'image')
 const hasVideoContent = computed(() => props.parts.some(p => p.type === 'video'))
 const hasAudioContent = computed(() => props.parts.some(p => p.type === 'audio'))
 
+const mediaHint = computed(() => {
+  if (hasImageContent.value) return 'image' as const
+  if (hasVideoContent.value) return 'video' as const
+  if (hasAudioContent.value) return 'audio' as const
+  return null
+})
+
 // Dynamic label for model badge based on content type
 const getModelTypeLabel = computed(() => {
   if (hasImageContent.value) return 'Image Model'
@@ -665,7 +679,8 @@ const { modelOptions, predictedModel, hasModels } = useModelSelection(
   againDataComputed, 
   filesComputed,
   currentProviderComputed,
-  currentModelNameComputed
+  currentModelNameComputed,
+  mediaHint
 )
 
 // Selected model: use predicted or first available
@@ -694,12 +709,17 @@ const showModelDetails = (modelType?: 'chat' | 'sorting') => {
 }
 
 const handleAgain = () => {
-  if (props.backendMessageId && (selectedModel.value as any)?.id) {
+  const model = selectedModel.value
+  if (!model) {
+    return
+  }
+
+  if (props.backendMessageId && (model as any).id) {
     // New backend-driven again
-    emit('again', props.backendMessageId, (selectedModel.value as any).id)
+    emit('again', props.backendMessageId, (model as any).id)
   } else {
     // Fallback to old regenerate
-    emit('regenerate', selectedModel.value as any)
+    emit('regenerate', model as any)
   }
 }
 

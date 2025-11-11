@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgainData } from '@/types/ai-models'
 
-export type PartType = 'text' | 'image' | 'video' | 'code' | 'links' | 'docs' | 'screenshot' | 'translation' | 'link' | 'commandList' | 'thinking'
+export type PartType = 'text' | 'image' | 'video' | 'audio' | 'code' | 'links' | 'docs' | 'screenshot' | 'translation' | 'link' | 'commandList' | 'thinking'
 
 export interface Part {
   type: PartType
