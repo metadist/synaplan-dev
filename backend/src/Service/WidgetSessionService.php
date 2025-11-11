@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\WidgetSession;
 use App\Repository\WidgetSessionRepository;
+use App\Entity\Chat;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -18,6 +19,9 @@ class WidgetSessionService
     const DEFAULT_MAX_MESSAGES = 50;         // Total messages per session
     const DEFAULT_MAX_PER_MINUTE = 10;       // Messages per minute
     const SESSION_EXPIRY_HOURS = 24;         // Session expires after 24h of inactivity
+
+    private int $maxMessages = self::DEFAULT_MAX_MESSAGES;
+    private int $maxPerMinute = self::DEFAULT_MAX_PER_MINUTE;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -63,18 +67,14 @@ class WidgetSessionService
      */
     public function checkSessionLimit(WidgetSession $session): array
     {
-        // Use default limits
-        $maxMessages = self::DEFAULT_MAX_MESSAGES;
-        $maxPerMinute = self::DEFAULT_MAX_PER_MINUTE;
-
         // Check total message limit
-        if ($session->getMessageCount() >= $maxMessages) {
+        if ($session->getMessageCount() >= $this->maxMessages) {
             return [
                 'allowed' => false,
                 'reason' => 'total_limit_reached',
                 'remaining' => 0,
                 'retry_after' => null,
-                'max_messages' => $maxMessages
+                'max_messages' => $this->maxMessages
             ];
         }
 
@@ -83,7 +83,7 @@ class WidgetSessionService
         if ($session->getLastMessage() >= $lastMinute) {
             $messagesInLastMinute = $this->getMessagesInLastMinute($session);
             
-            if ($messagesInLastMinute >= $maxPerMinute) {
+            if ($messagesInLastMinute >= $this->maxPerMinute) {
                 $retryAfter = 60 - (time() - $session->getLastMessage());
                 
                 return [
@@ -91,19 +91,19 @@ class WidgetSessionService
                     'reason' => 'rate_limit_exceeded',
                     'remaining' => 0,
                     'retry_after' => $retryAfter,
-                    'max_per_minute' => $maxPerMinute
+                    'max_per_minute' => $this->maxPerMinute
                 ];
             }
         }
 
-        $remaining = $maxMessages - $session->getMessageCount();
+        $remaining = $this->maxMessages - $session->getMessageCount();
 
         return [
             'allowed' => true,
             'reason' => null,
             'remaining' => $remaining,
             'retry_after' => null,
-            'max_messages' => $maxMessages
+            'max_messages' => $this->maxMessages
         ];
     }
 
@@ -115,6 +115,52 @@ class WidgetSessionService
         $session->incrementMessageCount();
         $session->updateLastMessage();
         $this->em->flush();
+    }
+
+    /**
+     * Fetch an existing session without modifying it.
+     */
+    public function getSession(string $widgetId, string $sessionId): ?WidgetSession
+    {
+        return $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+    }
+
+    /**
+     * Attach a chat to the session if not already linked.
+     */
+    public function attachChat(WidgetSession $session, Chat $chat): void
+    {
+        if ($session->getChatId() !== $chat->getId()) {
+            $session->setChatId($chat->getId());
+            $this->em->flush();
+        }
+    }
+
+    /**
+     * Map chat IDs to widget session metadata.
+     *
+     * @param array<int> $chatIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function getSessionMapForChats(array $chatIds): array
+    {
+        $rows = $this->sessionRepository->findSessionsByChatIds($chatIds);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $chatId = (int) $row['chat_id'];
+            $map[$chatId] = [
+                'widgetId' => $row['widget_id'],
+                'widgetName' => $row['widget_name'] ?? null,
+                'sessionId' => $row['session_id'],
+                'messageCount' => (int) $row['message_count'],
+                'lastMessage' => $row['last_message'] !== null ? (int) $row['last_message'] : null,
+                'created' => (int) $row['created'],
+                'expires' => (int) $row['expires']
+            ];
+        }
+
+        return $map;
     }
 
     /**

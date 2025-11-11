@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -25,6 +26,7 @@ class ChatController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
+        private WidgetSessionService $widgetSessionService,
         private LoggerInterface $logger
     ) {}
 
@@ -67,15 +69,18 @@ class ChatController extends AbstractController
         }
 
         $chats = $this->chatRepository->findByUser($user->getId());
+        $chatIds = array_map(static fn (Chat $chat) => $chat->getId(), $chats);
+        $sessionMap = $this->widgetSessionService->getSessionMapForChats($chatIds);
 
-        $result = array_map(function (Chat $chat) {
+        $result = array_map(function (Chat $chat) use ($sessionMap) {
             return [
                 'id' => $chat->getId(),
                 'title' => $chat->getTitle() ?? 'New Chat',
                 'createdAt' => $chat->getCreatedAt()->format('c'),
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
-                'messageCount' => $chat->getMessages()->count(),
+                'messageCount' => $sessionMap[$chat->getId()]['messageCount'] ?? $chat->getMessages()->count(),
                 'isShared' => $chat->isPublic(),
+                'widgetSession' => $sessionMap[$chat->getId()] ?? null,
             ];
         }, $chats);
 
@@ -203,6 +208,8 @@ class ChatController extends AbstractController
             return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $sessionInfo = $this->widgetSessionService->getSessionMapForChats([$chat->getId()]);
+
         return $this->json([
             'success' => true,
             'chat' => [
@@ -212,6 +219,7 @@ class ChatController extends AbstractController
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
                 'isShared' => $chat->isPublic(),
                 'shareToken' => $chat->getShareToken(),
+                'widgetSession' => $sessionInfo[$chat->getId()] ?? null,
             ]
         ]);
     }

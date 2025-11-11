@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
           '@': fileURLToPath(new URL('./src', import.meta.url))
         }
       },
+      define: {
+        'process.env.NODE_ENV': JSON.stringify('production')
+      },
       build: {
         lib: {
           entry: resolve(__dirname, 'src/widget.ts'),
@@ -22,6 +25,7 @@ export default defineConfig(({ mode }) => {
         },
         rollupOptions: {
           output: {
+            entryFileNames: 'widget.js',
             // Inline all CSS into JS for single-file widget
             inlineDynamicImports: true,
             assetFileNames: (assetInfo) => {

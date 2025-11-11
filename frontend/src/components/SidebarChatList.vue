@@ -157,8 +157,8 @@ const showAllMy = ref(false)
 const showAllWidget = ref(false)
 
 // Helper to format dates
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
+const formatDate = (value: string | number): string => {
+  const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value)
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
@@ -171,7 +171,9 @@ const formatDate = (dateString: string): string => {
 
 // Map API chats to sidebar format
 const myChats = computed(() => {
-  const apiChats = chatsStore.chats.map(c => ({
+  const apiChats = chatsStore.chats
+    .filter(c => !c.widgetSession)
+    .map(c => ({
     id: String(c.id),
     title: c.title,
     timestamp: formatDate(c.updatedAt),
@@ -187,8 +189,31 @@ const myArchivedChats = computed((): Chat[] => {
 })
 
 const widgetChats = computed((): Chat[] => {
-  // Widget chats not implemented yet
-  return []
+  const sessionChatsRaw = chatsStore.chats
+    .filter(c => c.widgetSession)
+    .map(c => {
+      const session = c.widgetSession!
+      const shortId = session.sessionId.slice(-6)
+      const title = `${session.widgetName ?? 'Widget'} • ${shortId}`
+      const lastTimestamp = session.lastMessage ?? Math.floor(new Date(c.updatedAt).getTime() / 1000)
+      const timestampLabel = `${session.messageCount} msg · ${formatDate(lastTimestamp)}`
+
+      return {
+        metaTimestamp: lastTimestamp,
+        item: {
+          id: String(c.id),
+          title,
+          timestamp: timestampLabel,
+          type: 'widget' as const,
+          archived: false
+        }
+      }
+    })
+    .sort((a, b) => b.metaTimestamp - a.metaTimestamp)
+
+  const sessionChats = sessionChatsRaw.map(entry => entry.item)
+
+  return showAllWidget.value ? sessionChats : sessionChats.slice(0, 5)
 })
 
 const widgetArchivedChats = computed((): Chat[] => {

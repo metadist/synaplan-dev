@@ -159,8 +159,31 @@ HTML;
             return false;
         }
 
-        // For now, just return the widget's active status
-        // TODO: Implement owner rate limit checking when needed
+        $owner = $widget->getOwner();
+        if (!$owner) {
+            $owner = $this->em->find(User::class, $widget->getOwnerId());
+        }
+
+        if (!$owner instanceof User) {
+            $this->logger->warning('Widget owner not found', [
+                'widget_id' => $widget->getWidgetId(),
+                'owner_id' => $widget->getOwnerId()
+            ]);
+            return false;
+        }
+
+        // Check owner's usage limits for messages
+        $limitCheck = $this->rateLimitService->checkLimit($owner, 'MESSAGES');
+
+        if (!($limitCheck['allowed'] ?? true)) {
+            $this->logger->warning('Widget owner rate limit exceeded', [
+                'widget_id' => $widget->getWidgetId(),
+                'owner_id' => $owner->getId(),
+                'remaining' => $limitCheck['remaining'] ?? 0
+            ]);
+            return false;
+        }
+
         return true;
     }
 

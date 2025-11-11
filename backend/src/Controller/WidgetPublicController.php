@@ -9,13 +9,13 @@ use App\Service\WidgetSessionService;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Repository\ChatRepository;
+use App\Repository\MessageRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Psr\Log\LoggerInterface;
 
@@ -34,6 +34,7 @@ class WidgetPublicController extends AbstractController
         private MessageProcessor $messageProcessor,
         private RateLimitService $rateLimitService,
         private ChatRepository $chatRepository,
+        private MessageRepository $messageRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger
     ) {}
@@ -97,7 +98,7 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Send message to widget (SSE Streaming)
+     * Send message to widget (synchronous response)
      * 
      * PUBLIC endpoint - no authentication required, session-based rate limiting
      */
@@ -119,7 +120,7 @@ class WidgetPublicController extends AbstractController
             ]
         )
     )]
-    public function message(string $widgetId, Request $request): StreamedResponse|JsonResponse
+    public function message(string $widgetId, Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
         
@@ -183,21 +184,42 @@ class WidgetPublicController extends AbstractController
         }
 
         try {
-            // Get or create chat for this widget session
-            $chatId = $data['chatId'] ?? null;
-            if ($chatId) {
-                $chat = $this->chatRepository->find($chatId);
+            // Resolve chat for this session
+            $sessionChatId = $session->getChatId();
+            $chat = null;
+
+            if ($sessionChatId) {
+                $chat = $this->chatRepository->find($sessionChatId);
+                if (!$chat || $chat->getUserId() !== $owner->getId()) {
+                    $chat = null;
+                }
+            }
+
+            if (!$chat && !empty($data['chatId'])) {
+                $chat = $this->chatRepository->find((int) $data['chatId']);
                 if (!$chat || $chat->getUserId() !== $owner->getId()) {
                     $chat = null;
                 }
             }
 
             if (!$chat) {
+                $now = new \DateTimeImmutable();
                 $chat = new Chat();
                 $chat->setUserId($owner->getId());
-                $chat->setTitle('Widget: ' . $widget->getName());
-                $chat->setCreatedAt(time());
+                $sessionSuffix = substr($session->getSessionId(), -6);
+                $chat->setTitle(sprintf('Widget: %s • %s', $widget->getName(), $sessionSuffix));
+                $chat->setCreatedAt($now);
+                $chat->setUpdatedAt($now);
                 $this->em->persist($chat);
+                $this->em->flush();
+
+                $this->logger->info('Widget chat created', [
+                    'widget_id' => $widget->getWidgetId(),
+                    'chat_id' => $chat->getId(),
+                    'session_id' => $session->getSessionId()
+                ]);
+            } else {
+                $chat->updateTimestamp();
                 $this->em->flush();
             }
 
@@ -208,7 +230,7 @@ class WidgetPublicController extends AbstractController
             $incomingMessage->setText($data['text']);
             $incomingMessage->setDirection('IN');
             $incomingMessage->setStatus('processing');
-            $incomingMessage->setMessageType('WIDGET');
+            $incomingMessage->setMessageType('WDGT');
             $incomingMessage->setTrackingId(time());
             $incomingMessage->setUnixTimestamp(time());
             $incomingMessage->setDateTime(date('YmdHis'));
@@ -219,71 +241,93 @@ class WidgetPublicController extends AbstractController
 
             // Increment session message count
             $this->sessionService->incrementMessageCount($session);
+            $this->sessionService->attachChat($session, $chat);
 
-            // Stream response using MessageProcessor
-            // WICHTIG: skipSorting = true, direkt zum Task Prompt!
-            $response = new StreamedResponse();
-            $response->headers->set('Content-Type', 'text/event-stream');
-            $response->headers->set('Cache-Control', 'no-cache');
-            $response->headers->set('X-Accel-Buffering', 'no');
+            \set_time_limit(0);
 
-            $response->setCallback(function () use ($incomingMessage, $widget, $chat) {
-                $responseText = '';
-                $chunkCount = 0;
+            $result = $this->messageProcessor->process(
+                $incomingMessage,
+                [
+                    'fixed_task_prompt' => $widget->getTaskPromptTopic(),  // Direkt zum Task Prompt!
+                    'skipSorting' => true,                                  // KEIN AI-Sorting!
+                    'channel' => 'WIDGET',
+                    'language' => 'en'
+                ]
+            );
 
-                try {
-                    $result = $this->messageProcessor->processStream(
-                        $incomingMessage,
-                        function ($chunk) use (&$responseText, &$chunkCount) {
-                            if (is_array($chunk)) {
-                                $content = $chunk['content'] ?? '';
-                            } else {
-                                $content = $chunk;
-                            }
+            if (!($result['success'] ?? false)) {
+                $errorMessage = $result['error'] ?? 'Processing failed';
+                $this->logger->error('Widget message processing returned error', [
+                    'error' => $errorMessage,
+                    'widget_id' => $widget->getWidgetId(),
+                ]);
 
-                            $responseText .= $content;
+                return $this->json([
+                    'error' => $errorMessage,
+                    'details' => $result,
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
 
-                            if (!empty($content)) {
-                                echo "event: data\n";
-                                echo 'data: ' . json_encode(['chunk' => $content]) . "\n\n";
-                                ob_flush();
-                                flush();
-                            }
+            $responseData = $result['response'] ?? [];
+            $responseText = '';
+            $responseMetadata = [];
 
-                            $chunkCount++;
-                        },
-                        [
-                            'topic' => $widget->getTaskPromptTopic(),  // Direkt zum Task Prompt!
-                            'skipSorting' => true,                     // KEIN AI-Sorting!
-                            'channel' => 'WIDGET',
-                            'language' => 'en'
-                        ]
-                    );
+            if (is_array($responseData)) {
+                $responseText = $responseData['content'] ?? '';
+                $responseMetadata = $responseData['metadata'] ?? [];
+            } elseif (is_string($responseData)) {
+                $responseText = $responseData;
+            } else {
+                $responseText = (string) $responseData;
+            }
 
-                    // Send completion event
-                    echo "event: complete\n";
-                    echo 'data: ' . json_encode([
-                        'status' => 'complete',
-                        'messageId' => $incomingMessage->getId(),
-                        'chatId' => $chat->getId()
-                    ]) . "\n\n";
-                    ob_flush();
-                    flush();
+            $tokens = $responseMetadata['tokens'] ?? 0;
+            if (is_array($tokens)) {
+                $tokens = array_sum(array_map(static fn ($value) => is_numeric($value) ? (int) $value : 0, $tokens));
+            }
 
-                } catch (\Exception $e) {
-                    $this->logger->error('Widget message processing failed', [
-                        'error' => $e->getMessage(),
-                        'widget_id' => $widget->getWidgetId()
-                    ]);
+            // Persist outgoing AI message for owner visibility & history restoration
+            $outgoingMessage = new Message();
+            $outgoingMessage->setUserId($owner->getId());
+            $outgoingMessage->setChat($chat);
+            $outgoingMessage->setTrackingId($incomingMessage->getTrackingId());
+            $outgoingMessage->setProviderIndex($responseMetadata['provider'] ?? 'AI_WIDGET');
+            $outgoingMessage->setUnixTimestamp(time());
+            $outgoingMessage->setDateTime(date('YmdHis'));
+            $outgoingMessage->setMessageType('WDGT');
+            $outgoingMessage->setFile(0);
+            $outgoingMessage->setFilePath('');
+            $outgoingMessage->setFileType('');
+            $outgoingMessage->setTopic($incomingMessage->getTopic());
+            $outgoingMessage->setLanguage($incomingMessage->getLanguage());
+            $outgoingMessage->setText($responseText);
+            $outgoingMessage->setDirection('OUT');
+            $outgoingMessage->setStatus('complete');
 
-                    echo "event: error\n";
-                    echo 'data: ' . json_encode(['error' => 'Processing failed']) . "\n\n";
-                    ob_flush();
-                    flush();
-                }
-            });
+            $incomingMessage->setStatus('complete');
 
-            return $response;
+            $this->em->persist($outgoingMessage);
+            $this->em->flush();
+
+            $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
+                'provider' => $responseMetadata['provider'] ?? null,
+                'model' => $responseMetadata['model'] ?? null,
+                'tokens' => $tokens,
+                'channel' => 'WIDGET'
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'messageId' => $incomingMessage->getId(),
+                'chatId' => $chat->getId(),
+                'response' => $responseText,
+                'metadata' => [
+                    'response' => $responseMetadata,
+                    'classification' => $result['classification'] ?? null,
+                    'preprocessed' => $result['preprocessed'] ?? null,
+                    'search_results' => $result['search_results'] ?? null,
+                ],
+            ]);
 
         } catch (\Exception $e) {
             $this->logger->error('Widget message failed', [
@@ -305,6 +349,109 @@ class WidgetPublicController extends AbstractController
                 ]
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Get conversation history for a widget session.
+     *
+     * Restores chats after page reloads (PUBLIC).
+     */
+    #[Route('/{widgetId}/history', name: 'history', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/widget/{widgetId}/history',
+        summary: 'Get widget chat history for a session',
+        tags: ['Widget (Public)']
+    )]
+    public function history(string $widgetId, Request $request): JsonResponse
+    {
+        $sessionId = $request->query->getString('sessionId');
+
+        if ($sessionId === '') {
+            return $this->json([
+                'error' => 'sessionId is required'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $widget = $this->widgetService->getWidgetById($widgetId);
+        if (!$widget) {
+            return $this->json([
+                'error' => 'Widget not found'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $session = $this->sessionService->getSession($widgetId, $sessionId);
+        if (!$session) {
+            return $this->json([
+                'success' => true,
+                'chatId' => null,
+                'messages' => [],
+                'session' => [
+                    'sessionId' => $sessionId,
+                    'messageCount' => 0,
+                    'lastMessage' => null
+                ]
+            ]);
+        }
+
+        $chatId = $session->getChatId();
+        if (!$chatId) {
+            return $this->json([
+                'success' => true,
+                'chatId' => null,
+                'messages' => [],
+                'session' => [
+                    'sessionId' => $session->getSessionId(),
+                    'messageCount' => $session->getMessageCount(),
+                    'lastMessage' => $session->getLastMessage() ?: null
+                ]
+            ]);
+        }
+
+        $chat = $this->chatRepository->find($chatId);
+        if (!$chat || $chat->getUserId() !== $widget->getOwnerId()) {
+            return $this->json([
+                'success' => true,
+                'chatId' => null,
+                'messages' => [],
+                'session' => [
+                    'sessionId' => $session->getSessionId(),
+                    'messageCount' => $session->getMessageCount(),
+                    'lastMessage' => $session->getLastMessage() ?: null
+                ]
+            ]);
+        }
+
+        $messages = $this->messageRepository->findChatHistory(
+            $chat->getUserId(),
+            $chat->getId(),
+            50,
+            20000
+        );
+
+        $history = array_map(static function (Message $message) {
+            return [
+                'id' => $message->getId(),
+                'direction' => $message->getDirection(),
+                'text' => $message->getText(),
+                'timestamp' => $message->getUnixTimestamp(),
+                'messageType' => $message->getMessageType(),
+                'metadata' => [
+                    'topic' => $message->getTopic(),
+                    'language' => $message->getLanguage(),
+                ]
+            ];
+        }, $messages);
+
+        return $this->json([
+            'success' => true,
+            'chatId' => $chat->getId(),
+            'messages' => $history,
+            'session' => [
+                'sessionId' => $session->getSessionId(),
+                'messageCount' => $session->getMessageCount(),
+                'lastMessage' => $session->getLastMessage() ?: null
+            ]
+        ]);
     }
 }
 

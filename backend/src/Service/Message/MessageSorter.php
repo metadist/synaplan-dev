@@ -60,12 +60,19 @@ class MessageSorter
                     'topic' => $ruleBasedTopic,
                     'user_id' => $userId
                 ]);
-                
+
+                $promptMetadata = [];
+                $promptData = $this->promptService->getPromptWithMetadata($ruleBasedTopic, $userId);
+                if ($promptData) {
+                    $promptMetadata = $promptData['metadata'] ?? [];
+                }
+
                 return [
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
-                    'web_search' => false,
+                    'web_search' => $promptMetadata['tool_internet'] ?? false,
                     'raw_response' => 'Rule-based routing',
+                    'prompt_metadata' => $promptMetadata,
                     'model_id' => null,
                     'provider' => null,
                     'model_name' => null
@@ -187,11 +194,25 @@ class MessageSorter
                 'raw_ai_response' => $aiResponse
             ]);
 
+            $promptMetadata = [];
+            if (!empty($parsed['topic'])) {
+                $promptData = $this->promptService->getPromptWithMetadata($parsed['topic'], $userId ?? 0);
+                if ($promptData) {
+                    $promptMetadata = $promptData['metadata'] ?? [];
+                }
+            }
+
+            $webSearch = $parsed['web_search'] ?? null;
+            if ($webSearch === null && ($promptMetadata['tool_internet'] ?? false)) {
+                $webSearch = true;
+            }
+
             return [
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
-                'web_search' => $parsed['web_search'] ?? false,
+                'web_search' => $webSearch ?? false,
                 'raw_response' => $aiResponse,
+                'prompt_metadata' => $promptMetadata,
                 'model_id' => $modelId,
                 'provider' => $provider,
                 'model_name' => $modelName
