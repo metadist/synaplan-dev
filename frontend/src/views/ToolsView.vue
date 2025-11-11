@@ -25,7 +25,7 @@
               <button
                 v-if="searchQuery"
                 @click="searchQuery = ''"
-                class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center"
+                class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover-overlay-light transition-colors flex items-center justify-center"
               >
                 <XMarkIcon class="w-4 h-4 txt-secondary" />
               </button>
@@ -42,7 +42,7 @@
           >
             <button
               @click="toggleCommand(cmd.name)"
-              class="w-full px-6 py-4 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              class="w-full px-6 py-4 flex items-center justify-between hover-overlay-light transition-colors"
             >
               <div class="flex items-center gap-4">
                 <div
@@ -92,7 +92,7 @@
                     </span>
                   </div>
 
-                  <div class="p-4 bg-black/5 dark:bg-white/5 rounded-lg">
+                  <div class="p-4 bg-overlay-light rounded-lg">
                     <div class="font-mono text-sm font-medium txt-primary mb-2">
                       {{ cmd.usage }}
                     </div>

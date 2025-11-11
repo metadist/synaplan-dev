@@ -283,6 +283,13 @@
   .hover-surface:hover{ background: rgba(0,183,157,.06) !important; }
   .dark .hover-surface:hover{ background: rgba(0,240,211,.12) !important; }
 
+  /* Light overlay backgrounds */
+  .bg-overlay-light { background: rgba(0,0,0,.05); }
+  .dark .bg-overlay-light { background: rgba(255,255,255,.05); }
+
+  .hover-overlay-light:hover { background: rgba(0,0,0,.05); }
+  .dark .hover-overlay-light:hover { background: rgba(255,255,255,.05); }
+
   /* Select */
   select option { background: var(--bg-chip); color: var(--txt-primary); }
 
