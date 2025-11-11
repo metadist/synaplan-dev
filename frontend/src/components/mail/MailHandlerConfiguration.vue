@@ -265,7 +265,7 @@
             </div>
             <button
               @click="removeDepartment(dept.id)"
-              class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors"
+              class="icon-ghost icon-ghost--danger"
               :aria-label="$t('mail.removeDepartment')"
             >
               <TrashIcon class="w-4 h-4" />

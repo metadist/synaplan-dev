@@ -343,11 +343,16 @@ class MessageController extends AbstractController
             ]);
 
             // Get enhance prompt
-            $promptData = $this->promptService->getPrompt('tools:enhance', 'en', 0);
-            $systemPrompt = $promptData['BPROMPT'];
+            $promptData = $this->promptService->getPromptWithMetadata('tools:enhance', 0, 'en');
+            if (!$promptData) {
+                return $this->json([
+                    'error' => 'Enhancement prompt not found'
+                ], Response::HTTP_NOT_FOUND);
+            }
+            $systemPrompt = $promptData['prompt']->getPrompt();
             
             $this->logger->info('Enhancement prompt loaded', [
-                'prompt_id' => $promptData['BID'],
+                'prompt_id' => $promptData['prompt']->getId(),
                 'prompt_length' => strlen($systemPrompt)
             ]);
             

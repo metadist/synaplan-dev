@@ -35,7 +35,7 @@
           Rename
         </button>
         <button
-          class="dropdown-item text-red-600 dark:text-red-400"
+          class="dropdown-item dropdown-item--danger"
           @click.stop="handleAction('delete')"
         >
           Delete

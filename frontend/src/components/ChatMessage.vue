@@ -5,7 +5,16 @@
       v-if="role === 'assistant'"
       class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 surface-card"
     >
-      <Icon :icon="getProviderIcon(displayProvider)" class="w-6 h-6" />
+      <GroqIcon 
+        v-if="displayProvider.toLowerCase().includes('groq')"
+        :size="24" 
+        class-name="" 
+      />
+      <Icon 
+        v-else
+        :icon="getProviderIcon(displayProvider)" 
+        class="w-6 h-6" 
+      />
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
@@ -301,7 +310,7 @@
       <!-- Footer with separator line and responsive layout -->
       <div
         :class="[
-          'px-3 md:px-4 py-2 md:py-0 border-t md:h-[46px] flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-3',
+          'px-3 md:px-4 py-2 border-t md:min-h-[46px] flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-3',
           role === 'user'
             ? 'border-white/20'
             : 'border-light-border/30 dark:border-dark-border/20'
@@ -413,7 +422,7 @@
               <div
                 v-if="modelDropdownOpen && !isSuperseded"
                 v-click-outside="closeModelDropdown"
-                class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-80 overflow-y-auto scroll-thin"
+                class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin"
                 @keydown.escape="closeModelDropdown"
               >
                 <button
@@ -428,7 +437,16 @@
                       : ''
                   ]"
                 >
-                  <Icon :icon="getProviderIcon(option.provider)" class="w-5 h-5 flex-shrink-0" />
+                  <GroqIcon 
+                    v-if="option.provider.toLowerCase().includes('groq')"
+                    :size="20" 
+                    class-name="flex-shrink-0" 
+                  />
+                  <Icon 
+                    v-else
+                    :icon="getProviderIcon(option.provider)" 
+                    class="w-5 h-5 flex-shrink-0" 
+                  />
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium">{{ option.label }}</div>
                     <div class="text-xs txt-secondary">{{ option.provider }}</div>
@@ -466,6 +484,7 @@ import { Icon } from '@iconify/vue'
 import { useModelSelection } from '@/composables/useModelSelection'
 import { getProviderIcon } from '@/utils/providerIcons'
 import MessagePart from './MessagePart.vue'
+import GroqIcon from '@/components/icons/GroqIcon.vue'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
 

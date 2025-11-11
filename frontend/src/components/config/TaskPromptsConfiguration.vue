@@ -347,7 +347,7 @@
         <button
           @click="handleDelete"
           :disabled="loading"
-          class="px-6 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          class="btn-secondary px-6 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/30 font-medium flex items-center gap-2"
         >
           <Icon icon="heroicons:trash" class="w-5 h-5" />
           {{ $t('config.taskPrompts.deletePrompt') }}

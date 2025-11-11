@@ -4,7 +4,16 @@
       @click="isOpen = !isOpen"
       class="dropdown-trigger"
     >
-      <Icon :icon="getProviderIcon(modelsStore.selectedProvider)" class="w-4 h-4 md:w-5 md:h-5" />
+      <GroqIcon 
+        v-if="modelsStore.selectedProvider.toLowerCase().includes('groq')"
+        :size="20" 
+        class-name="flex-shrink-0" 
+      />
+      <Icon 
+        v-else
+        :icon="getProviderIcon(modelsStore.selectedProvider)" 
+        class="w-4 h-4 md:w-5 md:h-5" 
+      />
       <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ currentLabel }}</span>
       <ChevronDownIcon class="w-4 h-4" />
     </button>
@@ -26,7 +35,16 @@
             : '',
         ]"
       >
-        <Icon :icon="getProviderIcon(option.provider)" class="w-5 h-5 flex-shrink-0" />
+        <GroqIcon 
+          v-if="option.provider.toLowerCase().includes('groq')"
+          :size="20" 
+          class-name="flex-shrink-0" 
+        />
+        <Icon 
+          v-else
+          :icon="getProviderIcon(option.provider)" 
+          class="w-5 h-5 flex-shrink-0" 
+        />
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium">{{ option.label }}</div>
           <div class="text-xs txt-secondary">{{ option.provider }}</div>
@@ -42,6 +60,7 @@ import { ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelsStore } from '@/stores/models'
 import { getProviderIcon } from '@/utils/providerIcons'
+import GroqIcon from '@/components/icons/GroqIcon.vue'
 
 const modelsStore = useModelsStore()
 const isOpen = ref(false)
