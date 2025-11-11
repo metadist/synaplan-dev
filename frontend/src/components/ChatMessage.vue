@@ -310,7 +310,7 @@
       <!-- Footer with separator line and responsive layout -->
       <div
         :class="[
-          'px-3 md:px-4 py-2 md:py-0 border-t md:h-[46px] flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-3',
+          'px-3 md:px-4 py-2 border-t md:min-h-[46px] flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-3',
           role === 'user'
             ? 'border-white/20'
             : 'border-light-border/30 dark:border-dark-border/20'
