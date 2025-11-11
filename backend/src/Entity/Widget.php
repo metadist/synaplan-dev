@@ -39,6 +39,9 @@ class Widget
     #[ORM\Column(name: 'BCONFIG', type: 'json')]
     private array $config = [];
 
+    #[ORM\Column(name: 'BALLOWED_DOMAINS', type: 'json')]
+    private array $allowedDomains = [];
+
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
     private int $created;
 
@@ -50,6 +53,7 @@ class Widget
         $this->created = time();
         $this->updated = time();
         $this->widgetId = 'wdg_' . bin2hex(random_bytes(16));
+        $this->allowedDomains = [];
     }
 
     public function getId(): ?int
@@ -133,12 +137,18 @@ class Widget
 
     public function getConfig(): array
     {
+        if (!isset($this->config['allowedDomains'])) {
+            $this->config['allowedDomains'] = $this->allowedDomains;
+        }
         return $this->config;
     }
 
     public function setConfig(array $config): self
     {
         $this->config = $config;
+        if (isset($config['allowedDomains']) && is_array($config['allowedDomains'])) {
+            $this->setAllowedDomains($config['allowedDomains']);
+        }
         return $this;
     }
 
@@ -179,6 +189,44 @@ class Widget
     {
         $this->updated = time();
         return $this;
+    }
+
+    public function getAllowedDomains(): array
+    {
+        return $this->allowedDomains;
+    }
+
+    public function setAllowedDomains(array $allowedDomains): self
+    {
+        $normalized = array_values($allowedDomains);
+        $this->allowedDomains = $normalized;
+
+        if (!isset($this->config['allowedDomains']) || !is_array($this->config['allowedDomains'])) {
+            $this->config['allowedDomains'] = [];
+        }
+        $this->config['allowedDomains'] = $normalized;
+
+        $this->config = array_merge($this->config, [
+            'allowedDomains' => $normalized
+        ]);
+        return $this;
+    }
+
+    public function syncAllowedDomainsFromConfig(): void
+    {
+        if (!isset($this->config['allowedDomains']) || !is_array($this->config['allowedDomains'])) {
+            return;
+        }
+
+        $normalized = array_values(array_unique(array_map(
+            static fn ($domain) => is_string($domain) ? strtolower(trim($domain)) : null,
+            $this->config['allowedDomains']
+        )));
+
+        $normalized = array_filter($normalized, static fn ($domain) => !empty($domain));
+
+        $this->allowedDomains = $normalized;
+        $this->config['allowedDomains'] = $normalized;
     }
 }
 

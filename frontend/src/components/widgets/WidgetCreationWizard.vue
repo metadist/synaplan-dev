@@ -21,8 +21,8 @@
       </div>
 
       <!-- Progress Steps -->
-      <div class="px-3 lg:px-6 py-3 lg:py-4 border-b border-light-border/30 dark:border-dark-border/20 overflow-x-auto">
-        <div class="flex items-center justify-between max-w-3xl mx-auto min-w-max">
+      <div class="px-3 lg:px-6 py-3 lg:py-4 border-b border-light-border/30 dark:border-dark-border/20">
+        <div class="hidden sm:flex items-center justify-between max-w-3xl mx-auto w-full gap-4">
           <div
             v-for="(step, index) in steps"
             :key="index"
@@ -61,6 +61,45 @@
                 currentStep > index ? 'bg-[var(--brand)]' : 'bg-[var(--border-light)]'
               ]"
             ></div>
+          </div>
+        </div>
+
+        <div class="sm:hidden grid grid-cols-2 gap-2 mt-3">
+          <div
+            v-for="(step, index) in steps"
+            :key="`mobile-${index}`"
+            :class="[
+              'surface-chip rounded-lg p-3 flex flex-col gap-1 border transition-all',
+              currentStep > index
+                ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
+                : currentStep === index
+                ? 'border-[var(--brand)]/60 bg-[var(--brand-alpha-faint)]'
+                : 'border-light-border/30 dark:border-dark-border/20'
+            ]"
+          >
+            <div class="flex items-center gap-2">
+              <div
+                :class="[
+                  'w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold',
+                  currentStep > index
+                    ? 'bg-[var(--brand)] text-white'
+                    : currentStep === index
+                    ? 'bg-[var(--brand-alpha-light)] txt-brand'
+                    : 'surface-card txt-secondary'
+                ]"
+              >
+                <Icon v-if="currentStep > index" icon="heroicons:check" class="w-4 h-4" />
+                <span v-else>{{ index + 1 }}</span>
+              </div>
+              <span
+                :class="[
+                  'text-sm font-medium',
+                  currentStep >= index ? 'txt-primary' : 'txt-secondary'
+                ]"
+              >
+                {{ step.label }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -224,6 +263,37 @@
                 />
               </div>
 
+              <div class="surface-chip rounded-lg p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-medium txt-primary">{{ $t('widgets.allowFileUpload') }}</p>
+                    <p class="text-xs txt-secondary mt-1">{{ $t('widgets.allowFileUploadHelp') }}</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input
+                      v-model="formData.config.allowFileUpload"
+                      type="checkbox"
+                      class="sr-only peer"
+                    />
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"></div>
+                  </label>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-1">
+                    {{ $t('widgets.fileUploadLimit') }}
+                  </label>
+                  <input
+                    v-model.number="formData.config.fileUploadLimit"
+                    type="number"
+                    min="0"
+                    max="20"
+                    :disabled="!formData.config.allowFileUpload"
+                    class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <p class="text-xs txt-secondary mt-1.5">{{ $t('widgets.fileUploadLimitHelp') }}</p>
+                </div>
+              </div>
+
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium txt-primary mb-2">
@@ -262,6 +332,102 @@
               </h3>
 
               <div class="surface-chip p-4 rounded-lg space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="font-medium txt-primary">{{ $t('widgets.allowedDomainsTitle') }}</p>
+                    <p class="text-xs txt-secondary mt-1">
+                      {{ $t('widgets.allowedDomainsHelp') }}
+                    </p>
+                  </div>
+                  <Icon icon="heroicons:shield-check" class="w-8 h-8 txt-secondary opacity-60 hidden lg:block" />
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <input
+                    v-model="newAllowedDomain"
+                    type="text"
+                    :placeholder="$t('widgets.allowedDomainsPlaceholder')"
+                    class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    @keydown.enter.prevent="addAllowedDomain"
+                    autocomplete="off"
+                  />
+                  <button
+                    @click="addAllowedDomain"
+                    class="btn-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Icon icon="heroicons:plus" class="w-4 h-4" />
+                    {{ $t('widgets.allowedDomainsAdd') }}
+                  </button>
+                </div>
+
+                <div class="flex flex-wrap gap-2 text-xs">
+                  <span class="txt-secondary">{{ $t('widgets.allowedDomainsQuickAdd') }}</span>
+                  <button
+                    v-for="domain in LOCAL_TEST_DOMAINS"
+                    :key="domain"
+                    @click.prevent="addPredefinedDomain(domain)"
+                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-light-border/40 dark:border-dark-border/30 hover:bg-[var(--brand-alpha-light)] hover:txt-brand transition-colors"
+                  >
+                    <Icon icon="heroicons:plus" class="w-3.5 h-3.5" />
+                    {{ domain }}
+                  </button>
+                </div>
+
+                <p v-if="allowedDomainError" class="text-xs text-red-500 dark:text-red-400">
+                  {{ allowedDomainError }}
+                </p>
+
+                <div
+                  v-if="allowedDomainsList.length > 0"
+                  class="flex flex-wrap gap-2"
+                >
+                  <span
+                    v-for="domain in allowedDomainsList"
+                    :key="domain"
+                    :class="[
+                      'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                      isLocalTestingDomain(domain)
+                        ? 'bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/40'
+                        : 'bg-[var(--brand-alpha-light)] txt-primary border-[var(--brand)]/20'
+                    ]"
+                    :title="isLocalTestingDomain(domain) ? $t('widgets.localhostTooltip') : undefined"
+                  >
+                    <Icon
+                      v-if="isLocalTestingDomain(domain)"
+                      icon="heroicons:exclamation-triangle"
+                      class="w-3.5 h-3.5 text-red-500 dark:text-red-300"
+                    />
+                    {{ domain }}
+                    <button
+                      @click="removeAllowedDomain(domain)"
+                      class="w-4 h-4 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                      :aria-label="$t('widgets.removeDomain', { domain })"
+                    >
+                      <Icon icon="heroicons:x-mark" class="w-3 h-3" />
+                    </button>
+                  </span>
+                </div>
+                <p v-else class="text-xs txt-secondary">
+                  {{ $t('widgets.allowedDomainsEmpty') }}
+                </p>
+
+                <div
+                  v-if="hasLocalTestingDomain"
+                  class="mt-3 p-3 rounded-lg border border-red-500/30 bg-red-500/10 flex items-start gap-2 text-red-600 dark:text-red-300"
+                >
+                  <Icon icon="heroicons:shield-exclamation" class="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p class="text-sm font-semibold">
+                      {{ $t('widgets.localhostWarningTitle') }}
+                    </p>
+                    <p class="text-xs mt-1">
+                      {{ $t('widgets.localhostWarningDescription') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="surface-chip p-4 rounded-lg space-y-3">
                 <div>
                   <p class="text-xs txt-secondary">{{ $t('widgets.widgetName') }}</p>
                   <p class="font-medium txt-primary">{{ formData.name || '-' }}</p>
@@ -288,6 +454,16 @@
                       :style="{ backgroundColor: formData.config.iconColor }"
                     ></div>
                   </div>
+                </div>
+                <div>
+                  <p class="text-xs txt-secondary">{{ $t('widgets.allowedDomainsSummary') }}</p>
+                  <p class="font-medium txt-primary">
+                    {{
+                      allowedDomainsList.length > 0
+                        ? allowedDomainsList.join(', ')
+                        : $t('widgets.allowedDomainsEmpty')
+                    }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -317,13 +493,13 @@
             </div>
 
             <div
-              class="surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative overflow-hidden min-h-[520px] lg:min-h-[720px] min-w-[320px]"
+              class="relative overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-transparent sm:border-light-border/30 sm:dark:border-dark-border/20 min-h-[520px] sm:min-h-[600px] lg:min-h-[720px]"
             >
               <div class="absolute inset-0 bg-white dark:bg-slate-900">
                 <iframe
                   v-if="sanitizedPreviewUrl"
                   :src="sanitizedPreviewUrl"
-                  class="w-full h-full border-0 scale-[0.75] origin-top-left lg:scale-100 lg:origin-center"
+                  class="w-full h-full border-0 sm:scale-[0.9] sm:origin-top lg:scale-100 lg:origin-center"
                   sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                 ></iframe>
                 <div v-else class="w-full h-full flex items-center justify-center text-sm txt-secondary px-6 text-center">
@@ -334,8 +510,8 @@
                 </div>
               </div>
 
-              <div class="absolute inset-0 pointer-events-none flex items-end justify-end p-4">
-                <div class="pointer-events-auto w-[90%] max-w-[420px]">
+              <div class="absolute inset-0 pointer-events-none flex items-end justify-end p-2 sm:p-4">
+                <div class="pointer-events-auto w-full max-w-none sm:w-[90%] sm:max-w-[420px]">
                   <ChatWidget
                     v-if="previewWidget"
                     :widget-id="previewWidget.widgetId"
@@ -348,6 +524,8 @@
                     :max-file-size="formData.config.maxFileSize"
                     :default-theme="formData.config.defaultTheme"
                     :is-preview="true"
+                    :allow-file-upload="formData.config.allowFileUpload"
+                    :file-upload-limit="formData.config.fileUploadLimit"
                   />
                 </div>
               </div>
@@ -418,6 +596,7 @@ import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi } from '@/services/api/promptsApi'
 import { useNotification } from '@/composables/useNotification'
+import { useI18n } from 'vue-i18n'
 
 const emit = defineEmits<{
   close: []
@@ -425,6 +604,7 @@ const emit = defineEmits<{
 }>()
 
 const { error: showError } = useNotification()
+const { t } = useI18n()
 
 const currentStep = ref(0)
 const creating = ref(false)
@@ -432,6 +612,8 @@ const taskPrompts = ref<any[]>([])
 const previewWidget = ref<widgetsApi.Widget | null>(null)
 const isCreatingPreview = ref(false)
 const previewWebsite = ref('')
+const newAllowedDomain = ref('')
+const allowedDomainError = ref<string | null>(null)
 const sanitizedPreviewUrl = computed(() => {
   const url = previewWebsite.value.trim()
   if (!url) return ''
@@ -468,7 +650,10 @@ const formData = ref<WidgetFormData>({
     autoOpen: false,
     autoMessage: 'Hello! How can I help you today?',
     messageLimit: 50,
-    maxFileSize: 10
+    maxFileSize: 10,
+    allowFileUpload: false,
+    fileUploadLimit: 3,
+    allowedDomains: []
   }
 })
 
@@ -481,6 +666,106 @@ const canProceed = computed(() => {
 
 const canCreate = computed(() => {
   return canProceed.value && !creating.value
+})
+
+const MAX_ALLOWED_DOMAINS = 20
+const LOCAL_TEST_DOMAINS = ['localhost', '127.0.0.1', 'localhost:5173']
+
+const sanitizeDomainList = (domains: unknown): string[] => {
+  if (!Array.isArray(domains)) return []
+  const sanitized: string[] = []
+  domains.forEach((value) => {
+    if (typeof value !== 'string') return
+    const normalized = sanitizeDomainInput(value)
+    if (normalized && !sanitized.includes(normalized)) {
+      sanitized.push(normalized)
+    }
+  })
+  return sanitized
+}
+
+const arraysEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false
+  return a.every((value, index) => value === b[index])
+}
+
+const sanitizeDomainInput = (value: string): string | null => {
+  if (!value) return null
+  let normalized = value.trim().toLowerCase()
+  if (!normalized) return null
+  normalized = normalized.replace(/^https?:\/\//, '')
+  normalized = normalized.replace(/^\/\//, '')
+  normalized = normalized.split(/[\/?#]/)[0]
+  if (!normalized) return null
+  const domainPattern = /^(?:\*\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::\d+)?$/
+  if (!domainPattern.test(normalized)) {
+    return null
+  }
+  return normalized
+}
+
+const isLocalTestingDomain = (domain: string): boolean => {
+  const value = domain.toLowerCase()
+  return LOCAL_TEST_DOMAINS.some(pattern => value === pattern || value.startsWith(`${pattern}:`))
+}
+
+const ensureSanitizedAllowedDomains = (): string[] => {
+  const sanitized = sanitizeDomainList(formData.value.config.allowedDomains)
+  if (!arraysEqual(sanitized, formData.value.config.allowedDomains)) {
+    formData.value.config.allowedDomains = sanitized
+  }
+  return sanitized
+}
+
+const pushAllowedDomain = (value: string) => {
+  const sanitized = sanitizeDomainInput(value)
+  if (!sanitized) return
+  if (!formData.value.config.allowedDomains.includes(sanitized)) {
+    formData.value.config.allowedDomains.push(sanitized)
+  }
+}
+
+const addAllowedDomain = () => {
+  allowedDomainError.value = null
+
+  if (formData.value.config.allowedDomains.length >= MAX_ALLOWED_DOMAINS) {
+    allowedDomainError.value = t('widgets.allowedDomainsLimit', { max: MAX_ALLOWED_DOMAINS })
+    return
+  }
+
+  const sanitized = sanitizeDomainInput(newAllowedDomain.value)
+  if (!sanitized) {
+    allowedDomainError.value = t('widgets.invalidDomain')
+    return
+  }
+
+  if (formData.value.config.allowedDomains.includes(sanitized)) {
+    allowedDomainError.value = t('widgets.domainAlreadyAdded')
+    return
+  }
+
+  formData.value.config.allowedDomains.push(sanitized)
+  newAllowedDomain.value = ''
+}
+
+const removeAllowedDomain = (domain: string) => {
+  formData.value.config.allowedDomains = formData.value.config.allowedDomains.filter(item => item !== domain)
+}
+
+const addPredefinedDomain = (domain: string) => {
+  pushAllowedDomain(domain)
+}
+
+const allowedDomainsList = computed(() => formData.value.config.allowedDomains ?? [])
+
+const hasLocalTestingDomain = computed(() =>
+  allowedDomainsList.value.some(domain => isLocalTestingDomain(domain))
+)
+
+watch(newAllowedDomain, () => {
+  if (allowedDomainError.value) {
+    allowedDomainError.value = null
+  }
 })
 
 /**
@@ -516,8 +801,9 @@ watch(
   async (newConfig) => {
     if (previewWidget.value) {
       try {
+        const sanitizedDomains = ensureSanitizedAllowedDomains()
         await widgetsApi.updateWidget(previewWidget.value.widgetId, {
-          config: newConfig
+          config: { ...newConfig, allowedDomains: sanitizedDomains }
         })
       } catch (error) {
         console.error('Failed to update preview widget:', error)
@@ -565,17 +851,27 @@ const createWidget = async () => {
   try {
     console.log('Creating widget with data:', JSON.stringify(formData.value, null, 2))
     
+    const sanitizedDomains = ensureSanitizedAllowedDomains()
+    const payloadConfig = {
+      ...formData.value.config,
+      allowedDomains: sanitizedDomains
+    }
+
     // If preview widget exists, update it to be the real widget
     if (previewWidget.value) {
       await widgetsApi.updateWidget(previewWidget.value.widgetId, {
         name: formData.value.name, // Remove [PREVIEW] prefix
-        config: formData.value.config,
+        config: payloadConfig,
         status: 'active'
       })
       previewWidget.value = null // Prevent cleanup on close
     } else {
       // No preview widget, create new one
-      await widgetsApi.createWidget(formData.value)
+      await widgetsApi.createWidget({
+        name: formData.value.name,
+        taskPromptTopic: formData.value.taskPromptTopic,
+        config: payloadConfig
+      })
     }
     
     emit('created')

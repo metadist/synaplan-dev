@@ -147,8 +147,8 @@ class MessagePreProcessor
         // Image mit Vision AI
         elseif (in_array($fileType, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
             try {
-                // Get userId from message relation
-                $userId = $messageFile->getMessage()?->getUserId() ?? 0;
+                // Use file owner as context for Vision AI
+                $userId = $messageFile->getUserId() ?? 0;
                 $text = $this->processImageWithVision($messageFile->getFilePath(), $userId);
                 if ($text) {
                     $messageFile->setFileText($text);
@@ -321,11 +321,18 @@ class MessagePreProcessor
     private function processImageWithVision(string $relativePath, int $userId): ?string
     {
         try {
-            $prompt = 'Describe this image in detail and extract any visible text. If there is text in the image, transcribe it exactly.';
+            $prompt = 'Extract all text visible in this image. '
+                . 'Return only the text exactly as it appears, preserving line breaks. '
+                . 'Do not add descriptions or commentary. '
+                . 'If no text is visible, return an empty string.';
             
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
-            
-            return $result['content'] ?? null;
+            $text = trim($result['content'] ?? '');
+            if ($text !== '' && str_starts_with(strtolower($text), 'test image description:')) {
+                $text = preg_replace('/^test image description:\s*/i', '', $text);
+                $text = trim($text);
+            }
+            return $text !== '' ? $text : null;
         } catch (\Exception $e) {
             $this->logger->error("Vision AI analysis failed: {$e->getMessage()}", [
                 'file' => basename($relativePath),
