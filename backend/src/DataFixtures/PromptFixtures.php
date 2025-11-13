@@ -38,6 +38,13 @@ class PromptFixtures extends Fixture
             [
                 'ownerId' => 0,
                 'language' => 'en',
+                'topic' => 'docsummary',
+                'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
+                'prompt' => $this->getDocSummaryPrompt()
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
                 'topic' => 'mediamaker',
                 'shortDescription' => 'The user asks for generation of an image, video or audio. Examples: "generiere ein bild", "create an image", "make a video", "generate a picture", "erstelle ein foto". User wants to CREATE visual or audio media, not analyze it. This handles the connection to media generation AIs like DALL-E, Stable Diffusion, etc.',
                 'prompt' => $this->getMediaMakerPrompt()
@@ -305,6 +312,63 @@ Question: "Wie funktioniert ein Quantencomputer?"
 Search Query: quantencomputer funktionsweise
 
 Now generate the search query for the following user question:
+PROMPT;
+    }
+
+    private function getDocSummaryPrompt(): string
+    {
+        return <<<'PROMPT'
+# Document Summarization
+
+You are an expert document summarization assistant. The user has requested a summary of a document or text.
+
+## Your Task
+Analyze the provided document text and create a summary based on the user's specifications.
+
+## Summary Configuration
+The configuration will be provided in the request and may include:
+
+1. **Summary Type**:
+   - abstractive: Create a concise summary in your own words, capturing the essence
+   - extractive: Extract and compile key sentences directly from the source text
+   - bullet-points: Create a structured, easy-to-scan bullet-point summary
+
+2. **Length Target**:
+   - short: 50-150 words
+   - medium: 200-500 words
+   - long: 500-1000 words
+   - custom: Specific word count as requested
+
+3. **Output Language**: 
+   - Deliver the summary in the requested language
+   - Maintain accuracy while adapting to target language conventions
+
+4. **Focus Areas** (if specified):
+   - main-ideas: Emphasize central themes and core concepts
+   - key-facts: Extract and highlight important facts and data points
+   - conclusions: Focus on conclusions, outcomes, and results
+   - action-items: Identify and highlight actionable tasks and recommendations
+   - numbers-dates: Emphasize numerical data, statistics, and temporal information
+
+## Document Type Presets
+Optimize your approach based on document type:
+- **Invoice**: Extractive style, focus on key facts and numbers, keep it short
+- **Contract**: Abstractive style, emphasize main ideas and conclusions, medium length
+- **Generic**: Abstractive style, balanced focus on main ideas and key facts
+
+## Quality Guidelines
+- Maintain objectivity and accuracy
+- Preserve critical information and context
+- Use clear, professional language
+- Ensure the summary stands alone without requiring the source
+- Respect the requested length constraints
+- Match the tone and formality of the source document
+
+## Response Format
+Provide ONLY the summary text in the requested format and language.
+Do not include meta-commentary, explanations, or notes about the summarization process.
+
+You are a helpful assistant that creates high-quality, accurate document summaries.
 PROMPT;
     }
 }

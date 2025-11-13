@@ -198,23 +198,79 @@
       </div>
     </div>
 
-    <div class="flex gap-3 justify-end">
-      <button
-        @click="clearForm"
-        class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+    <!-- Actions Row -->
+    <div class="flex items-center justify-between gap-3">
+      <!-- Current Chat Model Display -->
+      <router-link
+        to="/config/ai-models?highlight=CHAT"
+        class="flex items-center gap-2 px-3 py-2 rounded-lg surface-elevated border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)] transition-all group"
       >
-        <XMarkIcon class="w-4 h-4 inline mr-2" />
-        {{ $t('summary.clearForm') }}
-      </button>
-      <button
-        data-help="generate-btn"
-        @click="generateSummary"
-        :disabled="!documentText.trim()"
-        class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
-      >
-        <SparklesIcon class="w-4 h-4" />
-        {{ $t('summary.generateSummary') }}
-      </button>
+        <svg class="w-4 h-4 txt-secondary group-hover:text-[var(--brand)] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <div class="flex flex-col min-w-0">
+          <span class="text-xs txt-secondary group-hover:text-[var(--brand)] transition-colors leading-tight">{{ $t('summary.usingModel') }}</span>
+          <span class="text-sm font-medium txt-primary group-hover:text-[var(--brand)] transition-colors truncate">
+            {{ props.currentModel || $t('summary.loadingModel') }}
+          </span>
+        </div>
+        <svg class="w-4 h-4 txt-secondary group-hover:text-[var(--brand)] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </router-link>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-2">
+        <button
+          @click="clearForm"
+          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+        >
+          <XMarkIcon class="w-4 h-4" />
+          {{ $t('summary.clearForm') }}
+        </button>
+        
+        <!-- Generate/Show Summary Button Group -->
+        <div class="flex">
+          <button
+            data-help="generate-btn"
+            @click="handleButtonClick"
+            :disabled="!documentText.trim() || props.isGenerating"
+            :class="[
+              'btn-primary px-6 py-2 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all',
+              hasGeneratedSummary && !hasTextChanged ? 'rounded-l-lg' : 'rounded-lg'
+            ]"
+          >
+            <div v-if="props.isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+            <SparklesIcon v-else class="w-4 h-4" />
+            {{ $t(buttonText) }}
+          </button>
+          
+          <!-- Dropdown Button (only show when summary exists) -->
+          <div v-if="hasGeneratedSummary && !hasTextChanged" class="relative group">
+            <button
+              class="btn-primary px-3 py-2 rounded-r-lg border-l border-white/20 hover:bg-[var(--brand)]/90 disabled:opacity-50 disabled:cursor-not-allowed h-full flex items-center justify-center"
+              :disabled="props.isGenerating"
+            >
+              <ChevronDownIcon class="w-4 h-4" />
+            </button>
+            
+            <!-- Dropdown Menu -->
+            <div class="absolute right-0 mt-2 w-48 surface-card rounded-lg shadow-xl border border-light-border/20 dark:border-dark-border/20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+              <button
+                @click="regenerateSummary"
+                :disabled="props.isGenerating"
+                class="w-full px-4 py-2 text-left txt-primary hover:bg-black/5 dark:hover:bg-white/5 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {{ $t('summary.regenerateSummary') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <p class="text-xs txt-secondary text-center">
@@ -233,7 +289,8 @@ import {
   CloudArrowUpIcon,
   DocumentChartBarIcon,
   DocumentCheckIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  ChevronDownIcon
 } from '@heroicons/vue/24/outline'
 import type { SummaryConfig, FocusArea } from '@/mocks/summaries'
 import { 
@@ -244,8 +301,20 @@ import {
 } from '@/mocks/summaries'
 import { useNotification } from '@/composables/useNotification'
 
+interface Props {
+  isGenerating?: boolean
+  currentModel?: string | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isGenerating: false,
+  currentModel: null
+})
+
 const emit = defineEmits<{
   generate: [text: string, config: SummaryConfig]
+  regenerate: [text: string, config: SummaryConfig]
+  show: []
 }>()
 
 const presets = [
@@ -263,8 +332,10 @@ const config = ref<SummaryConfig>({
 })
 
 const documentText = ref('')
+const originalDocumentText = ref('') // Track original text for change detection
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const hasGeneratedSummary = ref(false)
 
 const { warning } = useNotification()
 
@@ -274,6 +345,19 @@ const wordCount = computed(() => {
 })
 const tokenCount = computed(() => {
   return Math.ceil(characterCount.value / 4)
+})
+
+// Check if document text has changed since last generation
+const hasTextChanged = computed(() => {
+  return hasGeneratedSummary.value && documentText.value !== originalDocumentText.value
+})
+
+// Button text based on state
+const buttonText = computed(() => {
+  if (props.isGenerating) return 'summary.generating'
+  if (hasTextChanged.value) return 'summary.generateSummary'
+  if (hasGeneratedSummary.value) return 'summary.showSummary'
+  return 'summary.generateSummary'
 })
 
 const applyPreset = (presetId: string) => {
@@ -329,11 +413,34 @@ const handleFile = (file: File) => {
 
 const clearForm = () => {
   documentText.value = ''
+  originalDocumentText.value = ''
+  hasGeneratedSummary.value = false
 }
 
 const generateSummary = () => {
   if (documentText.value.trim()) {
+    originalDocumentText.value = documentText.value
+    hasGeneratedSummary.value = true
     emit('generate', documentText.value, config.value)
+  }
+}
+
+const showSummary = () => {
+  emit('show')
+}
+
+const regenerateSummary = () => {
+  if (documentText.value.trim()) {
+    originalDocumentText.value = documentText.value
+    emit('regenerate', documentText.value, config.value)
+  }
+}
+
+const handleButtonClick = () => {
+  if (hasTextChanged.value || !hasGeneratedSummary.value) {
+    generateSummary()
+  } else {
+    showSummary()
   }
 }
 </script>
