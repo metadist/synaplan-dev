@@ -814,12 +814,14 @@ class FileController extends AbstractController
         $this->em->flush();
 
         // Step 2: Extract text from file (if not already extracted)
-        $extractedText = $messageFile->getExtractedText();
-        
-        if (empty($extractedText)) {
-            $filePath = $this->uploadDir . '/' . $messageFile->getFilePath();
-            
-            if (!file_exists($filePath)) {
+        $relativePath = $messageFile->getFilePath();
+        $fileExtension = strtolower($messageFile->getFileType() ?: pathinfo($relativePath, PATHINFO_EXTENSION) ?? '');
+        $extractedText = $messageFile->getFileText();
+
+        if (trim($extractedText) === '') {
+            $absolutePath = rtrim($this->uploadDir, '/') . '/' . ltrim($relativePath, '/');
+
+            if (!is_file($absolutePath)) {
                 return $this->json([
                     'success' => false,
                     'error' => 'File not found on disk'
@@ -827,19 +829,21 @@ class FileController extends AbstractController
             }
 
             try {
-                $extractResult = $this->fileProcessor->extractText($filePath);
-                
-                if ($extractResult['success']) {
-                    $extractedText = $extractResult['text'];
-                    $messageFile->setExtractedText($extractedText);
-                    $messageFile->setStatus('extracted');
-                    $this->em->flush();
-                } else {
-                    return $this->json([
-                        'success' => false,
-                        'error' => 'Text extraction failed: ' . ($extractResult['error'] ?? 'Unknown error')
-                    ], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
+                [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
+                    $relativePath,
+                    $fileExtension,
+                    $user->getId()
+                );
+
+                $messageFile->setFileText($extractedText);
+                $messageFile->setStatus('extracted');
+                $this->em->flush();
+
+                $this->logger->info('FileController: Re-vectorization text extraction completed', [
+                    'file_id' => $id,
+                    'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    'bytes' => strlen($extractedText)
+                ]);
             } catch (\Throwable $e) {
                 $this->logger->error('FileController: Re-vectorization text extraction failed', [
                     'file_id' => $id,
@@ -853,6 +857,13 @@ class FileController extends AbstractController
             }
         }
 
+        if (trim($extractedText) === '') {
+            return $this->json([
+                'success' => false,
+                'error' => 'Text extraction produced no content'
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
         // Step 3: Vectorize extracted text (NOT the binary file!)
         try {
             $vectorResult = $this->vectorizationService->vectorizeAndStore(
@@ -860,7 +871,7 @@ class FileController extends AbstractController
                 $user->getId(),
                 $messageFile->getId(),
                 $groupKey,
-                $this->getFileTypeCode($messageFile->getFileType())
+                $this->getFileTypeCode($fileExtension)
             );
 
             if ($vectorResult['success']) {

@@ -29,6 +29,7 @@ services:
     App\AI\Provider\AnthropicProvider:
         arguments:
             $apiKey: '%env(ANTHROPIC_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.vision' }
@@ -36,7 +37,7 @@ services:
     App\AI\Provider\OpenAIProvider:
         arguments:
             $apiKey: '%env(OPENAI_API_KEY)%'
-            $uploadDir: '%kernel.project_dir%/public/uploads'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.embedding' }
@@ -63,7 +64,7 @@ services:
             $apiKey: '%env(GOOGLE_GEMINI_API_KEY)%'
             $projectId: '%env(string:default::GOOGLE_CLOUD_PROJECT_ID)%'
             $region: 'us-central1'
-            $uploadDir: '%kernel.project_dir%/public/uploads'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.vision' }

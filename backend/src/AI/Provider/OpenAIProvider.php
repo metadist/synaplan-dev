@@ -26,7 +26,7 @@ class OpenAIProvider implements
     public function __construct(
         private LoggerInterface $logger,
         private ?string $apiKey = null,
-        private string $uploadDir = '/var/www/html/public/uploads'
+        private string $uploadDir = '/var/www/html/var/uploads'
     ) {
         if (!empty($apiKey)) {
             $this->client = OpenAI::client($apiKey);

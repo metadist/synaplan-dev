@@ -195,39 +195,135 @@ class AiFacade
      */
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
-        $providerName = $options['provider'] ?? null;
-        
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
-        if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'pic2text');
+        $providerWasExplicit = array_key_exists('provider', $options);
+        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'pic2text');
+        $requestedProvider = $requestedProvider ?: 'test';
+        $normalizedRequested = strtolower($requestedProvider);
+
+        $candidates = [];
+
+        // Prefer explicitly requested provider first (unless it is the dummy test provider)
+        if ($providerWasExplicit && $requestedProvider) {
+            $candidates[] = [
+                'name' => $requestedProvider,
+                'requireCapability' => $normalizedRequested !== 'test'
+            ];
+        } elseif ($requestedProvider && $normalizedRequested !== 'test') {
+            $candidates[] = [
+                'name' => $requestedProvider,
+                'requireCapability' => true
+            ];
         }
-        
-        $provider = $this->registry->getVisionProvider($providerName);
-        
-        $this->logger->info('AI vision request', [
-            'provider' => $provider->getName(),
-            'user_id' => $userId,
-            'image' => basename($imagePath),
-        ]);
-        
-        try {
-            $response = $this->circuitBreaker->execute(
-                callback: fn() => $provider->explainImage($imagePath, $prompt, $options),
-                serviceName: 'ai_provider_vision_' . $provider->getName(),
-                fallback: null // NO FALLBACK
-            );
-        } catch (\Exception $e) {
-            $this->logger->error('AI vision failed', [
-                'error' => $e->getMessage()
+
+        // Add all available real providers next
+        $fallbackRequireCapability = true;
+        $fallbackProviders = $this->registry->getAvailableProviders('vision', includeTest: false, requireCapability: true);
+
+        if (empty($fallbackProviders)) {
+            $this->logger->info('AI vision fallback: no DB-enabled providers, probing available providers with API keys', [
+                'requested_provider' => $requestedProvider,
+                'user_id' => $userId,
             ]);
-            throw new ProviderException('Vision AI failed', 'unknown', null, 0, $e);
+
+            $fallbackProviders = $this->registry->getAvailableProviders('vision', includeTest: false, requireCapability: false);
+            $fallbackRequireCapability = false;
         }
-        
-        return [
-            'content' => $response,
-            'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
-        ];
+
+        foreach ($fallbackProviders as $fallbackName) {
+            if ($normalizedRequested && strcasecmp($fallbackName, $requestedProvider) === 0) {
+                continue;
+            }
+
+            $candidates[] = [
+                'name' => $fallbackName,
+                'requireCapability' => $fallbackRequireCapability
+            ];
+        }
+
+        // Always keep TestProvider as last resort
+        $existingProviders = array_map(fn($c) => strtolower($c['name']), $candidates);
+        if (!in_array('test', $existingProviders, true)) {
+            $candidates[] = [
+                'name' => 'test',
+                'requireCapability' => false
+            ];
+        }
+
+        $attempted = [];
+        $lastException = null;
+
+        foreach ($candidates as $candidate) {
+            $candidateName = $candidate['name'];
+            $normalizedCandidate = strtolower($candidateName);
+
+            if (in_array($normalizedCandidate, $attempted, true)) {
+                continue;
+            }
+            $attempted[] = $normalizedCandidate;
+
+            try {
+                $provider = $this->registry->getVisionProvider($candidateName, $candidate['requireCapability']);
+            } catch (ProviderException $e) {
+                $this->logger->warning('AI vision provider not available', [
+                    'provider' => $candidateName,
+                    'require_capability' => $candidate['requireCapability'],
+                    'error' => $e->getMessage(),
+                ]);
+                $lastException = $e;
+                continue;
+            }
+
+            $this->logger->info('AI vision request via ' . $provider->getName(), [
+                'provider' => $provider->getName(),
+                'user_id' => $userId,
+                'image' => basename($imagePath),
+            ]);
+            
+            try {
+                $response = $this->circuitBreaker->execute(
+                    callback: fn() => $provider->explainImage($imagePath, $prompt, $options),
+                    serviceName: 'ai_provider_vision_' . $provider->getName(),
+                    fallback: null // NO FALLBACK
+                );
+
+                return [
+                    'content' => $response,
+                    'provider' => $provider->getName(),
+                    'model' => $options['model'] ?? 'unknown',
+                ];
+            } catch (ProviderException $e) {
+                $this->logger->warning('AI vision provider failed: ' . $provider->getName() . ' - ' . $e->getMessage(), [
+                    'provider' => $provider->getName(),
+                    'error' => $e->getMessage(),
+                ]);
+                $lastException = $e;
+                continue;
+            } catch (\Throwable $e) {
+                $this->logger->error('AI vision provider error: ' . $provider->getName() . ' - ' . $e->getMessage(), [
+                    'provider' => $provider->getName(),
+                    'error' => $e->getMessage(),
+                ]);
+                $lastException = new ProviderException(
+                    'Vision provider error: ' . $e->getMessage(),
+                    $provider->getName(),
+                    null,
+                    0,
+                    $e
+                );
+                continue;
+            }
+        }
+
+        $this->logger->error('AI vision failed after exhausting providers', [
+            'image' => basename($imagePath),
+            'attempted' => $attempted,
+        ]);
+
+        if ($lastException) {
+            throw $lastException;
+        }
+
+        throw new ProviderException('Vision AI failed', 'unknown');
     }
 
     /**

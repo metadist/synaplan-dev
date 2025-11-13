@@ -39,7 +39,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
         private ?string $apiKey = null,
-        private int $timeout = 120
+        private int $timeout = 120,
+        private string $uploadDir = '/var/www/html/var/uploads'
     ) {}
 
     public function getName(): string
@@ -480,8 +481,10 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
      */
     private function prepareImageData(string $imagePath): array
     {
-        $uploadDir = '/var/www/html/public/uploads';
-        $fullPath = $uploadDir . '/' . ltrim($imagePath, '/');
+        $baseDir = rtrim($this->uploadDir, '/');
+        $fullPath = $baseDir . '/' . ltrim($imagePath, '/');
+        $baseDir = rtrim($this->uploadDir, '/');
+        $fullPath = $baseDir . '/' . ltrim($imagePath, '/');
         
         if (!file_exists($fullPath)) {
             throw new \Exception("Image file not found: {$fullPath}");

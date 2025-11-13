@@ -226,6 +226,7 @@
     "selectFilesButton": "Select files",
     "noFileSelected": "None selected",
     "supportedFormats": "Select one or more files (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
+    "processingInfo": "Files are automatically extracted and vectorized for optimal RAG performance.",
     "uploadAndProcess": "Upload and Process Files",
     "yourFiles": "Your Files",
     "filterByGroup": "Filter by Group:",
