@@ -186,7 +186,7 @@ const copyToClipboard = async () => {
 
   try {
     await navigator.clipboard.writeText(fileData.value.extracted_text)
-    showSuccess('Text copied to clipboard')
+    success('Text copied to clipboard')
   } catch (err) {
     showError('Failed to copy text')
   }
