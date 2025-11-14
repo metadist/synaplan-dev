@@ -1,24 +1,24 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
-      <div class="max-w-7xl mx-auto">
-        <div v-if="currentPage === 'inbound'">
+    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin" data-testid="page-config">
+      <div class="max-w-7xl mx-auto" data-testid="section-config">
+        <div v-if="currentPage === 'inbound'" data-testid="section-inbound">
           <InboundConfiguration />
         </div>
 
-        <div v-else-if="currentPage === 'ai-models'">
+        <div v-else-if="currentPage === 'ai-models'" data-testid="section-ai-models">
           <AIModelsConfiguration />
         </div>
 
-        <div v-else-if="currentPage === 'task-prompts'">
+        <div v-else-if="currentPage === 'task-prompts'" data-testid="section-task-prompts">
           <TaskPromptsConfiguration />
         </div>
 
-        <div v-else-if="currentPage === 'sorting-prompt'">
+        <div v-else-if="currentPage === 'sorting-prompt'" data-testid="section-sorting-prompt">
           <SortingPromptConfiguration />
         </div>
 
-        <div v-else-if="currentPage === 'api-keys'">
+        <div v-else-if="currentPage === 'api-keys'" data-testid="section-api-keys">
           <APIKeysConfiguration />
         </div>
       </div>

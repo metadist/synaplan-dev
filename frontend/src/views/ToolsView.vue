@@ -1,8 +1,8 @@
 <template>
   <MainLayout>
-    <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin">
+    <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin" data-testid="page-tools">
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
-        <div class="mb-8">
+        <div class="mb-8" data-testid="section-header">
           <h1 class="text-3xl font-semibold txt-primary mb-2">
             {{ getPageTitle() }}
           </h1>
@@ -11,9 +11,9 @@
           </p>
         </div>
 
-        <div v-if="currentPage === 'introduction'" class="space-y-4">
+        <div v-if="currentPage === 'introduction'" class="space-y-4" data-testid="section-introduction">
           <!-- Search Bar -->
-          <div class="surface-card p-4">
+          <div class="surface-card p-4" data-testid="section-command-search">
             <div class="relative">
               <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary" />
               <input
@@ -21,11 +21,13 @@
                 type="text"
                 :placeholder="$t('tools.searchCommands')"
                 class="w-full pl-12 pr-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-command-search"
               />
               <button
                 v-if="searchQuery"
                 @click="searchQuery = ''"
                 class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover-overlay-light transition-colors flex items-center justify-center"
+                data-testid="btn-clear-search"
               >
                 <XMarkIcon class="w-4 h-4 txt-secondary" />
               </button>
@@ -39,10 +41,12 @@
             v-for="cmd in filteredCommands"
             :key="cmd.name"
             class="surface-card overflow-hidden"
+            data-testid="item-command"
           >
             <button
               @click="toggleCommand(cmd.name)"
               class="w-full px-6 py-4 flex items-center justify-between hover-overlay-light transition-colors"
+              data-testid="btn-toggle-command"
             >
               <div class="flex items-center gap-4">
                 <div
@@ -81,7 +85,7 @@
               leave-to-class="max-h-0 opacity-0"
             >
               <div v-if="expandedCommands.includes(cmd.name)" class="overflow-hidden">
-                <div class="px-6 pb-6 border-t border-light-border/30 dark:border-dark-border/20 pt-4">
+                <div class="px-6 pb-6 border-t border-light-border/30 dark:border-dark-border/20 pt-4" data-testid="section-command-details">
                   <div class="flex flex-wrap gap-2 mb-4">
                     <span
                       v-for="tag in getCommandTags(cmd)"
@@ -116,6 +120,7 @@
               @create="createWidget"
               @edit="editWidget"
               @delete="deleteWidget"
+              data-testid="comp-widget-list"
             />
           </div>
           <div v-else class="grid grid-cols-1 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
@@ -126,10 +131,11 @@
                 :user-id="'152'"
                 :show-code="!!currentWidgetId"
                 @cancel="cancelEdit"
+                data-testid="comp-widget-editor"
               />
             </div>
 
-            <div v-if="showPreview" class="xl:col-span-3 xl:sticky xl:top-6 xl:h-fit">
+            <div v-if="showPreview" class="xl:col-span-3 xl:sticky xl:top-6 xl:h-fit" data-testid="section-widget-preview">
               <div class="surface-card p-2 sm:p-4 lg:p-6">
                 <div class="flex items-center justify-between mb-3 lg:mb-4">
                   <h3 class="text-base lg:text-lg font-semibold txt-primary flex items-center gap-2">
@@ -183,7 +189,7 @@
         </div>
 
         <div v-else-if="currentPage === 'doc-summary'">
-          <SummaryConfiguration @generate="handleGenerateSummary" />
+          <SummaryConfiguration @generate="handleGenerateSummary" data-testid="comp-summary-config" />
         </div>
 
             <div v-else-if="currentPage === 'mail-handler'">
@@ -193,6 +199,7 @@
                 @create="createMailHandler"
                 @edit="editMailHandler"
                 @delete="deleteMailHandler"
+                data-testid="comp-mail-handler-list"
               />
               <MailHandlerConfiguration
                 v-else
@@ -200,6 +207,7 @@
                 :handler-id="currentMailHandlerId"
                 @save="saveMailHandler"
                 @cancel="cancelMailHandlerEdit"
+                data-testid="comp-mail-handler-config"
               />
             </div>
        </div>
@@ -212,9 +220,10 @@
        @save="saveWidget"
        @discard="discardChanges"
        @preview="togglePreview"
+       data-testid="bar-widget-unsaved"
      />
-   </MainLayout>
- </template>
+  </MainLayout>
+</template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
@@ -536,4 +545,3 @@ const cancelMailHandlerEdit = () => {
   currentMailHandlerId.value = ''
 }
 </script>
-

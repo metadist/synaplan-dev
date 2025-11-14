@@ -1,11 +1,11 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
+    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin" data-testid="page-files-upload">
       <div class="max-w-7xl mx-auto space-y-6">
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
         
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-upload-form">
           <h1 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
             <CloudArrowUpIcon class="w-6 h-6 text-[var(--brand)]" />
             {{ $t('files.uploadTitle') }}
@@ -21,6 +21,7 @@
                 type="text"
                 class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('files.groupKeywordPlaceholder')"
+                data-testid="input-group-keyword"
               />
               <p class="text-xs txt-secondary mt-1">
                 {{ $t('files.groupKeywordHelp') }}
@@ -34,6 +35,7 @@
               <select
                 v-model="selectedGroup"
                 class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-group-select"
               >
                 <option value="">{{ $t('files.orSelectExisting') }}</option>
                 <option
@@ -47,18 +49,19 @@
             </div>
           </div>
 
-          <div class="mb-6">
+          <div class="mb-6" data-testid="section-file-picker">
             <label class="block text-sm font-medium txt-primary mb-2">
               {{ $t('files.selectFiles') }}
             </label>
             <div class="flex items-center gap-3">
-              <label class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+              <label class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer" data-testid="btn-select-files">
                 <input
                   type="file"
                   multiple
                   accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.xlsx,.csv"
                   class="hidden"
                   @change="handleFileSelect"
+                  data-testid="input-files"
                 />
                 {{ $t('files.selectFilesButton') }}
               </label>
@@ -71,13 +74,14 @@
             </p>
           </div>
 
-          <div class="mb-6">
+          <div class="mb-6" data-testid="section-processing-level">
             <label class="label mb-3">Processing Level</label>
             <div class="grid gap-3">
               <!-- Extract Option -->
               <label 
                 class="surface-card p-4 cursor-pointer transition-all hover:shadow-lg"
                 :class="processLevel === 'extract' ? 'ring-2 ring-[var(--brand)]' : ''"
+                data-testid="item-process-option"
               >
                 <div class="flex items-start gap-3">
                   <input
@@ -85,6 +89,7 @@
                     v-model="processLevel"
                     value="extract"
                     class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
+                    data-testid="input-process-extract"
                   />
                   <div class="flex-1">
                     <div class="flex items-center gap-2">
@@ -102,6 +107,7 @@
               <label 
                 class="surface-card p-4 cursor-pointer transition-all hover:shadow-lg"
                 :class="processLevel === 'vectorize' ? 'ring-2 ring-[var(--brand)]' : ''"
+                data-testid="item-process-option"
               >
                 <div class="flex items-start gap-3">
                   <input
@@ -109,6 +115,7 @@
                     v-model="processLevel"
                     value="vectorize"
                     class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
+                    data-testid="input-process-vectorize"
                   />
                   <div class="flex-1">
                     <div class="flex items-center gap-2">
@@ -126,6 +133,7 @@
               <label 
                 class="surface-card p-4 cursor-pointer transition-all hover:shadow-lg opacity-60"
                 :class="processLevel === 'full' ? 'ring-2 ring-[var(--brand)]' : ''"
+                data-testid="item-process-option"
               >
                 <div class="flex items-start gap-3">
                   <input
@@ -134,6 +142,7 @@
                     value="full"
                     class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
                     disabled
+                    data-testid="input-process-full"
                   />
                   <div class="flex-1">
                     <div class="flex items-center gap-2">
@@ -153,6 +162,7 @@
             @click="uploadFiles"
             :disabled="selectedFiles.length === 0 || isUploading"
             class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-upload"
           >
             <CloudArrowUpIcon v-if="!isUploading" class="w-5 h-5" />
             <svg v-else class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -163,7 +173,7 @@
           </button>
         </div>
 
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-files-list">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-semibold txt-primary">
               {{ $t('files.yourFiles') }}
@@ -178,6 +188,7 @@
               <select
                 v-model="filterGroup"
                 class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-filter-group"
               >
                 <option value="">{{ $t('files.allFiles') }}</option>
                 <option
@@ -192,6 +203,7 @@
             <button
               @click="applyFilter"
               class="btn-primary px-6 py-2 rounded-lg mt-7"
+              data-testid="btn-filter"
             >
               {{ $t('files.filterButton') }}
             </button>
@@ -205,13 +217,14 @@
             <button
               @click="deleteSelected"
               class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2"
+              data-testid="btn-delete-selected"
             >
               <TrashIcon class="w-4 h-4" />
               {{ $t('files.deleteSelected') }}
             </button>
           </div>
 
-          <div v-if="isLoading" class="text-center py-12 txt-secondary">
+          <div v-if="isLoading" class="text-center py-12 txt-secondary" data-testid="state-loading">
             <svg class="animate-spin h-8 w-8 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -219,11 +232,11 @@
             Loading files...
           </div>
 
-          <div v-else-if="filteredFiles.length === 0" class="text-center py-12 txt-secondary">
+          <div v-else-if="filteredFiles.length === 0" class="text-center py-12 txt-secondary" data-testid="state-empty">
             {{ $t('files.noFiles') }}
           </div>
 
-          <div v-else class="overflow-x-auto">
+          <div v-else class="overflow-x-auto" data-testid="section-table">
             <table class="w-full">
               <thead>
                 <tr class="border-b border-light-border/30 dark:border-dark-border/20">
@@ -250,6 +263,7 @@
                   v-for="file in paginatedFiles"
                   :key="file.id"
                   class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  data-testid="item-file"
                 >
                   <td class="py-3 px-2">
                     <input
@@ -360,6 +374,7 @@
                       @click="reVectorize(file.id)"
                       class="p-2 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
                       title="Re-vectorize this file with extracted text"
+                      data-testid="btn-revectorize"
                     >
                       <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
                     </button>
@@ -367,6 +382,7 @@
                       @click="viewFileContent(file.id)"
                       class="p-2 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
                       title="View content"
+                      data-testid="btn-view"
                     >
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -377,6 +393,7 @@
                       @click="downloadFile(file.id, file.filename)"
                       class="icon-ghost icon-ghost--info"
                       title="Download file"
+                      data-testid="btn-download"
                     >
                       <ArrowDownTrayIcon class="w-4 h-4" />
                     </button>
@@ -385,6 +402,7 @@
                       @click="deleteFile(file.id)"
                       class="icon-ghost icon-ghost--danger"
                       title="Delete file"
+                      data-testid="btn-delete"
                     >
                       <TrashIcon class="w-4 h-4" />
                     </button>
@@ -395,7 +413,7 @@
             </table>
           </div>
 
-          <div v-if="filteredFiles.length > 0" class="flex items-center justify-between mt-6">
+          <div v-if="filteredFiles.length > 0" class="flex items-center justify-between mt-6" data-testid="section-pagination">
             <div class="txt-secondary text-sm">
               {{ $t('files.page') }} {{ currentPage }} ({{ $t('files.showing') }} {{ paginatedFiles.length }} {{ $t('files.files') }})
             </div>
@@ -404,6 +422,7 @@
                 @click="previousPage"
                 :disabled="currentPage === 1"
                 class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-prev-page"
               >
                 {{ $t('files.previous') }}
               </button>
@@ -411,6 +430,7 @@
                 @click="nextPage"
                 :disabled="currentPage >= totalPages"
                 class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-next-page"
               >
                 {{ $t('files.next') }}
               </button>
@@ -879,4 +899,3 @@ onMounted(async () => {
   await loadAllFileGroupKeys()
 })
 </script>
-

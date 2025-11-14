@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden">
+  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden" data-testid="page-verify-email">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
       <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
@@ -8,6 +8,7 @@
       <button
         @click="cycleLanguage"
         class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium"
+        data-testid="btn-language-toggle"
       >
         {{ currentLanguage.toUpperCase() }}
       </button>
@@ -15,6 +16,7 @@
         @click="toggleTheme"
         class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
         :aria-label="themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        data-testid="btn-theme-toggle"
       >
         <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-5 h-5" />
         <MoonIcon v-else class="w-5 h-5" />
@@ -23,7 +25,7 @@
 
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
-        <router-link to="/login" class="inline-block">
+        <router-link to="/login" class="inline-block" data-testid="link-back-login">
           <img
             :src="logoSrc"
             alt="synaplan"
@@ -32,7 +34,7 @@
         </router-link>
       </div>
 
-      <div class="surface-card p-8 text-center">
+      <div class="surface-card p-8 text-center" data-testid="section-verify-card">
         <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
           <EnvelopeIcon class="w-10 h-10" style="color: var(--brand)" />
         </div>
@@ -43,7 +45,7 @@
         </p>
 
         <div class="space-y-4">
-          <div class="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <div class="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg" data-testid="info-check-spam">
             <p class="text-sm txt-primary flex items-start gap-2">
               <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
               <span>{{ $t('auth.checkSpam') }}</span>
@@ -51,7 +53,7 @@
           </div>
 
           <!-- Success Message -->
-          <div v-if="successMessage" class="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+          <div v-if="successMessage" class="p-4 bg-green-500/10 border border-green-500/20 rounded-lg" data-testid="alert-resend-success">
             <p class="text-sm text-green-600 dark:text-green-400 flex items-start gap-2">
               <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -61,7 +63,7 @@
           </div>
 
           <!-- Error Message -->
-          <div v-if="error" class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <div v-if="error" class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg" data-testid="alert-resend-error">
             <p class="text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
               <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -71,7 +73,7 @@
           </div>
 
           <!-- Remaining Attempts Info -->
-          <div v-if="remainingAttempts < 5" class="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+          <div v-if="remainingAttempts < 5" class="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg" data-testid="text-remaining-attempts">
             <p class="text-xs txt-secondary text-center">
               {{ remainingAttempts }} attempt{{ remainingAttempts !== 1 ? 's' : '' }} remaining
             </p>
@@ -81,6 +83,7 @@
             @click="handleResendEmail"
             :disabled="isResending || countdown > 0 || remainingAttempts <= 0"
             class="w-full btn-secondary py-3 rounded-lg font-medium"
+            data-testid="btn-resend-email"
           >
             <span v-if="remainingAttempts <= 0">
               Maximum attempts reached
@@ -100,11 +103,12 @@
             </span>
           </Button>
 
-          <div class="flex items-center gap-2 text-sm txt-secondary">
+          <div class="flex items-center gap-2 text-sm txt-secondary" data-testid="section-change-email">
             <span>{{ $t('auth.wrongEmail') }}</span>
             <button
               @click="handleChangeEmail"
               class="font-medium transition-colors" style="color: var(--brand)"
+              data-testid="btn-change-email"
             >
               {{ $t('auth.changeEmail') }}
             </button>
@@ -115,6 +119,7 @@
           <router-link
             to="/login"
             class="text-sm txt-secondary hover:txt-primary transition-colors inline-flex items-center gap-2"
+            data-testid="link-footer-login"
           >
             <ArrowLeftIcon class="w-4 h-4" />
             {{ $t('auth.backToLogin') }}
@@ -254,4 +259,3 @@ onUnmounted(() => {
   }
 })
 </script>
-

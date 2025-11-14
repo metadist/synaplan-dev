@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-app px-6">
-    <div class="max-w-2xl w-full text-center">
+  <div class="min-h-screen flex items-center justify-center bg-app px-6" data-testid="page-error">
+    <div class="max-w-2xl w-full text-center" data-testid="section-card">
       <!-- Error Icon -->
-      <div class="mb-8 relative">
+      <div class="mb-8 relative" data-testid="section-icon">
         <div class="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-br from-red-500/10 to-orange-500/10 relative">
           <div class="absolute inset-0 rounded-full bg-gradient-to-br from-red-500/20 to-orange-500/20 animate-ping"></div>
           <ExclamationTriangleIcon class="w-16 h-16 text-red-500 relative z-10" />
@@ -10,7 +10,7 @@
       </div>
 
       <!-- Content -->
-      <div class="space-y-4 mb-8">
+      <div class="space-y-4 mb-8" data-testid="section-content">
         <h1 class="text-4xl md:text-5xl font-bold txt-primary">
           {{ $t('error.title') }}
         </h1>
@@ -20,7 +20,7 @@
       </div>
 
       <!-- Error Details (if provided) -->
-      <div v-if="error" class="surface-card p-6 rounded-xl mb-8 text-left">
+      <div v-if="error" class="surface-card p-6 rounded-xl mb-8 text-left" data-testid="section-error-details">
         <div class="flex items-start gap-3 mb-4">
           <CodeBracketIcon class="w-5 h-5 txt-secondary flex-shrink-0 mt-0.5" />
           <div class="flex-1">
@@ -62,10 +62,11 @@
       </div>
 
       <!-- Actions -->
-      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8" data-testid="section-actions">
         <button
           @click="handleReload"
           class="btn-primary px-8 py-3 rounded-lg font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          data-testid="btn-reload"
         >
           <ArrowPathIcon class="w-5 h-5" />
           {{ $t('error.reload') }}
@@ -73,6 +74,7 @@
         <router-link
           to="/"
           class="px-8 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          data-testid="btn-home"
         >
           <HomeIcon class="w-5 h-5" />
           {{ $t('error.goHome') }}
@@ -80,7 +82,7 @@
       </div>
 
       <!-- Support Info -->
-      <div class="surface-card p-6 rounded-xl">
+      <div class="surface-card p-6 rounded-xl" data-testid="section-support">
         <div class="flex items-start gap-4">
           <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
             <ChatBubbleLeftRightIcon class="w-5 h-5 text-blue-500" />
@@ -96,6 +98,7 @@
               @click="copyErrorInfo"
               class="text-sm font-medium hover:text-[var(--brand)] transition-colors flex items-center gap-2"
               style="color: var(--brand)"
+              data-testid="btn-copy-error"
             >
               <ClipboardDocumentIcon class="w-4 h-4" />
               {{ copied ? $t('error.copied') : $t('error.copyError') }}

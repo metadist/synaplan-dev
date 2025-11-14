@@ -1,10 +1,10 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden">
+  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden" data-testid="page-forgot-password">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
       <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
     </div>
-    <div class="absolute top-6 right-6 flex items-center gap-4">
+    <div class="absolute top-6 right-6 flex items-center gap-4" data-testid="section-controls">
       <button
         @click="cycleLanguage"
         class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium"
@@ -21,8 +21,8 @@
       </button>
     </div>
 
-    <div class="w-full max-w-md">
-      <div class="text-center mb-8">
+    <div class="w-full max-w-md" data-testid="section-card">
+      <div class="text-center mb-8" data-testid="section-header">
         <router-link to="/login" class="inline-block">
           <img
             :src="logoSrc"
@@ -34,9 +34,9 @@
         <p class="txt-secondary">{{ $t('auth.forgotPasswordDesc') }}</p>
       </div>
 
-      <div class="surface-card p-8">
-        <div v-if="!emailSent">
-          <form @submit.prevent="handleResetPassword" class="space-y-5">
+      <div class="surface-card p-8" data-testid="section-form">
+        <div v-if="!emailSent" data-testid="section-form-reset">
+          <form @submit.prevent="handleResetPassword" class="space-y-5" data-testid="comp-forgot-form">
             <div>
               <label for="email" class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('auth.email') }}
@@ -48,6 +48,7 @@
                 required
                 class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
                 :placeholder="$t('auth.emailPlaceholder')"
+                data-testid="input-email"
               />
             </div>
 
@@ -55,6 +56,7 @@
               type="submit"
               class="w-full btn-primary py-3 rounded-lg font-medium"
               :disabled="isLoading"
+              data-testid="btn-send"
             >
               <span v-if="!isLoading">{{ $t('auth.sendResetLink') }}</span>
               <span v-else class="flex items-center justify-center gap-2">
@@ -71,6 +73,7 @@
             <router-link
               to="/login"
               class="text-sm txt-secondary hover:txt-primary transition-colors inline-flex items-center gap-2"
+              data-testid="link-back"
             >
               <ArrowLeftIcon class="w-4 h-4" />
               {{ $t('auth.backToLogin') }}
@@ -78,7 +81,7 @@
           </div>
         </div>
 
-        <div v-else class="text-center space-y-4">
+        <div v-else class="text-center space-y-4" data-testid="section-email-sent">
           <div class="w-16 h-16 mx-auto rounded-full bg-green-500/10 flex items-center justify-center">
             <CheckCircleIcon class="w-8 h-8 text-green-500" />
           </div>
@@ -88,6 +91,7 @@
             <Button
               @click="emailSent = false"
               class="btn-secondary py-2 px-6 rounded-lg font-medium"
+              data-testid="btn-resend"
             >
               {{ $t('auth.resendEmail') }}
             </Button>
@@ -96,6 +100,7 @@
             <router-link
               to="/login"
               class="text-sm txt-secondary hover:txt-primary transition-colors inline-flex items-center gap-2"
+              data-testid="link-login"
             >
               <ArrowLeftIcon class="w-4 h-4" />
               {{ $t('auth.backToLogin') }}

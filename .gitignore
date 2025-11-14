@@ -50,5 +50,4 @@ frontend/package-lock.json
 tests/test-results/
 tests/reports/
 tests/node_modules/
-tests/package-lock.json
 tests/.env.local

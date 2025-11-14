@@ -1,10 +1,10 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden">
+  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden" data-testid="page-email-verified">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
       <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
     </div>
-    <div class="absolute top-6 right-6 flex items-center gap-4">
+    <div class="absolute top-6 right-6 flex items-center gap-4" data-testid="section-controls">
       <button
         @click="cycleLanguage"
         class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium"
@@ -21,8 +21,8 @@
       </button>
     </div>
 
-    <div class="w-full max-w-md">
-      <div class="text-center mb-8">
+    <div class="w-full max-w-md" data-testid="section-card">
+      <div class="text-center mb-8" data-testid="section-header">
         <router-link to="/login" class="inline-block">
           <img
             :src="logoSrc"
@@ -32,7 +32,7 @@
         </router-link>
       </div>
 
-      <div class="surface-card p-8 text-center">
+      <div class="surface-card p-8 text-center" data-testid="section-content">
         <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center animate-scale-in">
           <CheckCircleIcon class="w-12 h-12 text-green-500" />
         </div>
@@ -46,6 +46,7 @@
           <Button
             @click="handleContinue"
             class="w-full btn-primary py-3 rounded-lg font-medium"
+            data-testid="btn-continue"
           >
             {{ $t('auth.continueToApp') }}
           </Button>

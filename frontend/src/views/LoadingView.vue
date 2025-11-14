@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-app">
-    <div class="text-center">
+  <div class="min-h-screen flex items-center justify-center bg-app" data-testid="page-loading">
+    <div class="text-center" data-testid="section-loading">
       <!-- Logo or Spinner -->
-      <div class="mb-8">
+      <div class="mb-8" data-testid="section-spinner">
         <div class="relative inline-flex">
           <!-- Outer spinning ring -->
           <div class="w-20 h-20 rounded-full border-4 border-light-border/20 dark:border-dark-border/20 border-t-[var(--brand)] animate-spin"></div>
@@ -15,17 +15,17 @@
       </div>
 
       <!-- Loading Text -->
-      <h2 class="text-xl font-semibold txt-primary mb-2 animate-pulse">
+      <h2 class="text-xl font-semibold txt-primary mb-2 animate-pulse" data-testid="text-message">
         {{ message || $t('loading.default') }}
       </h2>
       
       <!-- Optional subtitle -->
-      <p v-if="subtitle" class="txt-secondary text-sm">
+      <p v-if="subtitle" class="txt-secondary text-sm" data-testid="text-subtitle">
         {{ subtitle }}
       </p>
 
       <!-- Progress bar (optional) -->
-      <div v-if="showProgress" class="mt-6 w-64 mx-auto">
+      <div v-if="showProgress" class="mt-6 w-64 mx-auto" data-testid="section-progress">
         <div class="h-1 bg-light-border/20 dark:bg-dark-border/20 rounded-full overflow-hidden">
           <div 
             class="h-full bg-[var(--brand)] transition-all duration-300 ease-out rounded-full"
