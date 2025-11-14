@@ -1,10 +1,10 @@
 <template>
   <!-- Fullscreen Modal Overlay -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-    <div class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" data-testid="modal-embed-code">
+    <div class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" data-testid="section-embed-shell">
       <!-- Header -->
-      <div class="sticky top-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between">
-        <div>
+      <div class="sticky top-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between" data-testid="section-header">
+        <div data-testid="section-preview">
           <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:code-bracket" class="w-6 h-6 text-[var(--brand)]" />
             {{ $t('widgets.embedCode') }}
@@ -15,15 +15,16 @@
           @click="$emit('close')"
           class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center"
           :aria-label="$t('common.close')"
+          data-testid="btn-close"
         >
           <Icon icon="heroicons:x-mark" class="w-6 h-6 txt-secondary" />
         </button>
       </div>
 
       <!-- Content -->
-      <div class="p-6 space-y-6">
+      <div class="p-6 space-y-6" data-testid="section-content">
         <!-- HTML Embed Code -->
-        <div>
+        <div data-testid="section-html-code">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold txt-primary flex items-center gap-2">
               <Icon icon="heroicons:globe-alt" class="w-5 h-5" />
@@ -32,6 +33,7 @@
             <button
               @click="copyToClipboard(embedCode, 'HTML')"
               class="px-4 py-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium flex items-center gap-2"
+              data-testid="btn-copy-html"
             >
               <Icon :icon="copiedHTML ? 'heroicons:check' : 'heroicons:clipboard-document'" class="w-4 h-4" />
               {{ copiedHTML ? $t('common.copied') : $t('common.copy') }}
@@ -46,7 +48,7 @@
         </div>
 
         <!-- WordPress Shortcode -->
-        <div>
+        <div data-testid="section-wordpress-code">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold txt-primary flex items-center gap-2">
               <Icon icon="simple-icons:wordpress" class="w-5 h-5" />
@@ -55,6 +57,7 @@
             <button
               @click="copyToClipboard(wordpressShortcode, 'WordPress')"
               class="px-4 py-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium flex items-center gap-2"
+              data-testid="btn-copy-wp"
             >
               <Icon :icon="copiedWP ? 'heroicons:check' : 'heroicons:clipboard-document'" class="w-4 h-4" />
               {{ copiedWP ? $t('common.copied') : $t('common.copy') }}
@@ -122,6 +125,7 @@
         <button
           @click="$emit('close')"
           class="px-6 py-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary font-medium"
+          data-testid="btn-close-footer"
         >
           {{ $t('common.close') }}
         </button>
@@ -174,4 +178,3 @@ const copyToClipboard = async (text: string, type: string) => {
   }
 }
 </script>
-

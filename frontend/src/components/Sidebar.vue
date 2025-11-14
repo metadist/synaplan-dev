@@ -12,6 +12,7 @@
       v-if="sidebarStore.isMobileOpen"
       @click="sidebarStore.closeMobile()"
       class="fixed inset-0 bg-black/50 z-40 md:hidden"
+      data-testid="section-sidebar-backdrop"
     />
   </Transition>
 
@@ -25,14 +26,16 @@
       sidebarStore.isCollapsed ? 'md:w-20' : 'md:w-64',
       'w-64'
     ]"
+    data-testid="comp-sidebar"
   >
-    <div class="p-6 flex-shrink-0">
+    <div class="p-6 flex-shrink-0" data-testid="section-sidebar-header">
       <div class="flex items-center gap-3">
         <button
           v-if="sidebarStore.isCollapsed"
           @click="sidebarStore.toggleCollapsed()"
           class="h-8 w-8 hidden md:flex items-center justify-center txt-secondary hover-surface rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary flex-shrink-0"
           aria-label="Expand sidebar"
+          data-testid="btn-sidebar-expand"
         >
           <Bars3Icon class="w-5 h-5" />
         </button>
@@ -42,6 +45,7 @@
             @click="handleToggle"
             class="ml-auto h-8 w-8 flex items-center justify-center txt-secondary hover-surface rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary flex-shrink-0"
             aria-label="Collapse sidebar"
+            data-testid="btn-sidebar-collapse"
           >
             <Bars3Icon class="w-5 h-5" />
           </button>
@@ -51,7 +55,7 @@
 
     <div class="flex-1 min-h-0 flex flex-col">
       <div class="flex-1 overflow-y-auto sidebar-scroll px-3 py-4">
-        <nav class="space-y-2">
+        <nav class="space-y-2" data-testid="nav-sidebar">
         <template v-for="item in navItems" :key="item.path">
           <router-link
             v-if="!item.children"
@@ -106,14 +110,14 @@
         </template>
         </nav>
 
-        <div v-if="!sidebarStore.isCollapsed" class="mt-6 px-1">
+        <div v-if="!sidebarStore.isCollapsed" class="mt-6 px-1" data-testid="section-sidebar-chatlist">
           <SidebarChatList />
         </div>
 
         <div class="h-20"></div>
       </div>
 
-      <div class="sticky bottom-0 bg-sidebar p-4 border-t border-light-border/30 dark:border-dark-border/20">
+      <div class="sticky bottom-0 bg-sidebar p-4 border-t border-light-border/30 dark:border-dark-border/20" data-testid="section-sidebar-footer">
         <UserMenu :email="authStore.user?.email || 'guest@synaplan.com'" :collapsed="sidebarStore.isCollapsed" />
       </div>
     </div>

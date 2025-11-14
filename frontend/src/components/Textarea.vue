@@ -8,6 +8,7 @@
     :placeholder="placeholder"
     :rows="rows"
     class="chat-textarea block w-full bg-transparent resize-none overflow-hidden min-h-[44px] leading-6 text-[16px] txt-primary border-0 px-0 py-[11px] focus:outline-none focus:ring-0 placeholder:txt-secondary"
+    data-testid="input-textarea"
   />
 </template>
 

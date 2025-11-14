@@ -1,6 +1,7 @@
 <template>
   <div
     :class="[isPreview ? 'absolute' : 'fixed', 'z-[9999]', positionClass]"
+    data-testid="comp-chat-widget"
   >
     <!-- Chat Button -->
     <Transition
@@ -17,6 +18,7 @@
         :style="{ backgroundColor: primaryColor }"
         class="w-16 h-16 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center group"
         aria-label="Open chat"
+        data-testid="btn-open"
       >
         <ChatBubbleLeftRightIcon :style="{ color: iconColor }" class="w-8 h-8" />
         <span
@@ -44,6 +46,7 @@
           backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
           ...chatWindowStyle
         }"
+        data-testid="section-chat-window"
       >
         <!-- Header -->
         <div
@@ -67,6 +70,7 @@
               @click="startNewConversation"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               aria-label="Start new chat"
+              data-testid="btn-new"
             >
               <ArrowPathIcon class="w-5 h-5 text-white" />
             </button>
@@ -74,6 +78,7 @@
               @click="toggleTheme"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="widgetTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+              data-testid="btn-theme"
             >
               <SunIcon v-if="widgetTheme === 'dark'" class="w-5 h-5 text-white" />
               <MoonIcon v-else class="w-5 h-5 text-white" />
@@ -82,6 +87,7 @@
               @click="toggleChat"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               aria-label="Close chat"
+              data-testid="btn-close"
             >
               <XMarkIcon class="w-5 h-5 text-white" />
             </button>
@@ -95,6 +101,7 @@
           :style="{
             backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff'
           }"
+          data-testid="section-messages"
         >
           <div
             v-for="message in messages"
@@ -193,6 +200,7 @@
         <div
           class="border-t p-3"
           :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
+          data-testid="section-input"
         >
           <div v-if="fileUploadError" class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
             <div class="flex items-start gap-2">
@@ -217,6 +225,7 @@
             <button
               @click="removeFile"
               class="w-6 h-6 rounded hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center"
+              data-testid="btn-remove-file"
             >
               <XMarkIcon class="w-4 h-4 txt-secondary" />
             </button>
@@ -234,19 +243,21 @@
 
           <div class="flex items-end gap-2">
             <template v-if="allowFileUploads">
-              <input
-                ref="fileInput"
-                type="file"
-                @change="handleFileSelect"
-                accept="image/*,.pdf,.doc,.docx,.txt"
-                class="hidden"
-              />
-              <button
-                @click="fileInput?.click()"
-                :disabled="limitReached || fileLimitReached"
-                class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                :aria-label="$t('widget.attachFile')"
-              >
+             <input
+               ref="fileInput"
+               type="file"
+               @change="handleFileSelect"
+               accept="image/*,.pdf,.doc,.docx,.txt"
+               class="hidden"
+               data-testid="input-file"
+             />
+             <button
+               @click="fileInput?.click()"
+               :disabled="limitReached || fileLimitReached"
+               class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+               :aria-label="$t('widget.attachFile')"
+               data-testid="btn-attach"
+             >
                 <PaperClipIcon class="w-5 h-5" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }" />
               </button>
             </template>
@@ -264,6 +275,7 @@
                 maxHeight: '120px',
                 minHeight: '40px'
               }"
+              data-testid="input-message"
             />
             <button
               @click="sendMessage"
@@ -274,6 +286,7 @@
                 canSend ? 'hover:scale-110 shadow-lg' : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'
               ]"
               :aria-label="$t('widget.send')"
+              data-testid="btn-send"
             >
               <PaperAirplaneIcon :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-500']" />
             </button>

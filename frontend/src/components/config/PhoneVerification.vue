@@ -1,7 +1,7 @@
 <template>
-  <div class="surface-card p-6">
+  <div class="surface-card p-6" data-testid="section-phone-verification">
     <!-- Header -->
-    <div class="mb-6">
+    <div class="mb-6" data-testid="section-header">
       <h2 class="text-xl font-semibold txt-primary mb-2">
         {{ $t('config.phoneVerification.title') }}
       </h2>
@@ -11,19 +11,19 @@
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-8">
+    <div v-if="loading" class="flex items-center justify-center py-8" data-testid="section-loading">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
     </div>
 
     <!-- Error -->
-    <div v-if="error" class="mb-4 surface-card p-4 border-l-4 border-red-500">
+    <div v-if="error" class="mb-4 surface-card p-4 border-l-4 border-red-500" data-testid="alert-error">
       <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
     </div>
 
     <!-- Not Verified State -->
-    <div v-if="!loading && !status?.verified">
+    <div v-if="!loading && !status?.verified" data-testid="section-not-verified">
       <!-- Phone Input -->
-      <div v-if="!verificationPending" class="space-y-4">
+      <div v-if="!verificationPending" class="space-y-4" data-testid="section-phone-input">
         <div>
           <label class="block text-sm font-medium txt-primary mb-2">
             {{ $t('config.phoneVerification.phoneNumber') }}
@@ -33,6 +33,7 @@
             type="tel"
             :placeholder="$t('config.phoneVerification.phoneNumberPlaceholder')"
             class="w-full px-4 py-3 rounded-lg surface-chip txt-primary border border-light-border focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
+            data-testid="input-phone"
           />
           <p class="mt-2 text-xs txt-secondary">
             {{ $t('config.phoneVerification.phoneNumberHint') }}
@@ -43,6 +44,7 @@
           @click="requestVerification"
           :disabled="!phoneNumber.trim() || requesting"
           class="btn-primary px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          data-testid="btn-send"
         >
           <svg v-if="requesting" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -53,8 +55,8 @@
       </div>
 
       <!-- Code Verification -->
-      <div v-else class="space-y-4">
-        <div class="surface-card p-4 border-l-4 border-brand">
+      <div v-else class="space-y-4" data-testid="section-code-input">
+        <div class="surface-card p-4 border-l-4 border-brand" data-testid="alert-code-sent">
           <p class="text-sm txt-primary">
             {{ $t('config.phoneVerification.codeSent', { phone: phoneNumber }) }}
           </p>
@@ -71,6 +73,7 @@
             :placeholder="$t('config.phoneVerification.codePlace holder')"
             class="w-full px-4 py-3 rounded-lg surface-chip txt-primary border border-light-border focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors text-center text-2xl font-mono tracking-widest"
             @input="formatCode"
+            data-testid="input-code"
           />
         </div>
 
@@ -79,6 +82,7 @@
             @click="confirmVerification"
             :disabled="verificationCode.length !== 6 || confirming"
             class="flex-1 btn-primary px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            data-testid="btn-verify"
           >
             <svg v-if="confirming" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -90,6 +94,7 @@
           <button
             @click="cancelVerification"
             class="surface-chip px-6 py-3 rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            data-testid="btn-cancel"
           >
             {{ $t('common.cancel') }}
           </button>
@@ -99,6 +104,7 @@
           @click="requestVerification"
           :disabled="requesting"
           class="w-full text-sm txt-secondary hover:txt-primary transition-colors"
+          data-testid="btn-resend"
         >
           {{ $t('config.phoneVerification.resendCode') }}
         </button>
@@ -106,7 +112,7 @@
     </div>
 
     <!-- Verified State -->
-    <div v-else-if="status?.verified" class="space-y-4">
+    <div v-else-if="status?.verified" class="space-y-4" data-testid="section-verified">
       <div class="surface-card p-4 border-l-4 border-green-500">
         <div class="flex items-start gap-3">
           <svg class="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -129,6 +135,7 @@
       <button
         @click="removeVerification"
         class="w-full surface-chip px-4 py-3 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+        data-testid="btn-remove"
       >
         {{ $t('config.phoneVerification.removePhone') }}
       </button>
@@ -307,4 +314,3 @@ onMounted(() => {
   loadStatus()
 })
 </script>
-

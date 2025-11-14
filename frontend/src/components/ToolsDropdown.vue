@@ -1,11 +1,12 @@
 <template>
-  <div class="relative">
+  <div class="relative" data-testid="comp-tools-dropdown">
     <button
       @click="toggleOpen"
       type="button"
       :class="['pill', isOpen && 'pill--active']"
       :aria-label="$t('chatInput.tools.label')"
       @keydown.escape="closeDropdown"
+      data-testid="btn-tools-toggle"
     >
       <WrenchScrewdriverIcon class="w-4 h-4 md:w-5 md:h-5" />
       <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ $t('chatInput.tools.label') }}</span>
@@ -15,6 +16,7 @@
       v-if="isOpen"
       class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin"
       @keydown.escape="closeDropdown"
+      data-testid="dropdown-tools-panel"
     >
       <!-- Web Search Tool -->
       <button
@@ -28,6 +30,7 @@
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
+        data-testid="btn-tool-web-search"
       >
         <Icon icon="mdi:web" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
@@ -70,6 +73,7 @@
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
+        data-testid="btn-tool-image-gen"
       >
         <Icon icon="mdi:image" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
@@ -111,6 +115,7 @@
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
+        data-testid="btn-tool-code-interpreter"
       >
         <Icon icon="mdi:code-braces" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">

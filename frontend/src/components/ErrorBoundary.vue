@@ -1,5 +1,5 @@
 <template>
-  <div v-if="error">
+  <div v-if="error" data-testid="comp-error-boundary">
     <ErrorView :error="errorInfo" :show-stack="true" />
   </div>
   <slot v-else />

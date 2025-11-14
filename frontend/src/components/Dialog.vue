@@ -5,15 +5,17 @@
         v-if="dialog.isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
         @click.self="handleBackdropClick"
+        data-testid="modal-dialog-root"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
+        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm" data-testid="modal-dialog-backdrop"></div>
 
         <!-- Dialog -->
         <div
           class="relative surface-card rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-scale-in"
           role="dialog"
           aria-modal="true"
+          data-testid="modal-dialog"
         >
           <!-- Icon based on type/danger -->
           <div class="flex items-center gap-3">
@@ -53,6 +55,7 @@
             @keydown.enter="handleConfirm"
             @keydown.esc="handleCancel"
             ref="inputRef"
+            data-testid="input-dialog-prompt"
           />
 
           <!-- Actions -->
@@ -61,6 +64,7 @@
               v-if="dialog.type !== 'alert'"
               @click="handleCancel"
               class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+              data-testid="btn-dialog-cancel"
             >
               {{ dialog.cancelText }}
             </button>
@@ -72,6 +76,7 @@
                   ? 'bg-red-500 hover:bg-red-600 text-white'
                   : 'btn-primary'
               ]"
+              data-testid="btn-dialog-confirm"
             >
               {{ dialog.confirmText }}
             </button>
@@ -156,4 +161,3 @@ const handleBackdropClick = () => {
   }
 }
 </style>
-

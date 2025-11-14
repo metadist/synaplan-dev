@@ -1,5 +1,5 @@
 <template>
-  <div class="my-3 space-y-2">
+  <div class="my-3 space-y-2" data-testid="section-message-docs">
     <div
       v-for="(match, index) in matches"
       :key="index"

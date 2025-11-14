@@ -10,9 +10,10 @@
     <div
       v-if="show"
       class="fixed bottom-0 left-0 right-0 z-50 pointer-events-none"
+      data-testid="section-unsaved-bar"
     >
       <div class="max-w-7xl mx-auto px-4 pb-4 md:px-8 md:pb-6">
-        <div class="surface-card shadow-xl rounded-xl p-4 md:p-6 pointer-events-auto border-2 border-[var(--brand)]">
+        <div class="surface-card shadow-xl rounded-xl p-4 md:p-6 pointer-events-auto border-2 border-[var(--brand)]" data-testid="comp-unsaved-card">
           <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div class="flex items-start gap-3">
               <div class="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
@@ -28,11 +29,12 @@
               </div>
             </div>
             
-            <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="flex items-center gap-3 w-full md:w-auto" data-testid="section-unsaved-actions">
               <button
                 @click="handleDiscard"
                 :disabled="isSaving"
                 class="flex-1 md:flex-none px-6 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2"
+                data-testid="btn-unsaved-discard"
               >
                 {{ $t('unsavedChanges.discard') }}
               </button>
@@ -41,6 +43,7 @@
                 @click="handlePreview"
                 :disabled="isSaving"
                 class="flex-1 md:flex-none px-6 py-3 rounded-lg border-2 border-[var(--brand)]/30 txt-primary hover:bg-[var(--brand)]/10 transition-colors font-medium text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2"
+                data-testid="btn-unsaved-preview"
               >
                 {{ $t('widget.previewWidget') }}
               </button>
@@ -48,6 +51,7 @@
                 @click="handleSave"
                 :disabled="isSaving"
                 class="flex-1 md:flex-none btn-primary px-8 py-3 rounded-lg font-semibold text-base min-h-[48px] shadow-lg hover:shadow-xl transition-shadow disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)] flex items-center justify-center gap-2"
+                data-testid="btn-unsaved-save"
               >
                 <svg
                   v-if="isSaving"
@@ -140,4 +144,3 @@ defineExpose({
   }
 })
 </script>
-

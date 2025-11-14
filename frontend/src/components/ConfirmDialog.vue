@@ -5,10 +5,12 @@
         v-if="isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
         @click.self="cancel"
+        data-testid="modal-confirm-root"
       >
         <div
           class="surface-card max-w-md w-full rounded-xl shadow-2xl overflow-hidden"
           @click.stop
+          data-testid="modal-confirm"
         >
           <!-- Header -->
           <div class="p-6 border-b border-light-border/10 dark:border-dark-border/10">
@@ -75,9 +77,10 @@
 
           <!-- Footer -->
           <div class="flex items-center justify-end gap-3 p-6 border-t border-light-border/10 dark:border-dark-border/10">
-            <button
+           <button
               @click="cancel"
               class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              data-testid="btn-confirm-cancel"
             >
               {{ cancelText }}
             </button>
@@ -89,6 +92,7 @@
                 'bg-yellow-500 hover:bg-yellow-600 text-white': variant === 'warning',
                 'btn-primary': variant === 'info'
               }"
+              data-testid="btn-confirm-accept"
             >
               {{ confirmText }}
             </button>
@@ -147,4 +151,3 @@ const cancel = () => emit('cancel')
   transform: scale(0.9);
 }
 </style>
-

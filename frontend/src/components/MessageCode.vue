@@ -1,5 +1,5 @@
 <template>
-  <div class="my-3 surface-card border border-light-border/30 dark:border-dark-border/20 overflow-hidden">
+  <div class="my-3 surface-card border border-light-border/30 dark:border-dark-border/20 overflow-hidden" data-testid="comp-message-code">
     <div class="flex items-center justify-between px-4 py-2.5 border-b border-light-border/30 dark:border-dark-border/20 bg-black/5 dark:bg-white/5">
       <div class="flex items-center gap-2">
         <span v-if="language" class="text-xs font-semibold txt-primary uppercase tracking-wide">{{ language }}</span>
@@ -9,6 +9,7 @@
         @click="copyCode"
         class="text-xs px-3 py-1.5 rounded-lg hover-surface transition-all txt-secondary font-medium flex items-center gap-1.5"
         :aria-label="$t('commands.copyCode')"
+        data-testid="btn-copy-code"
       >
         <svg v-if="!copied" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />

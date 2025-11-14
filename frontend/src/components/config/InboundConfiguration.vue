@@ -1,6 +1,6 @@
 <template>
-  <div class="space-y-6">
-    <div class="mb-8">
+  <div class="space-y-6" data-testid="page-config-inbound">
+    <div class="mb-8" data-testid="section-header">
       <h1 class="text-2xl font-semibold txt-primary mb-2">
         {{ $t('config.inbound.title') }}
       </h1>
@@ -9,7 +9,7 @@
       </p>
     </div>
 
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-whatsapp">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
         {{ $t('config.inbound.whatsappChannels') }}
@@ -20,6 +20,7 @@
           v-for="channel in whatsappChannels"
           :key="channel.id"
           class="flex items-center justify-between p-3 surface-chip rounded-lg border border-light-border/30 dark:border-dark-border/20"
+          data-testid="item-whatsapp-channel"
         >
           <div class="flex items-center gap-3">
             <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
@@ -30,7 +31,7 @@
       </div>
     </div>
 
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-email">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <EnvelopeIcon class="w-5 h-5 text-blue-500" />
         {{ $t('config.inbound.emailChannels') }}
@@ -41,6 +42,7 @@
           v-for="channel in emailChannels"
           :key="channel.id"
           class="flex items-center justify-between p-3 surface-chip rounded-lg border border-light-border/30 dark:border-dark-border/20"
+          data-testid="item-email-channel"
         >
           <div class="flex items-center gap-3">
             <EnvelopeIcon class="w-5 h-5 text-blue-500" />
@@ -60,6 +62,7 @@
               type="text"
               class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] max-w-xs"
               :placeholder="$t('config.inbound.keywordPlaceholder')"
+              data-testid="input-email-keyword"
             />
             <span class="txt-primary">{{ emailKeywordDomain }}</span>
           </div>
@@ -67,7 +70,7 @@
       </div>
     </div>
 
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-api">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <CommandLineIcon class="w-5 h-5 text-purple-500" />
         {{ $t('config.inbound.apiChannel') }}
@@ -91,7 +94,7 @@
       </div>
     </div>
 
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-widget">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <GlobeAltIcon class="w-5 h-5 text-cyan-500" />
         {{ $t('config.inbound.webWidget') }}
@@ -107,6 +110,7 @@
           type="text"
           class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :placeholder="$t('config.inbound.domainPlaceholder')"
+          data-testid="input-widget-domain"
         />
         <button
           @click="toggleWidget"
@@ -116,6 +120,7 @@
               ? 'bg-red-500 text-white hover:bg-red-600' 
               : 'btn-primary'
           ]"
+          data-testid="btn-widget-toggle"
         >
           <component :is="widgetConfig.isActive ? XMarkIcon : CheckIcon" class="w-5 h-5" />
           {{ widgetConfig.isActive ? $t('config.inbound.widgetActive') : $t('config.inbound.activateWidget') }}
@@ -125,6 +130,7 @@
       <div
         v-if="widgetConfig.isActive"
         class="mt-4 p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-lg"
+        data-testid="section-widget-status"
       >
         <p class="text-sm txt-primary">
           <CheckCircleIcon class="w-5 h-5 text-cyan-500 inline mr-2" />
@@ -139,6 +145,7 @@
       :show="hasUnsavedChanges"
       @save="handleSave"
       @discard="handleDiscard"
+      data-testid="comp-unsaved-bar"
     />
   </div>
 </template>

@@ -47,8 +47,8 @@ frontend/package-lock.json
 
 # Test artifacts
 *.cache
-tests/test-results
-tests/reports
-tests/node_modules
+tests/test-results/
+tests/reports/
+tests/node_modules/
 tests/package-lock.json
-tests/.env.test
+tests/.env.local

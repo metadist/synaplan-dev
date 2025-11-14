@@ -1,5 +1,5 @@
 <template>
-  <div class="my-3">
+  <div class="my-3" data-testid="section-message-video">
     <div class="relative w-full aspect-video surface-card overflow-hidden border border-light-border/30 dark:border-dark-border/20 group">
       <video
         ref="videoRef"
@@ -8,6 +8,7 @@
         class="w-full h-full bg-black"
         preload="metadata"
         @click="togglePlay"
+        data-testid="media-video-player"
       >
         {{ $t('commands.videoNotSupported') }}
       </video>
@@ -19,6 +20,7 @@
             @click="togglePlay"
             class="text-white hover:text-white/80 transition-colors"
             :aria-label="isPlaying ? 'Pause' : 'Play'"
+            data-testid="btn-video-play"
           >
             <svg v-if="!isPlaying" class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z"/>
@@ -41,6 +43,7 @@
             @click="toggleMute"
             class="text-white hover:text-white/80 transition-colors"
             :aria-label="isMuted ? 'Unmute' : 'Mute'"
+            data-testid="btn-video-mute"
           >
             <svg v-if="!isMuted" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
@@ -54,6 +57,7 @@
             @click="toggleFullscreen"
             class="text-white hover:text-white/80 transition-colors"
             aria-label="Fullscreen"
+            data-testid="btn-video-fullscreen"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />

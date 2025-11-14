@@ -1,5 +1,5 @@
 <template>
-  <div class="my-3 p-4 surface-chip">
+  <div class="my-3 p-4 surface-chip" data-testid="section-message-link">
     <div class="space-y-3">
       <div>
         <h4 class="text-sm font-medium txt-primary mb-2">{{ $t('commands.loginLinkGenerated') }}</h4>
@@ -8,6 +8,7 @@
           target="_blank"
           rel="noopener noreferrer"
           class="block p-3 surface-card hover:ring-1 hover:ring-primary/30 transition-all break-all text-sm font-mono txt-secondary"
+          data-testid="link-message-login"
         >
           {{ url }}
         </a>

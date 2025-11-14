@@ -1,6 +1,6 @@
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between mb-8">
+  <div class="space-y-6" data-testid="comp-mail-handler-config">
+    <div class="flex items-center justify-between mb-8" data-testid="section-header">
       <div>
         <h1 class="text-2xl font-semibold txt-primary mb-2">
           {{ handlerId ? $t('mail.editHandler') : $t('mail.createHandler') }}
@@ -10,13 +10,14 @@
         @click="$emit('cancel')"
         class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
         :aria-label="$t('widget.closeEditor')"
+        data-testid="btn-close"
       >
         <XMarkIcon class="w-5 h-5" />
       </button>
     </div>
 
     <!-- Handler Name -->
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-handler-name">
       <label class="block text-sm font-medium txt-primary mb-2">
         {{ $t('mail.handlerName') }}
       </label>
@@ -25,6 +26,7 @@
         type="text"
         class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('mail.handlerNamePlaceholder')"
+        data-testid="input-handler-name"
       />
       <p class="text-xs txt-secondary mt-1">
         {{ $t('mail.handlerNameHelp') }}
@@ -32,7 +34,7 @@
     </div>
 
     <!-- Step Indicator -->
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-stepper">
       <div class="flex items-center justify-between">
         <div
           v-for="(step, index) in steps"
@@ -78,6 +80,7 @@
             type="text"
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.mailServerPlaceholder')"
+            data-testid="input-mail-server"
           />
           <p class="text-xs txt-secondary mt-1">
             {{ $t('mail.mailServerHelp') }}
@@ -93,6 +96,7 @@
             type="number"
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.portPlaceholder')"
+            data-testid="input-port"
           />
           <p class="text-xs txt-secondary mt-1">
             {{ $t('mail.portHelp') }}
@@ -106,6 +110,7 @@
           <select
             v-model="config.protocol"
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-protocol"
           >
             <option
               v-for="option in protocolOptions"
@@ -127,6 +132,7 @@
           <select
             v-model="config.security"
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-security"
           >
             <option
               v-for="option in securityOptions"
@@ -150,6 +156,7 @@
             type="text"
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             placeholder="user@example.com or account123"
+            data-testid="input-username"
           />
           <p class="text-xs txt-secondary mt-1">
             {{ $t('mail.usernameHelp') }}
@@ -165,6 +172,7 @@
             type="password"
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.passwordPlaceholder')"
+            data-testid="input-password"
           />
           <p class="text-xs txt-secondary mt-1">
             {{ $t('mail.passwordHelp') }}
@@ -178,6 +186,7 @@
           <select
             v-model.number="config.checkInterval"
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-check-interval"
           >
             <option
               v-for="option in checkIntervalOptions"
@@ -201,6 +210,7 @@
               v-model="config.deleteAfter"
               type="checkbox"
               class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+              data-testid="input-delete-after"
             />
             <span class="text-sm txt-primary">{{ $t('mail.deleteAfterLabel') }}</span>
           </label>
@@ -214,6 +224,7 @@
         <button
           @click="testConnection"
           class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2"
+          data-testid="btn-test"
         >
           <BoltIcon class="w-4 h-4" />
           {{ $t('mail.testConnection') }}
@@ -221,6 +232,7 @@
         <button
           @click="showHelp"
           class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+          data-testid="btn-help"
         >
           <QuestionMarkCircleIcon class="w-4 h-4" />
           {{ $t('mail.connectionHelp') }}
@@ -229,7 +241,7 @@
     </div>
 
     <!-- Step 2: Departments -->
-    <div v-else-if="currentStep === 1" class="surface-card p-6">
+    <div v-else-if="currentStep === 1" class="surface-card p-6" data-testid="section-step-departments">
       <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
         <UserGroupIcon class="w-5 h-5" />
         {{ $t('mail.departments') }}
@@ -247,11 +259,12 @@
         </div>
       </div>
 
-      <div class="space-y-3">
+      <div class="space-y-3" data-testid="section-departments-list">
         <div
           v-for="dept in departments"
           :key="dept.id"
           class="p-5 bg-black/[0.02] dark:bg-white/[0.02] rounded-xl border border-light-border/20 dark:border-dark-border/10 hover:border-light-border/40 dark:hover:border-dark-border/20 transition-colors"
+          data-testid="item-department"
         >
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-2">
@@ -267,6 +280,7 @@
               @click="removeDepartment(dept.id)"
               class="icon-ghost icon-ghost--danger"
               :aria-label="$t('mail.removeDepartment')"
+              data-testid="btn-remove"
             >
               <TrashIcon class="w-4 h-4" />
             </button>
@@ -277,36 +291,39 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('mail.emailAddress') }}
               </label>
-              <input
-                v-model="dept.email"
-                type="email"
-                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
-                :placeholder="$t('mail.emailAddressPlaceholder')"
-              />
+             <input
+               v-model="dept.email"
+               type="email"
+               class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+               :placeholder="$t('mail.emailAddressPlaceholder')"
+               data-testid="input-dept-email"
+             />
             </div>
 
             <div>
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('mail.rulesForwarding') }}
               </label>
-              <input
-                v-model="dept.rules"
-                type="text"
-                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
-                :placeholder="$t('mail.rulesPlaceholder')"
-              />
+             <input
+               v-model="dept.rules"
+               type="text"
+               class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+               :placeholder="$t('mail.rulesPlaceholder')"
+               data-testid="input-dept-rules"
+             />
             </div>
           </div>
 
           <div class="mt-4 pt-4 border-t border-light-border/20 dark:border-dark-border/10">
             <label class="flex items-center gap-2 cursor-pointer group">
-              <input
-                :checked="dept.isDefault"
-                @change="setDefault(dept.id)"
-                type="radio"
-                name="default-dept"
-                class="w-4 h-4 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-              />
+             <input
+               :checked="dept.isDefault"
+               @change="setDefault(dept.id)"
+               type="radio"
+               name="default-dept"
+               class="w-4 h-4 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+               data-testid="input-dept-default"
+             />
               <span class="text-sm txt-secondary group-hover:txt-primary transition-colors">{{ $t('mail.setAsDefault') }}</span>
             </label>
           </div>
@@ -318,6 +335,7 @@
           @click="addDepartment"
           :disabled="departments.length >= 10"
           class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-add"
         >
           <PlusIcon class="w-4 h-4" />
           {{ $t('mail.addDepartment') }}
@@ -325,6 +343,7 @@
         <button
           @click="resetToDefault"
           class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          data-testid="btn-reset"
         >
           {{ $t('mail.resetToDefault') }}
         </button>
@@ -332,7 +351,7 @@
     </div>
 
     <!-- Step 3: Test -->
-    <div v-else-if="currentStep === 2" class="surface-card p-6">
+    <div v-else-if="currentStep === 2" class="surface-card p-6" data-testid="section-step-test">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <BoltIcon class="w-5 h-5" />
         {{ $t('mail.testConnection') }}
@@ -360,6 +379,7 @@
           @click="testConnection"
           :disabled="isTestingConnection"
           class="w-full px-6 py-3 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-run-test"
         >
           <svg
             v-if="isTestingConnection"
@@ -412,11 +432,12 @@
     </div>
 
     <!-- Navigation -->
-    <div class="flex gap-3 justify-between">
+    <div class="flex gap-3 justify-between" data-testid="section-navigation">
       <button
         v-if="currentStep > 0"
         @click="prevStep"
         class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        data-testid="btn-prev"
       >
         {{ $t('mail.previous') }}
       </button>
@@ -425,17 +446,19 @@
       <div class="flex gap-3">
         <button
           v-if="currentStep < steps.length - 1"
-          @click="nextStep"
-          :disabled="(currentStep === 0 && !isStep1Valid) || (currentStep === 1 && !isStep2Valid)"
-          class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        @click="nextStep"
+        :disabled="(currentStep === 0 && !isStep1Valid) || (currentStep === 1 && !isStep2Valid)"
+        class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        data-testid="btn-next"
+      >
           {{ $t('mail.next') }}
         </button>
         <button
           v-else
-          @click="saveConfiguration"
-          class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
-        >
+        @click="saveConfiguration"
+        class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
+        data-testid="btn-save"
+      >
           <CheckIcon class="w-4 h-4" />
           {{ $t('mail.saveConfiguration') }}
         </button>

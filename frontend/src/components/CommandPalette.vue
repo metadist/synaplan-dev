@@ -12,6 +12,7 @@
       v-if="visible"
       class="fixed inset-0 bg-black/30 z-[59] md:hidden"
       @click="emit('close')"
+      data-testid="backdrop-command-palette"
     />
   </Transition>
 
@@ -29,6 +30,7 @@
       class="fixed bottom-0 left-0 right-0 md:bottom-32 md:left-1/2 md:-translate-x-1/2 md:w-[720px] md:max-w-[92vw] surface-card border-t md:border border-light-border/30 dark:border-dark-border/30 md:rounded-xl z-[60] h-[85vh] md:h-auto md:max-h-[70vh] flex flex-col"
       role="menu"
       @click.stop
+      data-testid="comp-command-palette"
     >
       <!-- Header -->
       <div class="flex-shrink-0 px-4 py-3 border-b border-light-border/20 dark:border-dark-border/20 bg-black/5 dark:bg-white/5">

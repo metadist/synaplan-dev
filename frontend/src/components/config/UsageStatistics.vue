@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-testid="page-config-usage">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between" data-testid="section-header">
       <div>
         <h2 class="text-xl font-semibold txt-primary mb-2">
           {{ $t('config.usage.title') }}
@@ -15,6 +15,7 @@
         @click="exportUsage"
         :disabled="loading || exporting"
         class="btn-secondary px-4 py-2 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50"
+        data-testid="btn-export"
       >
         <svg v-if="exporting" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -28,19 +29,19 @@
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-12">
+    <div v-if="loading" class="flex items-center justify-center py-12" data-testid="section-loading">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-brand"></div>
     </div>
 
     <!-- Error -->
-    <div v-if="error" class="surface-card p-4 border-l-4 border-red-500">
+    <div v-if="error" class="surface-card p-4 border-l-4 border-red-500" data-testid="alert-error">
       <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
     </div>
 
     <!-- Stats Content -->
-    <div v-if="!loading && stats" class="space-y-6">
+    <div v-if="!loading && stats" class="space-y-6" data-testid="section-stats">
       <!-- Subscription Info -->
-      <div class="surface-card p-6">
+      <div class="surface-card p-6" data-testid="section-subscription">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold txt-primary">
             {{ $t('config.usage.subscription') }}
@@ -76,13 +77,13 @@
       </div>
 
       <!-- Usage per Action Type -->
-      <div class="surface-card p-6">
+      <div class="surface-card p-6" data-testid="section-usage-types">
         <h3 class="text-lg font-semibold txt-primary mb-4">
           {{ $t('config.usage.usageByType') }}
         </h3>
         
         <div class="space-y-4">
-          <div v-for="(usage, action) in stats.usage" :key="action" class="space-y-2">
+          <div v-for="(usage, action) in stats.usage" :key="action" class="space-y-2" data-testid="item-usage">
             <div class="flex items-center justify-between text-sm">
               <span class="txt-primary font-medium">{{ getActionLabel(action) }}</span>
               <span class="txt-secondary">
@@ -111,14 +112,15 @@
 
       <!-- Breakdown by Source -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-breakdown-source">
           <h3 class="text-lg font-semibold txt-primary mb-4">
             {{ $t('config.usage.bySource') }}
           </h3>
           
           <div class="space-y-3">
             <div v-for="(data, source) in stats.breakdown.by_source" :key="source"
-                 class="flex items-center justify-between p-3 surface-chip rounded-lg">
+                 class="flex items-center justify-between p-3 surface-chip rounded-lg"
+                 data-testid="item-source">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">{{ getSourceIcon(source) }}</span>
                 <div>
@@ -137,14 +139,15 @@
         </div>
 
         <!-- Breakdown by Time -->
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-breakdown-time">
           <h3 class="text-lg font-semibold txt-primary mb-4">
             {{ $t('config.usage.byTime') }}
           </h3>
           
           <div class="space-y-3">
             <div v-for="(data, period) in stats.breakdown.by_time" :key="period"
-                 class="flex items-center justify-between p-3 surface-chip rounded-lg">
+                 class="flex items-center justify-between p-3 surface-chip rounded-lg"
+                 data-testid="item-period">
               <div>
                 <p class="text-sm font-medium txt-primary">{{ getTimePeriodLabel(period) }}</p>
                 <p class="text-xs txt-secondary">{{ Object.keys(data.actions).length }} {{ $t('config.usage.actionTypes') }}</p>
@@ -156,7 +159,7 @@
       </div>
 
       <!-- Recent Usage -->
-      <div class="surface-card p-6">
+      <div class="surface-card p-6" data-testid="section-recent">
         <h3 class="text-lg font-semibold txt-primary mb-4">
           {{ $t('config.usage.recentActivity') }}
         </h3>
@@ -173,7 +176,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-light-border">
-              <tr v-for="(entry, idx) in stats.recent_usage" :key="idx" class="hover:bg-black/5 dark:hover:bg-white/5">
+              <tr v-for="(entry, idx) in stats.recent_usage" :key="idx" class="hover:bg-black/5 dark:hover:bg-white/5" data-testid="item-activity">
                 <td class="px-4 py-3 txt-secondary">{{ formatDateTime(entry.timestamp) }}</td>
                 <td class="px-4 py-3">
                   <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
@@ -185,7 +188,7 @@
                 <td class="px-4 py-3 text-right txt-secondary">{{ entry.latency.toFixed(2) }}s</td>
               </tr>
               
-              <tr v-if="stats.recent_usage.length === 0">
+              <tr v-if="stats.recent_usage.length === 0" data-testid="row-empty">
                 <td colspan="5" class="px-4 py-8 text-center txt-secondary text-sm">
                   {{ $t('config.usage.noRecentActivity') }}
                 </td>
@@ -360,4 +363,3 @@ onMounted(() => {
   loadStats()
 })
 </script>
-

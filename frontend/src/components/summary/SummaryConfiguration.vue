@@ -1,6 +1,6 @@
 <template>
-  <div class="space-y-6">
-    <div class="mb-8">
+  <div class="space-y-6" data-testid="page-summary-configuration">
+    <div class="mb-8" data-testid="section-header">
       <h1 class="text-2xl font-semibold txt-primary mb-2 flex items-center gap-2">
         <Cog6ToothIcon class="w-6 h-6" />
         {{ $t('summary.title') }}
@@ -11,7 +11,7 @@
     </div>
 
     <!-- Presets -->
-    <div class="surface-card p-6" data-help="presets">
+    <div class="surface-card p-6" data-help="presets" data-testid="section-presets">
       <h3 class="text-lg font-semibold txt-primary mb-3">{{ $t('summary.quickPresets') }}</h3>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <button
@@ -19,6 +19,7 @@
           :key="preset.id"
           @click="applyPreset(preset.id)"
           class="p-4 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)] transition-colors text-left group"
+          data-testid="btn-preset"
         >
           <div class="flex items-start gap-3">
             <component :is="preset.icon" class="w-6 h-6 txt-secondary group-hover:text-[var(--brand)] transition-colors flex-shrink-0" />
@@ -31,16 +32,17 @@
       </div>
     </div>
 
-    <div class="surface-card p-6 space-y-6">
+    <div class="surface-card p-6 space-y-6" data-testid="section-configuration">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-medium txt-primary mb-2">
             {{ $t('summary.summaryType') }}
           </label>
-          <select
-            v-model="config.summaryType"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          >
+         <select
+           v-model="config.summaryType"
+           class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+           data-testid="input-summary-type"
+         >
             <option
               v-for="type in summaryTypes"
               :key="type.value"
@@ -58,10 +60,11 @@
           <label class="block text-sm font-medium txt-primary mb-2">
             {{ $t('summary.length') }}
           </label>
-          <select
-            v-model="config.length"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          >
+         <select
+           v-model="config.length"
+           class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+           data-testid="input-length"
+         >
             <option
               v-for="length in summaryLengths"
               :key="length.value"
@@ -79,14 +82,15 @@
           <label class="block text-sm font-medium txt-primary mb-2">
             {{ $t('summary.customLength') }}
           </label>
-          <input
-            v-model.number="config.customLength"
-            type="number"
-            min="50"
-            max="2000"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            placeholder="300"
-          />
+         <input
+           v-model.number="config.customLength"
+           type="number"
+           min="50"
+           max="2000"
+           class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+           placeholder="300"
+           data-testid="input-custom-length"
+         />
           <p class="text-xs txt-secondary mt-1">
             {{ $t('summary.customLengthHelp') }}
           </p>
@@ -96,10 +100,11 @@
           <label class="block text-sm font-medium txt-primary mb-2">
             {{ $t('summary.outputLanguage') }}
           </label>
-          <select
-            v-model="config.outputLanguage"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          >
+         <select
+           v-model="config.outputLanguage"
+           class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+           data-testid="input-language"
+         >
             <option
               v-for="lang in outputLanguages"
               :key="lang.value"
@@ -124,12 +129,13 @@
             :key="area.value"
             class="flex items-center gap-2 cursor-pointer"
           >
-            <input
-              v-model="config.focusAreas"
-              type="checkbox"
-              :value="area.value"
-              class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-            />
+           <input
+             v-model="config.focusAreas"
+             type="checkbox"
+             :value="area.value"
+             class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+             data-testid="input-focus-area"
+           />
             <span class="text-sm txt-primary">{{ area.label }}</span>
           </label>
         </div>
@@ -139,31 +145,33 @@
       </div>
     </div>
 
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-document">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <DocumentTextIcon class="w-5 h-5" />
         {{ $t('summary.documentInput') }}
       </h3>
 
       <!-- Drag & Drop Zone -->
-      <div
-        data-help="drag-drop"
-        @dragover.prevent="isDragging = true"
-        @dragleave.prevent="isDragging = false"
-        @drop.prevent="handleDrop"
-        :class="[
-          'border-2 border-dashed rounded-lg p-8 transition-colors text-center cursor-pointer mb-4',
-          isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/5' : 'border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50'
-        ]"
-        @click="triggerFileInput"
-      >
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".pdf,.docx,.txt,.doc"
-          @change="handleFileSelect"
-          class="hidden"
-        />
+     <div
+       data-help="drag-drop"
+       @dragover.prevent="isDragging = true"
+       @dragleave.prevent="isDragging = false"
+       @drop.prevent="handleDrop"
+       :class="[
+         'border-2 border-dashed rounded-lg p-8 transition-colors text-center cursor-pointer mb-4',
+         isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/5' : 'border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50'
+       ]"
+       @click="triggerFileInput"
+       data-testid="section-upload"
+     >
+       <input
+         ref="fileInput"
+         type="file"
+         accept=".pdf,.docx,.txt,.doc"
+         @change="handleFileSelect"
+         class="hidden"
+         data-testid="input-file"
+       />
         <CloudArrowUpIcon class="w-12 h-12 mx-auto mb-3 txt-secondary" />
         <p class="txt-primary font-medium mb-1">{{ $t('summary.dragDropTitle') }}</p>
         <p class="text-sm txt-secondary mb-3">{{ $t('summary.dragDropDesc') }}</p>
@@ -185,23 +193,25 @@
         <label class="block text-sm font-medium txt-primary mb-2">
           {{ $t('summary.documentText') }}
         </label>
-        <textarea
-          data-help="textarea"
-          v-model="documentText"
-          rows="10"
-          class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
-          :placeholder="$t('summary.documentTextPlaceholder')"
-        />
+       <textarea
+         data-help="textarea"
+         v-model="documentText"
+         rows="10"
+         class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+         :placeholder="$t('summary.documentTextPlaceholder')"
+         data-testid="input-document-text"
+       />
         <p class="text-xs txt-secondary mt-2">
           {{ characterCount }} characters | {{ wordCount }} words | {{ tokenCount }} estimated tokens
         </p>
       </div>
     </div>
 
-    <div class="flex gap-3 justify-end">
+    <div class="flex gap-3 justify-end" data-testid="section-actions">
       <button
         @click="clearForm"
         class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        data-testid="btn-clear"
       >
         <XMarkIcon class="w-4 h-4 inline mr-2" />
         {{ $t('summary.clearForm') }}
@@ -211,6 +221,7 @@
         @click="generateSummary"
         :disabled="!documentText.trim()"
         class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
+        data-testid="btn-generate"
       >
         <SparklesIcon class="w-4 h-4" />
         {{ $t('summary.generateSummary') }}

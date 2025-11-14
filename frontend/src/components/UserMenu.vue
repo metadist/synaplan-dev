@@ -1,8 +1,9 @@
 <template>
-  <div class="relative isolate">
+  <div class="relative isolate" data-testid="comp-user-menu">
     <button
       @click="isOpen = !isOpen"
       class="dropdown-trigger w-full"
+      data-testid="btn-user-menu-toggle"
     >
       <div class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-sm font-medium flex-shrink-0">
         <span class="txt-primary">{{ initials }}</span>
@@ -24,11 +25,13 @@
         v-click-outside="() => isOpen = false"
         role="menu"
         class="absolute bottom-full left-0 mb-2 w-full min-w-[220px] max-h-[60vh] overflow-auto scroll-thin dropdown-panel z-[70]"
+        data-testid="dropdown-user-menu"
       >
         <button
           @click="handleProfileSettings"
           role="menuitem"
           class="dropdown-item"
+          data-testid="btn-user-profile-settings"
         >
           <UserCircleIcon class="w-5 h-5" />
           <span>Profile settings</span>
@@ -37,6 +40,7 @@
           @click="handleLogout"
           role="menuitem"
           class="dropdown-item"
+          data-testid="btn-user-logout"
         >
           <ArrowRightOnRectangleIcon class="w-5 h-5" />
           <span>Log out</span>

@@ -1,9 +1,9 @@
 <template>
   <!-- Fullscreen Modal Overlay -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-    <div class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" data-testid="modal-widget-editor">
+    <div class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" data-testid="section-editor-shell">
       <!-- Header -->
-      <div class="sticky top-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between">
+      <div class="sticky top-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between" data-testid="section-header">
         <div>
           <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:cog-6-tooth" class="w-6 h-6 text-[var(--brand)]" />
@@ -15,13 +15,14 @@
           @click="$emit('close')"
           class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center"
           :aria-label="$t('common.close')"
+          data-testid="btn-close"
         >
           <Icon icon="heroicons:x-mark" class="w-6 h-6 txt-secondary" />
         </button>
       </div>
 
       <!-- Content -->
-      <div class="p-6 space-y-6">
+      <div class="p-6 space-y-6" data-testid="section-content">
         <!-- Basic Settings -->
         <div class="space-y-4">
           <h3 class="font-semibold txt-primary flex items-center gap-2">
@@ -39,6 +40,7 @@
               type="text"
               :placeholder="$t('widgets.widgetNamePlaceholder')"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              data-testid="input-widget-name"
             />
           </div>
 
@@ -50,6 +52,7 @@
             <select
               v-model="formData.taskPromptTopic"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              data-testid="input-task-prompt"
             >
               <option value="">{{ $t('widgets.selectTaskPrompt') }}</option>
               <option
@@ -109,6 +112,7 @@
               <select
                 v-model="formData.config.position"
                 class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-position"
               >
                 <option value="bottom-right">{{ $t('widgets.bottomRight') }}</option>
                 <option value="bottom-left">{{ $t('widgets.bottomLeft') }}</option>
@@ -125,6 +129,7 @@
               <select
                 v-model="formData.config.defaultTheme"
                 class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-theme"
               >
                 <option value="light">{{ $t('widgets.light') }}</option>
                 <option value="dark">{{ $t('widgets.dark') }}</option>
@@ -136,11 +141,12 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.primaryColor') }}
               </label>
-              <input
-                v-model="formData.config.primaryColor"
-                type="color"
-                class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
-              />
+             <input
+               v-model="formData.config.primaryColor"
+               type="color"
+               class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+               data-testid="input-primary-color"
+             />
             </div>
 
             <!-- Icon Color -->
@@ -148,11 +154,12 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.iconColor') }}
               </label>
-              <input
-                v-model="formData.config.iconColor"
-                type="color"
-                class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
-              />
+             <input
+               v-model="formData.config.iconColor"
+               type="color"
+               class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+               data-testid="input-icon-color"
+             />
             </div>
           </div>
         </div>
@@ -170,12 +177,13 @@
               <p class="font-medium txt-primary">{{ $t('widgets.autoOpen') }}</p>
               <p class="text-xs txt-secondary mt-1">{{ $t('widgets.autoOpenHelp') }}</p>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                v-model="formData.config.autoOpen"
-                type="checkbox"
-                class="sr-only peer"
-              />
+           <label class="relative inline-flex items-center cursor-pointer">
+             <input
+               v-model="formData.config.autoOpen"
+               type="checkbox"
+               class="sr-only peer"
+               data-testid="input-auto-open"
+             />
               <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"></div>
             </label>
           </div>
@@ -185,12 +193,13 @@
             <label class="block text-sm font-medium txt-primary mb-2">
               {{ $t('widgets.autoMessage') }}
             </label>
-            <textarea
-              v-model="formData.config.autoMessage"
-              rows="2"
-              :placeholder="$t('widgets.autoMessagePlaceholder')"
-              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
-            />
+             <textarea
+               v-model="formData.config.autoMessage"
+               rows="2"
+               :placeholder="$t('widgets.autoMessagePlaceholder')"
+               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+               data-testid="input-auto-message"
+             />
           </div>
 
           <div class="surface-chip rounded-lg p-4 space-y-3">
@@ -200,11 +209,12 @@
                 <p class="text-xs txt-secondary mt-1">{{ $t('widgets.allowFileUploadHelp') }}</p>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  v-model="formData.config.allowFileUpload"
-                  type="checkbox"
-                  class="sr-only peer"
-                />
+               <input
+                 v-model="formData.config.allowFileUpload"
+                 type="checkbox"
+                 class="sr-only peer"
+                 data-testid="input-allow-upload"
+               />
                 <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"></div>
               </label>
             </div>
@@ -213,14 +223,15 @@
                 <label class="block text-sm font-medium txt-primary mb-1">
                   {{ $t('widgets.fileUploadLimit') }}
                 </label>
-                <input
-                  v-model.number="formData.config.fileUploadLimit"
-                  type="number"
-                  min="0"
-                  max="20"
-                  :disabled="!formData.config.allowFileUpload"
-                  class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+               <input
+                 v-model.number="formData.config.fileUploadLimit"
+                 type="number"
+                 min="0"
+                 max="20"
+                 :disabled="!formData.config.allowFileUpload"
+                 class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                 data-testid="input-file-limit"
+               />
                 <p class="text-xs txt-secondary mt-1.5">{{ $t('widgets.fileUploadLimitHelp') }}</p>
               </div>
             </div>
@@ -232,13 +243,14 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.messageLimit') }}
               </label>
-              <input
-                v-model.number="formData.config.messageLimit"
-                type="number"
-                min="1"
-                max="100"
-                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              />
+             <input
+               v-model.number="formData.config.messageLimit"
+               type="number"
+               min="1"
+               max="100"
+               class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+               data-testid="input-message-limit"
+             />
               <p class="text-xs txt-secondary mt-1.5">{{ $t('widgets.messageLimitHelp') }}</p>
             </div>
 
@@ -247,13 +259,14 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.maxFileSize') }} (MB)
               </label>
-              <input
-                v-model.number="formData.config.maxFileSize"
-                type="number"
-                min="1"
-                max="50"
-                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              />
+             <input
+               v-model.number="formData.config.maxFileSize"
+               type="number"
+               min="1"
+               max="50"
+               class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+               data-testid="input-max-file-size"
+             />
             </div>
           </div>
         </div>
@@ -638,4 +651,3 @@ onMounted(() => {
   }
 })
 </script>
-

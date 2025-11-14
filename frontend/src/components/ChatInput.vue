@@ -1,5 +1,5 @@
 <template>
-  <div class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]">
+  <div class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]" data-testid="comp-chat-input">
     <div class="max-w-4xl mx-auto px-4 py-4">
       <!-- Active Tools and Command Display (above input) -->
       <div v-if="activeTools.length > 0 || activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
@@ -52,6 +52,7 @@
             'pill text-xs flex items-center gap-2',
             isCommandValid ? 'pill--active' : 'bg-orange-500/10 border-orange-500/30 text-orange-600 dark:text-orange-400'
           ]"
+          data-testid="btn-chat-command-clear"
         >
           <Icon :icon="commandIcon" class="w-4 h-4" />
           <span class="font-mono font-semibold">/{{ activeCommand }}</span>
@@ -65,6 +66,7 @@
         @dragleave.prevent="handleDragLeave"
         @drop.prevent="handleDrop"
         :class="{ 'ring-2 ring-primary': isDragging }"
+        data-testid="comp-chat-input-shell"
       >
         <!-- Command Palette (outside overflow container) -->
         <CommandPalette
@@ -89,18 +91,20 @@
               @focus="isFocused = true"
               @blur="isFocused = false"
               class="flex-1"
+              data-testid="input-chat-message"
             />
           </div>
         </div>
 
         <!-- Fixed file upload button (positioned absolutely) -->
-        <div class="absolute bottom-2 left-3 md:left-4 pointer-events-none">
+        <div class="absolute bottom-2 left-3 md:left-4 pointer-events-none" data-testid="section-chat-attachments">
           <button
             @click="triggerFileUpload"
             type="button"
             class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto"
             :aria-label="$t('chatInput.attach')"
             :disabled="uploading"
+            data-testid="btn-chat-attach"
           >
             <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
             <PlusIcon v-else class="w-5 h-5" />
@@ -113,11 +117,12 @@
             @change="handleFileSelect"
             class="hidden"
             accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
+            data-testid="input-chat-file"
           />
         </div>
 
         <!-- Fixed action buttons (positioned absolutely) -->
-        <div class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none">
+        <div class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none" data-testid="section-chat-primary-actions">
           <button
             @click="toggleRecording"
             type="button"
@@ -126,6 +131,7 @@
               isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost'
             ]"
             :aria-label="$t('chatInput.voice')"
+            data-testid="btn-chat-voice"
           >
             <Icon 
               v-if="isRecording" 
@@ -144,6 +150,7 @@
               isStreaming ? 'rounded' : 'rounded-xl'
             ]"
             :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
+            data-testid="btn-chat-send"
           >
             <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
             <PaperAirplaneIcon v-else class="w-5 h-5" />
@@ -152,7 +159,7 @@
       </div>
 
       <!-- Main controls - always visible below input -->
-      <div class="mt-3 flex items-center gap-2">
+      <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
         <ToolsDropdown 
           :active-tools="activeTools" 
           @select="toggleTool" 
@@ -169,6 +176,7 @@
           ]"
           :disabled="enhanceLoading"
           :aria-label="$t('chatInput.enhance')"
+          data-testid="btn-chat-enhance"
         >
           <SparklesIcon class="w-4 h-4 md:w-5 md:h-5" />
           <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ $t('chatInput.enhance') }}</span>
@@ -183,6 +191,7 @@
             !supportsReasoning && 'opacity-50 cursor-not-allowed'
           ]"
           :aria-label="$t('chatInput.thinking')"
+          data-testid="btn-chat-thinking"
         >
           <Icon icon="mdi:brain" class="w-4 h-4 md:w-5 md:h-5" />
           <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ $t('chatInput.thinking') }}</span>

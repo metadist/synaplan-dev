@@ -5,8 +5,9 @@
         v-if="visible"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
         @click.self="emit('close')"
+        data-testid="modal-file-selection-root"
       >
-        <div class="surface-card max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col rounded-lg shadow-xl">
+        <div class="surface-card max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col rounded-lg shadow-xl" data-testid="modal-file-selection">
           <!-- Header -->
           <div class="flex items-center justify-between p-6 border-b border-light-border/30 dark:border-dark-border/20">
             <h2 class="text-xl font-semibold txt-primary">
@@ -16,6 +17,7 @@
               @click="emit('close')"
               class="icon-ghost p-2"
               :aria-label="$t('common.close')"
+              data-testid="btn-file-selection-close"
             >
               <XMarkIcon class="w-5 h-5" />
             </button>
@@ -28,12 +30,14 @@
             @dragover.prevent="handleDragOver"
             @dragleave.prevent="handleDragLeave"
             @drop.prevent="handleDrop"
+            data-testid="section-file-dropzone"
           >
             <div class="flex items-center gap-3">
               <button
                 @click="triggerFileUpload"
                 :disabled="isUploading"
                 class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-file-selection-upload"
               >
                 <Icon v-if="isUploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
                 <Icon v-else icon="mdi:cloud-upload" class="w-5 h-5" />
@@ -46,6 +50,7 @@
                 @change="handleFileUpload"
                 class="hidden"
                 accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
+                data-testid="input-file-selection-upload"
               />
               <span v-if="uploadProgress" class="text-sm txt-secondary">
                 {{ $t('fileSelection.uploading', { count: uploadProgress.current, total: uploadProgress.total }) }}
@@ -67,10 +72,12 @@
                 type="text"
                 :placeholder="$t('fileSelection.searchPlaceholder')"
                 class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-file-selection-search"
               />
               <select
                 v-model="filterStatus"
                 class="px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="select-file-selection-status"
               >
                 <option value="all">{{ $t('fileSelection.allStatuses') }}</option>
                 <option value="vectorized">{{ $t('files.status_vectorized') }}</option>
@@ -144,6 +151,7 @@
               <button
                 @click="emit('close')"
                 class="btn-secondary px-6 py-2 rounded-lg"
+                data-testid="btn-file-selection-cancel"
               >
                 {{ $t('common.cancel') }}
               </button>
@@ -151,6 +159,7 @@
                 @click="attachFiles"
                 :disabled="selectedFiles.length === 0"
                 class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-file-selection-attach"
               >
                 {{ $t('fileSelection.attachFiles') }}
               </button>
@@ -359,4 +368,3 @@ watch(() => props.visible, (visible) => {
   opacity: 0;
 }
 </style>
-

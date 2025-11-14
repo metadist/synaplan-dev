@@ -153,6 +153,7 @@
                 v-if="totalBadgesCount > 3"
                 @click="showAllBadges = !showAllBadges"
                 class="flex items-center gap-1 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
+                data-testid="btn-message-badges-toggle"
               >
                 <span v-if="!showAllBadges">+{{ totalBadgesCount - (webSearch ? 3 : 2) }}</span>
                 <Icon :icon="showAllBadges ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="w-4 h-4" />
@@ -174,6 +175,7 @@
               <button
                 @click="sourcesExpanded = !sourcesExpanded"
                 class="flex items-center gap-2 text-sm font-medium txt-tertiary hover:txt-primary transition-colors"
+                data-testid="btn-message-sources-toggle"
               >
                 <Icon icon="mdi:web" class="w-4 h-4" />
                 <span class="hidden sm:inline">{{ $t('search.sources') }}</span>
@@ -194,6 +196,7 @@
                   :disabled="carouselPage === 0"
                   class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   :title="'Previous'"
+                  data-testid="btn-message-sources-prev"
                 >
                   <Icon icon="mdi:chevron-left" class="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
@@ -207,6 +210,7 @@
                   :disabled="carouselPage >= Math.ceil(searchResults.length / 3) - 1"
                   class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   :title="'Next'"
+                  data-testid="btn-message-sources-next"
                 >
                   <Icon icon="mdi:chevron-right" class="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
@@ -340,6 +344,7 @@
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
               :title="getModelTypeTitle"
               @click="showModelDetails('chat')"
+              data-testid="btn-message-model-chat"
             >
               <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
               <span class="hidden sm:inline">{{ getModelTypeLabel }}:</span>
@@ -353,6 +358,7 @@
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
               :title="$t('config.aiModels.messageClassification')"
               @click="showModelDetails('sorting')"
+              data-testid="btn-message-model-sorting"
             >
               <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
               <span class="hidden sm:inline">{{ $t('config.aiModels.sorting') }}:</span>
@@ -389,6 +395,7 @@
               (isSuperseded || !selectedModel || !hasModels) ? 'opacity-50 cursor-not-allowed' : ''
             ]"
             :aria-label="$t('chatMessage.again')"
+            data-testid="btn-message-again"
           >
             <ArrowPathIcon class="w-4 h-4" />
             <span v-if="selectedModel" class="font-medium hidden sm:inline">{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span>
@@ -407,6 +414,7 @@
               ]"
               :aria-label="$t('chatMessage.regenerateWith')"
               @keydown.escape="closeModelDropdown"
+              data-testid="btn-message-model-toggle"
             >
               <ChevronDownIcon class="w-4 h-4" />
             </button>

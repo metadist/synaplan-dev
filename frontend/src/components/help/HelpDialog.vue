@@ -11,6 +11,7 @@
       <div
         v-if="show"
         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        data-testid="modal-help"
         @click.self="$emit('close')"
       >
         <Transition
@@ -27,6 +28,7 @@
             role="dialog"
             aria-modal="true"
             :aria-labelledby="content ? 'help-title' : undefined"
+            data-testid="modal-help-body"
           >
             <!-- Header -->
             <div class="flex items-center justify-between p-6 border-b border-light-border/30 dark:border-dark-border/20">
@@ -43,6 +45,7 @@
                 @click="$emit('close')"
                 class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
                 :aria-label="$t('help.close')"
+                data-testid="btn-close"
               >
                 <XMarkIcon class="w-6 h-6 mx-auto" />
               </button>
@@ -59,6 +62,7 @@
                   v-for="(step, index) in content.steps"
                   :key="index"
                   class="flex gap-4"
+                  data-testid="item-step"
                 >
                   <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--brand)] text-white flex items-center justify-center font-semibold text-sm">
                     {{ index + 1 }}
@@ -80,6 +84,7 @@
               <button
                 @click="$emit('close')"
                 class="btn-primary w-full py-3 rounded-lg font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)]"
+                data-testid="btn-confirm"
               >
                 {{ $t('help.gotIt') }}
               </button>

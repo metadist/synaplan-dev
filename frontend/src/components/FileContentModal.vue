@@ -5,10 +5,12 @@
         v-if="isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
         @click.self="close"
+        data-testid="modal-file-content-root"
       >
         <div
           class="surface-card max-w-6xl w-full max-h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden"
           @click.stop
+          data-testid="modal-file-content"
         >
           <!-- Header -->
           <div class="flex items-center justify-between p-6 border-b border-light-border/10 dark:border-dark-border/10">
@@ -26,6 +28,7 @@
               @click="close"
               class="ml-4 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
               aria-label="Close"
+              data-testid="btn-file-content-close"
             >
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -90,6 +93,7 @@
               @click="copyToClipboard"
               :disabled="!fileData?.extracted_text"
               class="px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5"
+              data-testid="btn-file-content-copy"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -99,6 +103,7 @@
             <button
               @click="close"
               class="btn-primary px-6 py-2 rounded-lg"
+              data-testid="btn-file-content-dismiss"
             >
               Close
             </button>
@@ -214,4 +219,3 @@ const copyToClipboard = async () => {
   transform: scale(0.9);
 }
 </style>
-
