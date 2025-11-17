@@ -182,7 +182,7 @@ services:
     
     App\Controller\StaticUploadController:
         arguments:
-            $uploadDir: '%kernel.project_dir%/public/uploads'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'controller.service_arguments' }
 

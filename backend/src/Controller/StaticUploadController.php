@@ -7,6 +7,7 @@ use App\Repository\MessageRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
@@ -39,9 +40,28 @@ class StaticUploadController extends AbstractController
     #[Route('/{filename}', name: 'serve_static_upload', requirements: ['filename' => '[a-zA-Z0-9_\-\.]+'], methods: ['GET'])]
     public function serve(
         string $filename,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
+        Request $request
     ): Response {
-        // 1. Find message by filePath (format: "/api/v1/files/uploads/{filename}")
+        // Check if this is a temporary AI-generated file (TTS, generated images, etc.)
+        $isTemporaryAiFile = preg_match('/^(tts_|generated_|ai_)/', $filename);
+        
+        if ($isTemporaryAiFile) {
+            // For temporary AI-generated files: Allow access without strict auth
+            // These files are ephemeral (not stored in DB) and auto-deleted
+            // Browser <audio> and <video> tags can't send Authorization headers
+            
+            $this->logger->info('StaticUploadController: Serving temporary AI-generated file', [
+                'filename' => $filename,
+                'user_id' => $user?->getId(),
+                'has_auth' => $user !== null
+            ]);
+            
+            // Skip message/permission check - serve directly
+            return $this->serveFile($filename);
+        }
+        
+        // 1. For regular files: Find message by filePath (format: "/api/v1/files/uploads/{filename}")
         $filePath = "/api/v1/files/uploads/{$filename}";
         
         $message = $this->messageRepository->createQueryBuilder('m')
@@ -116,7 +136,16 @@ class StaticUploadController extends AbstractController
             ], Response::HTTP_GONE);
         }
 
-        // 5. Build absolute path with security checks
+        // 5. Serve the file
+        return $this->serveFile($filename);
+    }
+    
+    /**
+     * Serve file from disk with security checks
+     */
+    private function serveFile(string $filename): Response
+    {
+        // Build absolute path with security checks
         $absolutePath = $this->uploadDir . '/' . $filename;
         
         // Resolve to real path (prevents symlink attacks)
@@ -142,9 +171,9 @@ class StaticUploadController extends AbstractController
             throw $this->createNotFoundException('File not found on disk');
         }
 
-        // Determine MIME type and serve inline for images
+        // Determine MIME type and serve inline for images/audio/video
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        $inlineTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+        $inlineTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'mp3', 'wav', 'ogg', 'mp4', 'webm'];
 
         $disposition = in_array($extension, $inlineTypes)
             ? ResponseHeaderBag::DISPOSITION_INLINE
@@ -167,6 +196,9 @@ class StaticUploadController extends AbstractController
         // Security headers
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'no-referrer');
+        
+        // CORS headers for audio/video playback (already handled by Nelmio, but explicit for media)
+        $response->headers->set('Accept-Ranges', 'bytes');
 
         $this->logger->info('StaticUploadController: File served', [
             'filename' => $filename,
@@ -192,6 +224,9 @@ class StaticUploadController extends AbstractController
             'webm' => 'video/webm',
             'mp3' => 'audio/mpeg',
             'wav' => 'audio/wav',
+            'ogg' => 'audio/ogg',
+            'aac' => 'audio/aac',
+            'flac' => 'audio/flac',
             default => null
         };
     }

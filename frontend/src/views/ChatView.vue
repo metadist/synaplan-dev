@@ -83,6 +83,7 @@ import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api'
 import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
 import { parseAIResponse } from '@/utils/responseParser'
+import { normalizeMediaUrl } from '@/utils/urlHelper'
 
 const { t } = useI18n()
 
@@ -546,13 +547,14 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             console.log('📎 File received:', data.type, data.url)
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
-              // Add file part based on type
+              // Add file part based on type - normalize URLs to absolute
+              const absoluteUrl = normalizeMediaUrl(data.url)
               if (data.type === 'image') {
-                message.parts.push({ type: 'image', url: data.url })
+                message.parts.push({ type: 'image', url: absoluteUrl })
               } else if (data.type === 'video') {
-                message.parts.push({ type: 'video', url: data.url })
+                message.parts.push({ type: 'video', url: absoluteUrl })
               } else if (data.type === 'audio') {
-                message.parts.push({ type: 'audio', url: data.url })
+                message.parts.push({ type: 'audio', url: absoluteUrl })
               }
             }
           } else if (data.status === 'links') {
