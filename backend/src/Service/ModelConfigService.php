@@ -296,5 +296,16 @@ class ModelConfigService
         // Default: true (backward compatibility)
         return true;
     }
+
+    public function getModelTag(int $modelId): ?string
+    {
+        $model = $this->modelRepository->find($modelId);
+
+        if (!$model) {
+            return null;
+        }
+
+        return $model->getTag();
+    }
 }
 

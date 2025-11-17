@@ -128,7 +128,6 @@ class MessageControllerTest extends WebTestCase
         $this->assertArrayHasKey('message', $response);
         $this->assertArrayHasKey('id', $response['message']);
         $this->assertArrayHasKey('text', $response['message']);
-        $this->assertArrayHasKey('again', $response);
     }
 
     public function testGetHistoryWithoutAuth(): void

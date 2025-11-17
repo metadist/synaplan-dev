@@ -36,6 +36,5 @@ export interface MessageResponse {
     trackId: number
     topic: string
   }
-  again?: AgainData
 }
 

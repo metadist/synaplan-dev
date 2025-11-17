@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Service\ModelConfigService;
+use App\Service\Message\MediaPromptExtractor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -24,7 +25,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private ModelConfigService $modelConfigService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private ChatHandler $chatHandler,
+        private MediaPromptExtractor $promptExtractor,
         private string $uploadDir = '/var/www/html/var/uploads'
     ) {}
 
@@ -64,50 +65,23 @@ class MediaGenerationHandler implements MessageHandlerInterface
         // Send initial status based on detected media type (will be refined later)
         $this->notify($progressCallback, 'analyzing', 'Understanding your request...');
 
-        // Extract media prompt using ChatHandler with mediamaker prompt
-        // This processes the user input and extracts the actual text to be used for media generation
-        $extractedPrompt = '';
-        $promptExtractionCallback = function($chunk) use (&$extractedPrompt) {
-            $extractedPrompt .= $chunk;
-        };
+        // Extract media prompt via AI (mediamaker prompt)
+        $promptData = $this->promptExtractor->extract($message, $thread, $classification);
+        $prompt = trim($promptData['prompt'] ?? '');
+        $promptMediaType = $promptData['media_type'] ?? null;
         
-        try {
-            $this->logger->info('MediaGenerationHandler: Extracting prompt via ChatHandler', [
-                'original_text' => substr($message->getText(), 0, 100)
-            ]);
-            
-            $this->chatHandler->handleStream(
-                $message,
-                $thread,
-                $classification,
-                $promptExtractionCallback,
-                null, // No progress callback
-                $options
-            );
-            
-            $prompt = trim($extractedPrompt);
-            
-            $this->logger->info('MediaGenerationHandler: Prompt extracted', [
-                'extracted_prompt' => substr($prompt, 0, 100),
-                'original_length' => strlen($message->getText()),
-                'extracted_length' => strlen($prompt)
-            ]);
-        } catch (\Exception $e) {
-            // Fallback to original text if extraction fails
-            $this->logger->warning('MediaGenerationHandler: Prompt extraction failed, using original text', [
-                'error' => $e->getMessage()
-            ]);
+        if ($prompt === '') {
             $prompt = $message->getText();
         }
         
-        // If prompt is empty, use original text
-        if (empty($prompt)) {
-            $prompt = $message->getText();
+        if ($prompt === '') {
+            throw new \RuntimeException('Unable to determine media prompt text');
         }
         
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
             'user_id' => $message->getUserId(),
-            'prompt' => substr($prompt, 0, 100)
+            'prompt' => substr($prompt, 0, 100),
+            'media_hint' => $promptMediaType
         ]);
 
         // Get media generation model - detect type from model tag if specified
@@ -136,25 +110,39 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 $modelName = $model->getName();
             }
         } else {
-            // Auto-detect media type from prompt keywords (English only - sorting handles multilingual)
-            $isVideo = preg_match('/\b(video|film|movie|clip|animation|animated)\b/i', $prompt);
-            $isAudio = preg_match('/\b(audio|sound|music|voice|speech|song|read|aloud|speak|tts|text.?to.?speech|convert.?to.?audio|make.?voice)\b/i', $prompt);
-            
-            if ($isVideo) {
+            if ($promptMediaType === 'video') {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
                 $mediaType = 'video';
-            } elseif ($isAudio) {
+                $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (video)');
+            } elseif ($promptMediaType === 'audio') {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $message->getUserId());
                 $mediaType = 'audio';
-            } else {
+                $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (audio)');
+            } elseif ($promptMediaType === 'image') {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
                 $mediaType = 'image';
+                $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
+            } else {
+                // Auto-detect media type from prompt keywords (English only - sorting handles multilingual)
+                $isVideo = preg_match('/\b(video|film|movie|clip|animation|animated)\b/i', $prompt);
+                $isAudio = preg_match('/\b(audio|sound|music|voice|speech|song|read|aloud|speak|tts|text.?to.?speech|convert.?to.?audio|make.?voice)\b/i', $prompt);
+                
+                if ($isVideo) {
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
+                    $mediaType = 'video';
+                } elseif ($isAudio) {
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $message->getUserId());
+                    $mediaType = 'audio';
+                } else {
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
+                    $mediaType = 'image';
+                }
+                
+                $this->logger->info('MediaGenerationHandler: Auto-detected media type', [
+                    'media_type' => $mediaType,
+                    'model_id' => $modelId
+                ]);
             }
-            
-            $this->logger->info('MediaGenerationHandler: Auto-detected media type', [
-                'media_type' => $mediaType,
-                'model_id' => $modelId
-            ]);
         }
         
         // Resolve model ID to provider + model name
@@ -320,6 +308,8 @@ class MediaGenerationHandler implements MessageHandlerInterface
                     'model_id' => $modelId,
                     'image_url' => $mediaUrl,
                     'local_path' => $localPath,
+                    'media_prompt' => $prompt,
+                    'media_type' => $mediaType,
                     // StreamController expects this format for 'file' SSE event
                     'file' => [
                         'path' => $displayUrl,

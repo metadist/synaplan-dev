@@ -659,15 +659,20 @@ class GoogleProvider implements
         }
 
         try {
-            // Accept both gemini-2.0-flash and gemini-2.0-flash-exp for TTS
-            $model = $options['model'] ?? 'gemini-2.0-flash-exp';
-            if ($model === 'gemini-2.0-flash') {
-                $model = 'gemini-2.0-flash-exp'; // Use experimental version for TTS
+            $allowedTtsModels = [
+                'gemini-2.5-flash-preview-tts',
+                'gemini-2.5-pro-preview-tts',
+            ];
+            $model = $options['model'] ?? 'gemini-2.5-flash-preview-tts';
+            if (!in_array($model, $allowedTtsModels, true)) {
+                $model = 'gemini-2.5-flash-preview-tts';
             }
+            $voiceName = $options['voice'] ?? 'Kore';
             
             $this->logger->info('Google Gemini: Synthesizing speech with multimodal output', [
                 'model' => $model,
-                'text_length' => strlen($text)
+                'text_length' => strlen($text),
+                'voice' => $voiceName,
             ]);
 
             // Use Gemini 2.0 Flash with TTS capability (audio output modality)
@@ -686,11 +691,11 @@ class GoogleProvider implements
                     ]
                 ],
                 'generationConfig' => [
-                    'response_modalities' => ['AUDIO'], // Request audio output
-                    'speech_config' => [
-                        'voice_config' => [
-                            'prebuilt_voice_config' => [
-                                'voice_name' => 'Puck' // Default voice (Puck, Charon, Kore, Fenrir, Aoede)
+                    'responseModalities' => ['AUDIO'], // Request audio output
+                    'speechConfig' => [
+                        'voiceConfig' => [
+                            'prebuiltVoiceConfig' => [
+                                'voiceName' => $voiceName
                             ]
                         ]
                     ]
@@ -703,7 +708,8 @@ class GoogleProvider implements
                     'x-goog-api-key' => $this->apiKey,
                 ],
                 'json' => $payload,
-                'timeout' => 90,
+                'timeout' => 240,
+                'max_duration' => 300,
             ]);
 
             $statusCode = $response->getStatusCode();
@@ -717,27 +723,59 @@ class GoogleProvider implements
             }
 
             $data = $response->toArray();
-            
-            // Extract audio data from response
-            // Gemini returns audio in candidates[0].content.parts[0].inline_data.data (base64)
-            if (!isset($data['candidates'][0]['content']['parts'][0]['inline_data']['data'])) {
+
+            $parts = $data['candidates'][0]['content']['parts'] ?? [];
+            $audioPart = null;
+            foreach ($parts as $part) {
+                if (isset($part['inline_data']['data'])) {
+                    $this->logger->info('Google Gemini TTS: Found inline_data audio part', [
+                        'keys' => array_keys($part['inline_data']),
+                        'mime_type' => $part['inline_data']['mime_type'] ?? null,
+                        'data_preview' => substr($part['inline_data']['data'], 0, 32)
+                    ]);
+                    $audioPart = $part['inline_data'];
+                    break;
+                }
+                if (isset($part['inlineData']['data'])) {
+                    $this->logger->info('Google Gemini TTS: Found inlineData audio part', [
+                        'keys' => array_keys($part['inlineData']),
+                        'mime_type' => $part['inlineData']['mimeType'] ?? null,
+                        'data_preview' => substr($part['inlineData']['data'], 0, 32)
+                    ]);
+                    $audioPart = $part['inlineData'];
+                    break;
+                }
+            }
+
+            if (!$audioPart || empty($audioPart['data'])) {
                 $this->logger->error('Google Gemini TTS: No audio data in response', [
                     'response' => json_encode($data)
                 ]);
                 throw new \Exception('No audio data returned from Gemini TTS');
             }
 
-            $base64Audio = $data['candidates'][0]['content']['parts'][0]['inline_data']['data'];
-            $mimeType = $data['candidates'][0]['content']['parts'][0]['inline_data']['mime_type'] ?? 'audio/wav';
+            $base64Audio = $audioPart['data'];
+            $mimeType = strtolower($audioPart['mime_type'] ?? $audioPart['mimeType'] ?? 'audio/wav');
             
             // Decode base64 audio
             $audioData = base64_decode($base64Audio);
+
+            if ($audioData === false || $audioData === '') {
+                throw new \Exception('Failed to decode audio data returned from Gemini TTS');
+            }
+
+            // Gemini TTS returns signed 16-bit PCM data by default (see docs)
+            // Convert PCM payload to a proper WAV container so browsers can play it
+            if ($this->isRawPcmMimeType($mimeType)) {
+                $audioData = $this->convertPcmToWav($audioData);
+                $mimeType = 'audio/wav';
+            }
             
-            // Determine file extension from mime type
+            // Determine file extension from mime type (after PCM conversion)
             $extension = match(true) {
                 str_contains($mimeType, 'wav') => 'wav',
                 str_contains($mimeType, 'mp3') => 'mp3',
-                str_contains($mimeType, 'pcm') => 'wav',
+                str_contains($mimeType, 'ogg') => 'ogg',
                 default => 'wav'
             };
 
@@ -772,6 +810,47 @@ class GoogleProvider implements
     {
         // Google Cloud TTS voices would be loaded here
         return [];
+    }
+
+    private function isRawPcmMimeType(?string $mimeType): bool
+    {
+        if (!$mimeType) {
+            return true;
+        }
+
+        return str_contains($mimeType, 'pcm')
+            || str_contains($mimeType, 'x-raw')
+            || str_contains($mimeType, 'linear16');
+    }
+
+    /**
+     * Gemini TTS returns signed 16-bit PCM buffers (24 kHz, mono) by default.
+     * Wrap the PCM payload into a RIFF/WAVE container so browsers can play it.
+     */
+    private function convertPcmToWav(
+        string $pcmData,
+        int $sampleRate = 24000,
+        int $channels = 1,
+        int $bitsPerSample = 16
+    ): string {
+        $dataSize = strlen($pcmData);
+        $blockAlign = (int) ($channels * ($bitsPerSample / 8));
+        $byteRate = $sampleRate * $blockAlign;
+
+        $header = 'RIFF'
+            . pack('V', 36 + $dataSize)
+            . 'WAVEfmt '
+            . pack('V', 16)
+            . pack('v', 1) // PCM format
+            . pack('v', $channels)
+            . pack('V', $sampleRate)
+            . pack('V', $byteRate)
+            . pack('v', $blockAlign)
+            . pack('v', $bitsPerSample)
+            . 'data'
+            . pack('V', $dataSize);
+
+        return $header . $pcmData;
     }
 
     // ==================== HELPER METHODS ====================

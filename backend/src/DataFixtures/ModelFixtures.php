@@ -624,22 +624,24 @@ class ModelFixtures extends Fixture
             [
                 'id' => 37,
                 'service' => 'Google',
-                'name' => 'Gemini 2.0 Flash',
+                'name' => 'Gemini 2.5 Flash TTS',
                 'tag' => 'text2sound',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'gemini-2.0-flash',
+                'providerId' => 'gemini-2.5-flash-preview-tts',
                 'priceIn' => 0.1,
                 'inUnit' => 'per1M',
                 'priceOut' => 0.4,
                 'outUnit' => 'per1M',
-                'quality' => 8,
+                'quality' => 9,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'Google Speech Generation with Gemini 2.0 Flash',
+                    'description' => 'Google Gemini 2.5 Flash Preview TTS (native speech generation)',
                     'params' => [
-                        'model' => 'gemini-2.0-flash'
-                    ]
+                        'model' => 'gemini-2.5-flash-preview-tts',
+                        'voice' => 'Kore'
+                    ],
+                    'features' => ['tts', 'audio']
                 ]
             ],
             [

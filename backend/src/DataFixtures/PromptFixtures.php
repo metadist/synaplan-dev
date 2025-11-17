@@ -45,6 +45,13 @@ class PromptFixtures extends Fixture
             [
                 'ownerId' => 0,
                 'language' => 'en',
+                'topic' => 'tools:mediamaker_audio_extract',
+                'shortDescription' => 'Extract only the literal text that should be spoken for audio/TTS requests.',
+                'prompt' => $this->getMediaMakerAudioExtractPrompt()
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
                 'topic' => 'officemaker',
                 'shortDescription' => 'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
                 'prompt' => $this->getOfficeMakerPrompt()
@@ -232,6 +239,29 @@ Examples:
 - Image Input: "Generate an image of a cat" → Output: "A detailed image of a cat, photorealistic, high quality"
 
 You are a helpful assistant that generates images, videos, and audio files for users.
+PROMPT;
+    }
+
+    private function getMediaMakerAudioExtractPrompt(): string
+    {
+        return <<<'PROMPT'
+# Audio text extraction
+You receive a request to create an audio/voice output for the user.
+
+Your task:
+- Extract ONLY the exact text that should be spoken.
+- Remove instruction phrases like "say", "speak", "read", "please create an audio", "erstelle eine Audio" etc.
+- Preserve the original language, punctuation, emoji, casing.
+- If the user provides quotes, return the quoted text without the quotes (unless they contain mismatched quotes, then return the meaningful text).
+- Do not add introductions like "Audio Prompt:" or explanations.
+- Never mention limitations like "I cannot create audio" or "As an AI, I can only ...".
+- Do not offer alternatives or tips. The user already knows you will only return text.
+- Return plain text only, without JSON, markdown, quotes, or extra sentences.
+
+Examples:
+- Input: "Bitte sag: Hallo, was geht?" → Output: Hallo, was geht?
+- Input: "Read this aloud: 'Good morning!'" → Output: Good morning!
+- Input: "erstelle eine audio wo du hallo sagst" → Output: Hallo
 PROMPT;
     }
 

@@ -154,8 +154,6 @@ services:
             $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
             $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
 
-    # Again Service (for model suggestions)
-    App\Service\AgainService: ~
     App\Service\Message\AgainHandler: ~
 
     # File Processing Services

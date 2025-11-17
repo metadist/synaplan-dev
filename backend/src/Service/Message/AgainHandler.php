@@ -2,12 +2,10 @@
 
 namespace App\Service\Message;
 
-use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Entity\User;
-use App\Service\AgainService;
-use App\Service\ModelConfigService;
+use App\Service\Message\MessageProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -23,9 +21,7 @@ class AgainHandler
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private AiFacade $aiFacade,
-        private AgainService $againService,
-        private ModelConfigService $modelConfigService,
+        private MessageProcessor $messageProcessor,
         private LoggerInterface $logger
     ) {}
 
@@ -54,8 +50,11 @@ class AgainHandler
             throw new \RuntimeException('Original message not found or access denied');
         }
 
-        // Create new incoming message with same content
-        $incomingMessage = $this->createIncomingMessage($user, $originalMessage);
+        $mediaPrompt = $originalMessage->getMeta('media_prompt');
+        $mediaType = $originalMessage->getMeta('media_type');
+
+        // Create new incoming message with same content (or media prompt override)
+        $incomingMessage = $this->createIncomingMessage($user, $originalMessage, $mediaPrompt, $mediaType);
         
         $this->em->persist($incomingMessage);
         $this->em->flush();
@@ -68,35 +67,22 @@ class AgainHandler
         // Set metadata for skipping sorting
         $this->setMessageMetadata($incomingMessage, $promptId, $modelId);
 
-        // Resolve model_id to provider + model name
-        $provider = null;
-        $modelName = null;
-        if ($modelId) {
-            $provider = $this->modelConfigService->getProviderForModel($modelId);
-            $modelName = $this->modelConfigService->getModelName($modelId);
-            
-            $this->logger->info('AgainHandler: Resolved model', [
-                'model_id' => $modelId,
-                'provider' => $provider,
-                'model' => $modelName
-            ]);
-        }
+        $processingResult = $this->runMessagePipeline($incomingMessage);
+        $classification = $processingResult['classification'] ?? [];
+        $handlerResponse = $processingResult['response'] ?? [];
+        $streamedText = $processingResult['text'] ?? $incomingMessage->getText();
 
-        // Process with AI
-        $aiResponse = $this->aiFacade->chat(
-            [['role' => 'user', 'content' => $incomingMessage->getText()]],
-            $user->getId(),
-            [
-                'provider' => $provider,
-                'model' => $modelName
-            ]
-        );
+        // Create outgoing message with handler metadata
+        $incomingMessage->setTopic($classification['topic'] ?? $incomingMessage->getTopic());
+        $incomingMessage->setLanguage($classification['language'] ?? $incomingMessage->getLanguage());
 
-        // Create outgoing message
-        $outgoingMessage = $this->createOutgoingMessage(
+        $outgoingMessage = $this->createOutgoingMessageFromProcessing(
             $user,
             $incomingMessage,
-            $aiResponse
+            $streamedText,
+            $classification,
+            $handlerResponse,
+            $modelId
         );
 
         $this->em->persist($outgoingMessage);
@@ -110,9 +96,6 @@ class AgainHandler
             'model_id' => $modelId,
         ]);
 
-        // Get Again models for next iteration
-        $againData = $this->getAgainData($incomingMessage->getTopic(), $modelId);
-
         return [
             'success' => true,
             'message' => [
@@ -125,19 +108,27 @@ class AgainHandler
                 'timestamp' => $outgoingMessage->getUnixTimestamp(),
                 'trackId' => $outgoingMessage->getTrackingId(),
                 'topic' => $incomingMessage->getTopic(),
-            ],
-            'again' => $againData
+            ]
         ];
     }
 
     /**
      * Create incoming message clone
      */
-    private function createIncomingMessage(User $user, Message $originalMessage): Message
+    private function createIncomingMessage(
+        User $user,
+        Message $originalMessage,
+        ?string $mediaPrompt = null,
+        ?string $mediaType = null
+    ): Message
     {
         $message = new Message();
         $message->setUserId($user->getId());
         $message->setTrackingId($originalMessage->getTrackingId());
+        if ($originalMessage->getChat()) {
+            $message->setChat($originalMessage->getChat());
+        }
+        $message->setChatId($originalMessage->getChatId());
         $message->setProviderIndex('WEB');
         $message->setUnixTimestamp(time());
         $message->setDateTime(date('YmdHis'));
@@ -151,7 +142,56 @@ class AgainHandler
         $message->setDirection('IN');
         $message->setStatus('processing');
 
+        if ($mediaPrompt && $mediaType === 'audio') {
+            $message->setText($mediaPrompt);
+            $message->setTopic('mediamaker');
+            $message->setMeta('media_prompt_override', $mediaPrompt);
+            $message->setMeta('media_type', $mediaType);
+        }
+
         return $message;
+    }
+
+    /**
+     * Run message through the normal pipeline (streaming mode) and capture chunks.
+     */
+    private function runMessagePipeline(Message $message): array
+    {
+        $buffer = '';
+
+        $streamCallback = function ($chunk) use (&$buffer) {
+            if (is_array($chunk)) {
+                if (($chunk['type'] ?? '') === 'content' && isset($chunk['content'])) {
+                    $buffer .= $chunk['content'];
+                } elseif (isset($chunk['message'])) {
+                    $buffer .= (string)$chunk['message'];
+                } elseif (isset($chunk['content'])) {
+                    $buffer .= (string)$chunk['content'];
+                }
+            } else {
+                $buffer .= (string)$chunk;
+            }
+        };
+
+        $statusCallback = function (array $status) {
+            // Optional: log status updates for debugging
+        };
+
+        $result = $this->messageProcessor->processStream(
+            $message,
+            $streamCallback,
+            $statusCallback,
+            [] // rely on MessageMeta overrides for Again
+        );
+
+        if (!($result['success'] ?? false)) {
+            $error = $result['error'] ?? 'Unknown processing error';
+            throw new \RuntimeException($error);
+        }
+
+        $result['text'] = trim($buffer);
+
+        return $result;
     }
 
     /**
@@ -198,32 +238,71 @@ class AgainHandler
         $this->logger->info('AgainHandler: Metadata flushed');
     }
 
-    /**
-     * Create outgoing message from AI response
-     */
-    private function createOutgoingMessage(User $user, Message $incomingMessage, array $aiResponse): Message
-    {
-        $responseText = $aiResponse['content'] ?? 'No response';
-        $responseProvider = $aiResponse['provider'] ?? 'test';
+    private function createOutgoingMessageFromProcessing(
+        User $user,
+        Message $incomingMessage,
+        string $responseText,
+        array $classification,
+        array $handlerResponse,
+        ?int $selectedModelId
+    ): Message {
+        $metadata = $handlerResponse['metadata'] ?? [];
+        $fileMeta = $metadata['file'] ?? null;
 
-        // Parse for media markers
-        [$hasFile, $filePath, $fileType, $cleanText] = $this->parseMediaMarkers($responseText);
+        $hasFile = $fileMeta ? 1 : 0;
+        $filePath = $fileMeta['path'] ?? '';
+        $fileType = $fileMeta['type'] ?? '';
+
+        if (!$hasFile) {
+            [$markerHasFile, $markerPath, $markerType, $cleanText] = $this->parseMediaMarkers($responseText);
+            if ($markerHasFile) {
+                $hasFile = 1;
+                $filePath = $markerPath;
+                $fileType = $markerType;
+                $responseText = $cleanText;
+            }
+        }
 
         $message = new Message();
         $message->setUserId($user->getId());
         $message->setTrackingId($incomingMessage->getTrackingId());
-        $message->setProviderIndex($responseProvider);
+        $message->setChat($incomingMessage->getChat());
+        $message->setProviderIndex($metadata['provider'] ?? $incomingMessage->getProviderIndex());
         $message->setUnixTimestamp(time());
         $message->setDateTime(date('YmdHis'));
         $message->setMessageType('WEB');
-        $message->setFile($hasFile ? 1 : 0);
+        $message->setFile($hasFile);
         $message->setFilePath($filePath);
         $message->setFileType($fileType);
-        $message->setTopic($incomingMessage->getTopic());
-        $message->setLanguage($incomingMessage->getLanguage());
-        $message->setText(trim($cleanText));
+        $message->setTopic($classification['topic'] ?? $incomingMessage->getTopic());
+        $message->setLanguage($classification['language'] ?? $incomingMessage->getLanguage());
+        $message->setText(trim($responseText));
         $message->setDirection('OUT');
         $message->setStatus('complete');
+
+        // Store metadata similar to streaming flow
+        $message->setMeta('ai_chat_provider', $metadata['provider'] ?? 'unknown');
+        $message->setMeta('ai_chat_model', $metadata['model'] ?? 'unknown');
+
+        if ($selectedModelId) {
+            $message->setMeta('ai_chat_model_id', (string)$selectedModelId);
+        } elseif (!empty($metadata['model_id'])) {
+            $message->setMeta('ai_chat_model_id', (string)$metadata['model_id']);
+        }
+
+        if (!empty($metadata['usage'])) {
+            $message->setMeta('ai_chat_usage', json_encode($metadata['usage']));
+        }
+
+        if (!empty($classification['sorting_provider'])) {
+            $message->setMeta('ai_sorting_provider', $classification['sorting_provider']);
+        }
+        if (!empty($classification['sorting_model_name'])) {
+            $message->setMeta('ai_sorting_model', $classification['sorting_model_name']);
+        }
+        if (!empty($classification['sorting_model_id'])) {
+            $message->setMeta('ai_sorting_model_id', (string)$classification['sorting_model_id']);
+        }
 
         return $message;
     }
@@ -253,20 +332,5 @@ class AgainHandler
         return [$hasFile, $filePath, $fileType, $cleanText];
     }
 
-    /**
-     * Get Again data for response
-     */
-    private function getAgainData(string $topic, ?int $currentModelId): array
-    {
-        $tag = $this->againService->resolveTagFromTopic($topic);
-        $eligibleModels = $this->againService->getEligibleModels($tag);
-        $predictedNext = $this->againService->getPredictedNext($eligibleModels, $currentModelId);
-
-        return [
-            'eligible' => $eligibleModels,
-            'predictedNext' => $predictedNext,
-            'tag' => $tag,
-        ];
-    }
 }
 
