@@ -659,27 +659,42 @@ class GoogleProvider implements
         }
 
         try {
-            $model = $options['model'] ?? 'gemini-2.0-flash';
+            // Accept both gemini-2.0-flash and gemini-2.0-flash-exp for TTS
+            $model = $options['model'] ?? 'gemini-2.0-flash-exp';
+            if ($model === 'gemini-2.0-flash') {
+                $model = 'gemini-2.0-flash-exp'; // Use experimental version for TTS
+            }
             
-            $this->logger->info('Google: Synthesizing speech', [
+            $this->logger->info('Google Gemini: Synthesizing speech with multimodal output', [
                 'model' => $model,
                 'text_length' => strlen($text)
             ]);
 
-            // Use Gemini to generate speech (experimental)
+            // Use Gemini 2.0 Flash with TTS capability (audio output modality)
             $url = self::API_BASE . "/models/{$model}:generateContent";
 
+            // Gemini 2.0 Flash TTS via speech modality
             $payload = [
                 'contents' => [
                     [
                         'role' => 'user',
                         'parts' => [
                             [
-                                'text' => "Convert this text to speech: {$text}"
+                                'text' => $text
                             ]
                         ]
                     ]
                 ],
+                'generationConfig' => [
+                    'response_modalities' => ['AUDIO'], // Request audio output
+                    'speech_config' => [
+                        'voice_config' => [
+                            'prebuilt_voice_config' => [
+                                'voice_name' => 'Puck' // Default voice (Puck, Charon, Kore, Fenrir, Aoede)
+                            ]
+                        ]
+                    ]
+                ]
             ];
 
             $response = $this->httpClient->request('POST', $url, [
@@ -688,11 +703,63 @@ class GoogleProvider implements
                     'x-goog-api-key' => $this->apiKey,
                 ],
                 'json' => $payload,
-                'timeout' => 60,
+                'timeout' => 90,
             ]);
 
-            // For now, throw not implemented - Google TTS requires different API
-            throw new ProviderException('Google TTS not yet implemented - use Google Cloud Text-to-Speech API', 'google');
+            $statusCode = $response->getStatusCode();
+            if ($statusCode !== 200) {
+                $errorBody = $response->getContent(false);
+                $this->logger->error('Google Gemini TTS: API error', [
+                    'status_code' => $statusCode,
+                    'error_body' => $errorBody
+                ]);
+                throw new \Exception("Google Gemini TTS API error (HTTP $statusCode): $errorBody");
+            }
+
+            $data = $response->toArray();
+            
+            // Extract audio data from response
+            // Gemini returns audio in candidates[0].content.parts[0].inline_data.data (base64)
+            if (!isset($data['candidates'][0]['content']['parts'][0]['inline_data']['data'])) {
+                $this->logger->error('Google Gemini TTS: No audio data in response', [
+                    'response' => json_encode($data)
+                ]);
+                throw new \Exception('No audio data returned from Gemini TTS');
+            }
+
+            $base64Audio = $data['candidates'][0]['content']['parts'][0]['inline_data']['data'];
+            $mimeType = $data['candidates'][0]['content']['parts'][0]['inline_data']['mime_type'] ?? 'audio/wav';
+            
+            // Decode base64 audio
+            $audioData = base64_decode($base64Audio);
+            
+            // Determine file extension from mime type
+            $extension = match(true) {
+                str_contains($mimeType, 'wav') => 'wav',
+                str_contains($mimeType, 'mp3') => 'mp3',
+                str_contains($mimeType, 'pcm') => 'wav',
+                default => 'wav'
+            };
+
+            // Save to file
+            $filename = 'tts_' . uniqid() . '.' . $extension;
+            $outputPath = $this->uploadDir . '/' . $filename;
+            
+            $written = file_put_contents($outputPath, $audioData);
+            if ($written === false) {
+                throw new \Exception("Failed to write audio file to {$outputPath}");
+            }
+
+            $this->logger->info('Google Gemini TTS: Audio saved', [
+                'filename' => $filename,
+                'size_bytes' => strlen($audioData),
+                'mime_type' => $mimeType
+            ]);
+
+            return $filename;
+            
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException(
                 'Google TTS error: ' . $e->getMessage(),

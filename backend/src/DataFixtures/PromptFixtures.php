@@ -39,7 +39,7 @@ class PromptFixtures extends Fixture
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'mediamaker',
-                'shortDescription' => 'The user asks for generation of an image, video or audio. Examples: "generiere ein bild", "create an image", "make a video", "generate a picture", "erstelle ein foto". User wants to CREATE visual or audio media, not analyze it. This handles the connection to media generation AIs like DALL-E, Stable Diffusion, etc.',
+                'shortDescription' => 'The user asks for generation of an image, video or audio/speech. Examples: "create an image", "make a video", "generate a picture", "read this aloud", "text to speech", "convert to audio", "make a voice". User wants to CREATE visual or audio media, not analyze it. This handles the connection to media generation AIs like DALL-E, Stable Diffusion, TTS, etc.',
                 'prompt' => $this->getMediaMakerPrompt()
             ],
             [
@@ -211,9 +211,25 @@ You receive a media generation request. The user has requested the generation of
 
 Please find out if the user wants an image, video or an audio file.
 
-Extract the prompt from BTEXT. Improve the prompt, add details from the purpose of the user. 
-Create a better prompt from the user input in the language of the user, if it is not audio.
-Audio is taken like the user wants it. Only image and video prompts need improvements.
+## For AUDIO/TTS requests:
+- Extract ONLY the text that should be spoken from BTEXT
+- Remove instruction words like "read", "speak", "convert", "make audio", "generate voice", "erstelle audio", "lies vor", etc.
+- Keep only the actual content to be spoken
+- Preserve the original language and punctuation
+- If text is in quotes, extract the quoted text only
+- Return ONLY the extracted text, nothing else
+
+## For IMAGE/VIDEO requests:
+- Extract the prompt from BTEXT
+- Improve the prompt and add details from the user's purpose
+- Create a better, more detailed prompt in the user's language
+
+Examples:
+- Audio Input: "Read this aloud: Hello World" → Output: "Hello World"
+- Audio Input: "Erstelle eine audio mit 'Guten Tag!'" → Output: "Guten Tag!"
+- Audio Input: "Lies mir vor: Wie geht es dir?" → Output: "Wie geht es dir?"
+- Audio Input: "Make a voice saying welcome" → Output: "welcome"
+- Image Input: "Generate an image of a cat" → Output: "A detailed image of a cat, photorealistic, high quality"
 
 You are a helpful assistant that generates images, videos, and audio files for users.
 PROMPT;

@@ -532,7 +532,7 @@ class ModelFixtures extends Fixture
             [
                 'id' => 83,
                 'service' => 'OpenAI',
-                'name' => 'tts-1-hd (Alloy)',
+                'name' => 'tts-1-hd',
                 'tag' => 'text2sound',
                 'selectable' => 1,
                 'active' => 1,
@@ -544,54 +544,9 @@ class ModelFixtures extends Fixture
                 'quality' => 9,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'OpenAI high-quality text-to-speech with voice Alloy (neutral and balanced).',
+                    'description' => 'OpenAI high-quality text-to-speech.',
                     'params' => [
-                        'model' => 'tts-1-hd',
-                        'voice' => 'alloy'
-                    ]
-                ]
-            ],
-            [
-                'id' => 84,
-                'service' => 'OpenAI',
-                'name' => 'tts-1-hd (Echo)',
-                'tag' => 'text2sound',
-                'selectable' => 1,
-                'active' => 1,
-                'providerId' => 'tts-1-hd',
-                'priceIn' => 0.03,
-                'inUnit' => 'per1000chars',
-                'priceOut' => 0,
-                'outUnit' => '-',
-                'quality' => 9,
-                'rating' => 1,
-                'json' => [
-                    'description' => 'OpenAI high-quality text-to-speech with voice Echo (male voice).',
-                    'params' => [
-                        'model' => 'tts-1-hd',
-                        'voice' => 'echo'
-                    ]
-                ]
-            ],
-            [
-                'id' => 85,
-                'service' => 'OpenAI',
-                'name' => 'tts-1-hd (Shimmer)',
-                'tag' => 'text2sound',
-                'selectable' => 1,
-                'active' => 1,
-                'providerId' => 'tts-1-hd',
-                'priceIn' => 0.03,
-                'inUnit' => 'per1000chars',
-                'priceOut' => 0,
-                'outUnit' => '-',
-                'quality' => 9,
-                'rating' => 1,
-                'json' => [
-                    'description' => 'OpenAI high-quality text-to-speech with voice Shimmer (warm female voice).',
-                    'params' => [
-                        'model' => 'tts-1-hd',
-                        'voice' => 'shimmer'
+                        'model' => 'tts-1-hd'
                     ]
                 ]
             ],

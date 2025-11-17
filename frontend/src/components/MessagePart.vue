@@ -8,6 +8,7 @@ import type { Part } from '../stores/history'
 import MessageText from './MessageText.vue'
 import MessageImage from './MessageImage.vue'
 import MessageVideo from './MessageVideo.vue'
+import MessageAudio from './MessageAudio.vue'
 import MessageCode from './MessageCode.vue'
 import MessageLinks from './MessageLinks.vue'
 import MessageDocs from './MessageDocs.vue'
@@ -31,6 +32,8 @@ const componentType = computed(() => {
       return MessageImage
     case 'video':
       return MessageVideo
+    case 'audio':
+      return MessageAudio
     case 'code':
       return MessageCode
     case 'links':
@@ -60,6 +63,8 @@ const componentProps = computed(() => {
       return { url: props.part.url || '', alt: props.part.alt }
     case 'video':
       return { url: props.part.url || '', poster: props.part.poster }
+    case 'audio':
+      return { url: props.part.url || '' }
     case 'code':
       return {
         content: props.part.content || '',

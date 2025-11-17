@@ -24,6 +24,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private ModelConfigService $modelConfigService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private ChatHandler $chatHandler,
         private string $uploadDir = '/var/www/html/var/uploads'
     ) {}
 
@@ -63,8 +64,46 @@ class MediaGenerationHandler implements MessageHandlerInterface
         // Send initial status based on detected media type (will be refined later)
         $this->notify($progressCallback, 'analyzing', 'Understanding your request...');
 
-        // Use user input directly (no enhancement - frontend has "Enhance Prompt" button)
-        $prompt = $message->getText();
+        // Extract media prompt using ChatHandler with mediamaker prompt
+        // This processes the user input and extracts the actual text to be used for media generation
+        $extractedPrompt = '';
+        $promptExtractionCallback = function($chunk) use (&$extractedPrompt) {
+            $extractedPrompt .= $chunk;
+        };
+        
+        try {
+            $this->logger->info('MediaGenerationHandler: Extracting prompt via ChatHandler', [
+                'original_text' => substr($message->getText(), 0, 100)
+            ]);
+            
+            $this->chatHandler->handleStream(
+                $message,
+                $thread,
+                $classification,
+                $promptExtractionCallback,
+                null, // No progress callback
+                $options
+            );
+            
+            $prompt = trim($extractedPrompt);
+            
+            $this->logger->info('MediaGenerationHandler: Prompt extracted', [
+                'extracted_prompt' => substr($prompt, 0, 100),
+                'original_length' => strlen($message->getText()),
+                'extracted_length' => strlen($prompt)
+            ]);
+        } catch (\Exception $e) {
+            // Fallback to original text if extraction fails
+            $this->logger->warning('MediaGenerationHandler: Prompt extraction failed, using original text', [
+                'error' => $e->getMessage()
+            ]);
+            $prompt = $message->getText();
+        }
+        
+        // If prompt is empty, use original text
+        if (empty($prompt)) {
+            $prompt = $message->getText();
+        }
         
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
             'user_id' => $message->getUserId(),
@@ -97,9 +136,9 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 $modelName = $model->getName();
             }
         } else {
-            // Auto-detect media type from prompt keywords
+            // Auto-detect media type from prompt keywords (English only - sorting handles multilingual)
             $isVideo = preg_match('/\b(video|film|movie|clip|animation|animated)\b/i', $prompt);
-            $isAudio = preg_match('/\b(audio|sound|music|voice|speech|song)\b/i', $prompt);
+            $isAudio = preg_match('/\b(audio|sound|music|voice|speech|song|read|aloud|speak|tts|text.?to.?speech|convert.?to.?audio|make.?voice)\b/i', $prompt);
             
             if ($isVideo) {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
@@ -165,7 +204,36 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 
                 $media = $result['videos'] ?? [];
             } elseif ($mediaType === 'audio') {
-                throw new \Exception("Audio generation requires OpenAI TTS or Google TTS API setup. Audio support coming soon!");
+                // Generate audio using TTS
+                $this->logger->info('MediaGenerationHandler: Starting TTS generation', [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'text_length' => strlen($prompt)
+                ]);
+                
+                $result = $this->aiFacade->synthesize(
+                    $prompt,
+                    $message->getUserId(),
+                    [
+                        'provider' => $provider,
+                        'model' => $modelName,
+                        'format' => 'mp3'
+                    ]
+                );
+                
+                // synthesize() returns ['filename' => 'tts_xxx.mp3', 'provider' => 'openai', 'model' => 'tts-1']
+                $filename = $result['filename'];
+                
+                $this->logger->info('MediaGenerationHandler: TTS audio generated', [
+                    'filename' => $filename,
+                    'provider' => $result['provider']
+                ]);
+                
+                $media = [[
+                    'url' => "/api/v1/files/uploads/{$filename}",
+                    'type' => 'audio',
+                    'format' => pathinfo($filename, PATHINFO_EXTENSION)
+                ]];
             } else {
                 // Generate image
                 $result = $this->aiFacade->generateImage(
