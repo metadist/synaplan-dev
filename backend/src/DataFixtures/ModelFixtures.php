@@ -76,7 +76,7 @@ class ModelFixtures extends Fixture
             [
                 'id' => 17,
                 'service' => 'Groq',
-                'name' => 'llama-4-scout-17b-16e-instruct',
+                'name' => 'Llama 4 Scout Vision',
                 'tag' => 'pic2text',
                 'selectable' => 1,
                 'active' => 1,
@@ -88,10 +88,10 @@ class ModelFixtures extends Fixture
                 'quality' => 8,
                 'rating' => 0,
                 'json' => [
-                    'description' => 'Groq image processing and text extraction',
-                    'prompt' => 'Describe image! List the texts in the image, if possible. If not, describe the image in short.',
+                    'description' => 'Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode',
                     'params' => [
-                        'model' => 'llama-3.2-90b-vision-preview'
+                        'model' => 'meta-llama/llama-4-scout-17b-16e-instruct',
+                        'max_completion_tokens' => 1024
                     ]
                 ]
             ],

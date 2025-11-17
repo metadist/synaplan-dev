@@ -24,7 +24,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private ModelConfigService $modelConfigService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private string $uploadDir = '/var/www/html/public/uploads'
+        private string $uploadDir = '/var/www/html/var/uploads'
     ) {}
 
     public function getName(): string

@@ -202,9 +202,16 @@ class AiFacade
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'pic2text');
         }
         
+        $this->logger->info('AI vision request - provider selection', [
+            'requested_provider' => $providerName,
+            'user_id' => $userId,
+            'image' => basename($imagePath),
+            'options' => $options
+        ]);
+        
         $provider = $this->registry->getVisionProvider($providerName);
         
-        $this->logger->info('AI vision request', [
+        $this->logger->info('AI vision request - provider resolved', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'image' => basename($imagePath),
@@ -218,9 +225,12 @@ class AiFacade
             );
         } catch (\Exception $e) {
             $this->logger->error('AI vision failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'provider' => $provider->getName(),
+                'image_path' => $imagePath
             ]);
-            throw new ProviderException('Vision AI failed', 'unknown', null, 0, $e);
+            throw new ProviderException('Vision AI failed: ' . $e->getMessage(), 'unknown', null, 0, $e);
         }
         
         return [

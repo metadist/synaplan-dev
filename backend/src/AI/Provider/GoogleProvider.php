@@ -36,7 +36,7 @@ class GoogleProvider implements
         private ?string $apiKey = null,
         private ?string $projectId = null,
         private string $region = 'us-central1',
-        private string $uploadDir = '/var/www/html/public/uploads'
+        private string $uploadDir = '/var/www/html/var/uploads'
     ) {
         // Ensure projectId is null if empty string
         if (empty($this->projectId)) {
