@@ -1,8 +1,8 @@
 <template>
   <MainLayout>
-    <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin">
+    <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin" data-testid="page-tools">
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
-        <div class="mb-8">
+        <div class="mb-8" data-testid="section-header">
           <h1 class="text-3xl font-semibold txt-primary mb-2">
             {{ getPageTitle() }}
           </h1>
@@ -11,9 +11,9 @@
           </p>
         </div>
 
-        <div v-if="currentPage === 'introduction'" class="space-y-4">
+        <div v-if="currentPage === 'introduction'" class="space-y-4" data-testid="section-introduction">
           <!-- Search Bar -->
-          <div class="surface-card p-4">
+          <div class="surface-card p-4" data-testid="section-command-search">
             <div class="relative">
               <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary" />
               <input
@@ -21,11 +21,13 @@
                 type="text"
                 :placeholder="$t('tools.searchCommands')"
                 class="w-full pl-12 pr-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-command-search"
               />
               <button
                 v-if="searchQuery"
                 @click="searchQuery = ''"
                 class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover-overlay-light transition-colors flex items-center justify-center"
+                data-testid="btn-clear-search"
               >
                 <XMarkIcon class="w-4 h-4 txt-secondary" />
               </button>
@@ -39,10 +41,12 @@
             v-for="cmd in filteredCommands"
             :key="cmd.name"
             class="surface-card overflow-hidden"
+            data-testid="item-command"
           >
             <button
               @click="toggleCommand(cmd.name)"
               class="w-full px-6 py-4 flex items-center justify-between hover-overlay-light transition-colors"
+              data-testid="btn-toggle-command"
             >
               <div class="flex items-center gap-4">
                 <div
@@ -81,7 +85,7 @@
               leave-to-class="max-h-0 opacity-0"
             >
               <div v-if="expandedCommands.includes(cmd.name)" class="overflow-hidden">
-                <div class="px-6 pb-6 border-t border-light-border/30 dark:border-dark-border/20 pt-4">
+                <div class="px-6 pb-6 border-t border-light-border/30 dark:border-dark-border/20 pt-4" data-testid="section-command-details">
                   <div class="flex flex-wrap gap-2 mb-4">
                     <span
                       v-for="tag in getCommandTags(cmd)"
@@ -116,6 +120,7 @@
               @create="createWidget"
               @edit="editWidget"
               @delete="deleteWidget"
+              data-testid="comp-widget-list"
             />
           </div>
           <div v-else class="grid grid-cols-1 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
@@ -126,10 +131,11 @@
                 :user-id="'152'"
                 :show-code="!!currentWidgetId"
                 @cancel="cancelEdit"
+                data-testid="comp-widget-editor"
               />
             </div>
 
-            <div v-if="showPreview" class="xl:col-span-3 xl:sticky xl:top-6 xl:h-fit">
+            <div v-if="showPreview" class="xl:col-span-3 xl:sticky xl:top-6 xl:h-fit" data-testid="section-widget-preview">
               <div class="surface-card p-2 sm:p-4 lg:p-6">
                 <div class="flex items-center justify-between mb-3 lg:mb-4">
                   <h3 class="text-base lg:text-lg font-semibold txt-primary flex items-center gap-2">
@@ -183,7 +189,23 @@
         </div>
 
         <div v-else-if="currentPage === 'doc-summary'">
-          <SummaryConfiguration @generate="handleGenerateSummary" />
+          <SummaryConfiguration 
+            @generate="handleGenerateSummary"
+            @regenerate="handleRegenerateSummary"
+            @show="showSummaryModal"
+            :is-generating="isGeneratingSummary"
+            :current-model="currentChatModel"
+            data-testid="comp-summary-config"
+          />
+          
+          <!-- Summary Result Modal -->
+          <SummaryResultModal
+            :is-open="isSummaryModalOpen"
+            :summary="summaryResult?.summary || null"
+            :metadata="summaryResult?.metadata || null"
+            :config="lastSummaryConfig"
+            @close="closeSummaryModal"
+          />
         </div>
 
             <div v-else-if="currentPage === 'mail-handler'">
@@ -193,6 +215,7 @@
                 @create="createMailHandler"
                 @edit="editMailHandler"
                 @delete="deleteMailHandler"
+                data-testid="comp-mail-handler-list"
               />
               <MailHandlerConfiguration
                 v-else
@@ -200,6 +223,7 @@
                 :handler-id="currentMailHandlerId"
                 @save="saveMailHandler"
                 @cancel="cancelMailHandlerEdit"
+                data-testid="comp-mail-handler-config"
               />
             </div>
        </div>
@@ -212,12 +236,13 @@
        @save="saveWidget"
        @discard="discardChanges"
        @preview="togglePreview"
+       data-testid="bar-widget-unsaved"
      />
-   </MainLayout>
- </template>
+  </MainLayout>
+</template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
@@ -225,6 +250,7 @@ import WidgetEditor from '@/components/widgets/WidgetEditor.vue'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import SummaryConfiguration from '@/components/summary/SummaryConfiguration.vue'
+import SummaryResultModal from '@/components/summary/SummaryResultModal.vue'
 import MailHandlerConfiguration from '@/components/mail/MailHandlerConfiguration.vue'
 import MailHandlerList from '@/components/mail/MailHandlerList.vue'
 import { 
@@ -242,14 +268,20 @@ import {
   XMarkIcon
 } from '@heroicons/vue/24/outline'
 import { useCommandsStore } from '@/stores/commands'
+import { useAiConfigStore } from '@/stores/aiConfig'
 import type { Widget, WidgetConfig } from '@/mocks/widgets'
 import { mockWidgets } from '@/mocks/widgets'
 import type { SummaryConfig } from '@/mocks/summaries'
 import type { MailConfig, Department, SavedMailHandler } from '@/mocks/mail'
 import { mockMailHandlers } from '@/mocks/mail'
+import * as summaryService from '@/services/summaryService'
+import type { SummaryResponse } from '@/services/summaryService'
+import { useNotification } from '@/composables/useNotification'
 
 const route = useRoute()
 const commandsStore = useCommandsStore()
+const aiConfigStore = useAiConfigStore()
+const { success, error: showError } = useNotification()
 const expandedCommands = ref<string[]>([])
 const widgets = ref<Widget[]>(mockWidgets)
 const showWidgetEditor = ref(false)
@@ -273,6 +305,13 @@ const showMailHandlerEditor = ref(false)
 const currentMailHandler = ref<SavedMailHandler | undefined>(undefined)
 const currentMailHandlerId = ref<string>('')
 
+// Summary state
+const isGeneratingSummary = ref(false)
+const summaryResult = ref<SummaryResponse | null>(null)
+const isSummaryModalOpen = ref(false)
+const lastSummaryConfig = ref<SummaryConfig | null>(null)
+const currentChatModel = ref<string | null>(null)
+
 const hasWidgetChanges = computed(() => {
   if (!originalWidgetConfig.value || !showWidgetEditor.value) return false
   return JSON.stringify(currentWidgetConfig.value) !== JSON.stringify(originalWidgetConfig.value)
@@ -288,6 +327,37 @@ const currentPage = computed(() => {
   if (path.includes('mail-handler')) return 'mail-handler'
   return 'introduction'
 })
+
+// Load current chat model function (defined before watch)
+const loadCurrentChatModel = async () => {
+  try {
+    // Load models and defaults if not already loaded
+    if (Object.keys(aiConfigStore.models).length === 0) {
+      await aiConfigStore.loadModels()
+    }
+    if (Object.keys(aiConfigStore.defaults).length === 0) {
+      await aiConfigStore.loadDefaults()
+    }
+
+    // Get current CHAT model
+    const chatModel = aiConfigStore.getCurrentModel('CHAT')
+    if (chatModel) {
+      currentChatModel.value = chatModel.name
+    } else {
+      currentChatModel.value = 'No default model'
+    }
+  } catch (error) {
+    console.error('Failed to load current chat model:', error)
+    currentChatModel.value = 'Failed to load'
+  }
+}
+
+// Watch for page change to doc-summary and load model
+watch(currentPage, async (newPage) => {
+  if (newPage === 'doc-summary' && !currentChatModel.value) {
+    await loadCurrentChatModel()
+  }
+}, { immediate: true })
 
 const filteredCommands = computed(() => {
   if (currentPage.value === 'introduction') {
@@ -481,7 +551,49 @@ const togglePreview = () => {
 }
 
 const handleGenerateSummary = async (text: string, config: SummaryConfig) => {
-  console.log('Generate summary:', { text, config })
+  isGeneratingSummary.value = true
+  summaryResult.value = null
+  lastSummaryConfig.value = config
+
+  try {
+    const response = await summaryService.generateSummary({
+      text,
+      summaryType: config.summaryType,
+      length: config.length,
+      customLength: config.customLength,
+      outputLanguage: config.outputLanguage,
+      focusAreas: config.focusAreas
+    })
+
+    if (response.success && response.summary) {
+      summaryResult.value = response
+      success('Summary generated successfully!')
+      // Automatically open modal after generation
+      isSummaryModalOpen.value = true
+    } else {
+      showError(response.error || 'Failed to generate summary')
+    }
+  } catch (err: any) {
+    console.error('Summary generation error:', err)
+    showError(err.message || 'Failed to generate summary')
+  } finally {
+    isGeneratingSummary.value = false
+  }
+}
+
+const handleRegenerateSummary = async (text: string, config: SummaryConfig) => {
+  // Same as generate but doesn't change the text state
+  await handleGenerateSummary(text, config)
+}
+
+const showSummaryModal = () => {
+  if (summaryResult.value) {
+    isSummaryModalOpen.value = true
+  }
+}
+
+const closeSummaryModal = () => {
+  isSummaryModalOpen.value = false
 }
 
 const createMailHandler = () => {
@@ -536,4 +648,3 @@ const cancelMailHandlerEdit = () => {
   currentMailHandlerId.value = ''
 }
 </script>
-

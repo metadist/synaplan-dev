@@ -1,10 +1,11 @@
 <template>
-  <div class="surface-card mb-2 overflow-hidden opacity-50 hover:opacity-70 transition-opacity">
+  <div class="surface-card mb-2 overflow-hidden opacity-50 hover:opacity-70 transition-opacity" data-testid="section-message-thinking">
     <button
       @click="isExpanded = !isExpanded"
       class="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 hover-surface transition-colors"
       type="button"
       :aria-expanded="isExpanded"
+      data-testid="btn-thinking-toggle"
     >
       <span class="text-sm font-medium txt-secondary">
         Thought for {{ thinkingTime || 8 }} seconds
@@ -34,7 +35,7 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0 max-h-0"
     >
-      <div v-if="isExpanded" class="border-t border-light-border dark:border-dark-border px-3.5 py-3 flex gap-3 processing-enter">
+      <div v-if="isExpanded" class="border-t border-light-border dark:border-dark-border px-3.5 py-3 flex gap-3 processing-enter" data-testid="section-thinking-content">
         <div class="flex-shrink-0 w-3.5 h-3.5 mt-0.5">
           <!-- Brain/CPU icon from Heroicons -->
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-full h-full txt-tertiary">
@@ -61,4 +62,3 @@ defineProps<Props>()
 
 const isExpanded = ref(false)
 </script>
-

@@ -5,14 +5,16 @@
         v-if="isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
         @click.self="close"
+        data-testid="modal-chat-share-root"
       >
-        <div class="surface-elevated w-full max-w-2xl p-6 m-4 max-h-[90vh] overflow-y-auto">
+        <div class="surface-elevated w-full max-w-2xl p-6 m-4 max-h-[90vh] overflow-y-auto" data-testid="modal-chat-share">
           <!-- Header -->
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold txt-primary">{{ $t('chatShare.title') }}</h2>
             <button
               @click="close"
               class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
+              data-testid="btn-chat-share-close"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -77,6 +79,7 @@
                 @click="makePublic"
                 :disabled="sharing"
                 class="btn-primary w-full py-3 rounded-lg font-medium disabled:opacity-50"
+                data-testid="btn-chat-share-make-public"
               >
                 <span v-if="sharing">{{ $t('chatShare.generating') }}</span>
                 <span v-else>{{ $t('chatShare.makePublic') }}</span>
@@ -99,6 +102,7 @@
                   <button
                     @click="copyLink"
                     class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary text-sm"
+                    data-testid="btn-chat-share-copy"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -129,6 +133,7 @@
                 @click="revoke"
                 :disabled="revoking"
                 class="w-full py-2 rounded-lg border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                data-testid="btn-chat-share-revoke"
               >
                 <span v-if="revoking">{{ $t('chatShare.revoking') }}</span>
                 <span v-else>{{ $t('chatShare.revoke') }}</span>
@@ -283,4 +288,3 @@ const close = () => {
   transform: scale(0.95);
 }
 </style>
-

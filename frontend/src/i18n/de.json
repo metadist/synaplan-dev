@@ -365,6 +365,7 @@
     "selectFilesButton": "Dateien auswählen",
     "noFileSelected": "Keine ausgewählt",
     "supportedFormats": "Wählen Sie eine oder mehrere Dateien (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
+    "processingInfo": "Dateien werden automatisch extrahiert und vektorisiert, um optimale RAG-Ergebnisse zu erzielen.",
     "uploadAndProcess": "Dateien hochladen und verarbeiten",
     "yourFiles": "Ihre Dateien",
     "filterByGroup": "Nach Gruppe filtern:",

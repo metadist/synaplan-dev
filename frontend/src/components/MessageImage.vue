@@ -1,8 +1,9 @@
 <template>
-  <div class="my-3">
+  <div class="my-3" data-testid="section-message-image">
     <div 
       class="relative w-full aspect-video surface-card overflow-hidden cursor-pointer group border border-light-border/30 dark:border-dark-border/20 hover:border-light-border/50 dark:hover:border-dark-border/30 transition-all"
       @click="openFullscreen"
+      data-testid="btn-image-fullscreen"
     >
       <img
         v-if="blobUrl"
@@ -38,11 +39,13 @@
       v-if="isFullscreen"
       class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4"
       @click="closeFullscreen"
+      data-testid="modal-image-fullscreen"
     >
       <button
         @click.stop="closeFullscreen"
         class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2"
         aria-label="Close"
+        data-testid="btn-image-close"
       >
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

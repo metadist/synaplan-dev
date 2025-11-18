@@ -1,88 +1,95 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
+    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin" data-testid="page-test">
       <div class="max-w-7xl mx-auto space-y-6">
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-header">
           <h1 class="text-3xl font-bold txt-primary mb-2">Testing Ground</h1>
           <p class="txt-secondary text-sm">Test notifications and other functionalities</p>
         </div>
 
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-routes">
           <h2 class="text-xl font-semibold txt-primary mb-4">Routes</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            <router-link to="/" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/</router-link>
-            <router-link to="/login" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/login</router-link>
-            <router-link to="/register" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/register</router-link>
-            <router-link to="/forgot-password" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/forgot-password</router-link>
-            <router-link to="/verify-email" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/verify-email</router-link>
-            <router-link to="/email-verified" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/email-verified</router-link>
-            <router-link to="/tools/introduction" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/introduction</router-link>
-            <router-link to="/tools/chat-widget" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/chat-widget</router-link>
-            <router-link to="/tools/doc-summary" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/doc-summary</router-link>
-            <router-link to="/tools/mail-handler" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/mail-handler</router-link>
-            <router-link to="/files" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/files</router-link>
-            <router-link to="/config/inbound" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/inbound</router-link>
-            <router-link to="/config/ai-models" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/ai-models</router-link>
-            <router-link to="/config/task-prompts" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/task-prompts</router-link>
-            <router-link to="/config/sorting-prompt" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/sorting-prompt</router-link>
-            <router-link to="/config/api-keys" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/api-keys</router-link>
-            <router-link to="/statistics" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/statistics</router-link>
-            <router-link to="/profile" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/profile</router-link>
+            <router-link data-testid="link-route" to="/" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/</router-link>
+            <router-link data-testid="link-route" to="/login" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/login</router-link>
+            <router-link data-testid="link-route" to="/register" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/register</router-link>
+            <router-link data-testid="link-route" to="/forgot-password" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/forgot-password</router-link>
+            <router-link data-testid="link-route" to="/verify-email" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/verify-email</router-link>
+            <router-link data-testid="link-route" to="/email-verified" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/email-verified</router-link>
+            <router-link data-testid="link-route" to="/tools/introduction" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/introduction</router-link>
+            <router-link data-testid="link-route" to="/tools/chat-widget" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/chat-widget</router-link>
+            <router-link data-testid="link-route" to="/tools/doc-summary" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/doc-summary</router-link>
+            <router-link data-testid="link-route" to="/tools/mail-handler" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/tools/mail-handler</router-link>
+            <router-link data-testid="link-route" to="/files" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/files</router-link>
+            <router-link data-testid="link-route" to="/config/inbound" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/inbound</router-link>
+            <router-link data-testid="link-route" to="/config/ai-models" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/ai-models</router-link>
+            <router-link data-testid="link-route" to="/config/task-prompts" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/task-prompts</router-link>
+            <router-link data-testid="link-route" to="/config/sorting-prompt" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/sorting-prompt</router-link>
+            <router-link data-testid="link-route" to="/config/api-keys" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/config/api-keys</router-link>
+            <router-link data-testid="link-route" to="/statistics" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/statistics</router-link>
+            <router-link data-testid="link-route" to="/profile" class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm">/profile</router-link>
           </div>
         </div>
 
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-notifications">
           <h2 class="text-xl font-semibold txt-primary mb-4">Notifications</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <button
               @click="testSuccess"
               class="px-6 py-3 rounded bg-green-500 hover:bg-green-600 text-white font-medium transition-colors"
+              data-testid="btn-test-success"
             >
               Test Success
             </button>
             <button
               @click="testError"
               class="px-6 py-3 rounded bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
+              data-testid="btn-test-error"
             >
               Test Error
             </button>
             <button
               @click="testWarning"
               class="px-6 py-3 rounded bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors"
+              data-testid="btn-test-warning"
             >
               Test Warning
             </button>
             <button
               @click="testInfo"
               class="px-6 py-3 rounded bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors"
+              data-testid="btn-test-info"
             >
               Test Info
             </button>
           </div>
 
-          <div class="mt-6 space-y-3">
+          <div class="mt-6 space-y-3" data-testid="section-advanced-notifications">
             <button
               @click="testLongMessage"
               class="w-full px-6 py-3 rounded border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 font-medium transition-colors"
+              data-testid="btn-test-long"
             >
               Test Long Message
             </button>
             <button
               @click="testMultiple"
               class="w-full px-6 py-3 rounded border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 font-medium transition-colors"
+              data-testid="btn-test-multiple"
             >
               Test Multiple Notifications
             </button>
             <button
               @click="testPersistent"
               class="w-full px-6 py-3 rounded border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 font-medium transition-colors"
+              data-testid="btn-test-persistent"
             >
               Test Persistent Notification (No Auto-Dismiss)
             </button>
           </div>
         </div>
 
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-design-tokens">
           <h2 class="text-xl font-semibold txt-primary mb-4">Design Tokens</h2>
           <div class="space-y-4">
             <div>
@@ -151,7 +158,7 @@
           </div>
         </div>
 
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-forms">
           <h2 class="text-xl font-semibold txt-primary mb-4">Forms</h2>
           <div class="space-y-4 max-w-2xl">
             <div>
@@ -194,7 +201,7 @@
           </div>
         </div>
 
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-icons">
           <h2 class="text-xl font-semibold txt-primary mb-4">Icons</h2>
           <div class="grid grid-cols-4 md:grid-cols-8 gap-4">
             <div class="flex flex-col items-center gap-2 p-3 surface-chip rounded">
@@ -232,7 +239,7 @@
           </div>
         </div>
 
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-loading">
           <h2 class="text-xl font-semibold txt-primary mb-4">Loading States</h2>
           <div class="flex flex-wrap gap-4">
             <button class="btn-primary px-6 py-2.5 rounded flex items-center gap-2">
@@ -300,4 +307,3 @@ const testPersistent = () => {
   error('This notification will not auto-dismiss. Close it manually.', 0)
 }
 </script>
-

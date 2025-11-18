@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-app px-6">
-    <div class="max-w-2xl w-full text-center">
+  <div class="min-h-screen flex items-center justify-center bg-app px-6" data-testid="page-not-found">
+    <div class="max-w-2xl w-full text-center" data-testid="section-card">
       <!-- Animated 404 -->
-      <div class="relative mb-8">
+      <div class="relative mb-8" data-testid="section-illustration">
         <h1 class="text-[150px] md:text-[200px] font-bold txt-primary opacity-10 select-none leading-none">
           404
         </h1>
@@ -29,7 +29,7 @@
       </div>
 
       <!-- Content -->
-      <div class="space-y-4 mb-8">
+      <div class="space-y-4 mb-8" data-testid="section-content">
         <h2 class="text-3xl md:text-4xl font-bold txt-primary">
           {{ $t('notFound.title') }}
         </h2>
@@ -39,10 +39,11 @@
       </div>
 
       <!-- Actions -->
-      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12" data-testid="section-actions">
         <router-link
           to="/"
           class="btn-primary px-8 py-3 rounded-lg font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          data-testid="btn-home"
         >
           <HomeIcon class="w-5 h-5" />
           {{ $t('notFound.goHome') }}
@@ -50,6 +51,7 @@
         <button
           @click="goBack"
           class="px-8 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          data-testid="btn-back"
         >
           <ArrowLeftIcon class="w-5 h-5" />
           {{ $t('notFound.goBack') }}
@@ -57,15 +59,16 @@
       </div>
 
       <!-- Quick Links -->
-      <div class="surface-card p-6 rounded-xl">
+      <div class="surface-card p-6 rounded-xl" data-testid="section-links">
         <h3 class="text-sm font-semibold txt-secondary uppercase tracking-wider mb-4">
           {{ $t('notFound.quickLinks') }}
         </h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <router-link
-            to="/"
-            class="p-4 rounded-lg hover-surface transition-colors group"
-          >
+         <router-link
+           to="/"
+           class="p-4 rounded-lg hover-surface transition-colors group"
+           data-testid="item-quick-link"
+         >
             <ChatBubbleLeftRightIcon class="w-6 h-6 mx-auto mb-2 txt-secondary group-hover:text-[var(--brand)] transition-colors" />
             <span class="text-sm txt-primary">{{ $t('nav.chat') }}</span>
           </router-link>

@@ -8,12 +8,13 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="show && currentStepData" class="fixed inset-0 z-50">
+      <div v-if="show && currentStepData" class="fixed inset-0 z-50" data-testid="modal-help-tour">
         <!-- Backdrop with spotlight -->
         <div 
           class="absolute inset-0 bg-black transition-opacity duration-300 pointer-events-auto"
           :style="{ opacity: 0.7 }"
           @click="onBackdropClick"
+          data-testid="modal-backdrop"
         ></div>
         
         <!-- Spotlight cutout -->
@@ -21,6 +22,7 @@
           v-if="highlightedElement"
           class="absolute border-4 border-[var(--brand)] rounded-lg transition-all duration-300 pointer-events-none shadow-2xl"
           :style="spotlightStyle"
+          data-testid="spotlight"
         ></div>
 
         <!-- Tooltip/Step content -->
@@ -28,6 +30,7 @@
           v-if="tooltipStyle"
           class="absolute surface-card rounded-xl shadow-2xl p-5 max-w-md transition-all duration-300"
           :style="tooltipStyle"
+          data-testid="section-step"
         >
           <div class="flex items-start justify-between mb-3">
             <div class="flex items-center gap-2">
@@ -40,6 +43,7 @@
               @click="$emit('close')"
               class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
               :aria-label="$t('help.close')"
+              data-testid="btn-close"
             >
               <XMarkIcon class="w-5 h-5 mx-auto" />
             </button>
@@ -56,6 +60,7 @@
                 v-if="currentStepIndex > 0"
                 @click="prevStep"
                 class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
+                data-testid="btn-prev"
               >
                 {{ $t('mail.previous') }}
               </button>
@@ -63,6 +68,7 @@
                 v-if="currentStepIndex < steps.length - 1"
                 @click="nextStep"
                 class="btn-primary px-5 py-2 rounded-lg text-sm font-medium"
+                data-testid="btn-next"
               >
                 {{ $t('mail.next') }}
               </button>
@@ -70,6 +76,7 @@
                 v-else
                 @click="finish"
                 class="btn-primary px-5 py-2 rounded-lg text-sm font-medium"
+                data-testid="btn-finish"
               >
                 {{ $t('help.gotIt') }}
               </button>

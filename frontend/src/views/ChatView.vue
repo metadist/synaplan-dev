@@ -3,11 +3,11 @@
     <template #header>
     </template>
 
-    <div class="flex flex-col h-full">
-      <div ref="chatContainer" class="flex-1 overflow-y-auto bg-chat" @scroll="handleScroll">
+    <div class="flex flex-col h-full" data-testid="page-chat">
+      <div ref="chatContainer" class="flex-1 overflow-y-auto bg-chat" @scroll="handleScroll" data-testid="section-messages">
         <div class="max-w-4xl mx-auto py-6">
           <!-- Loading indicator for infinite scroll -->
-          <div v-if="historyStore.isLoadingMessages" class="flex items-center justify-center py-4">
+          <div v-if="historyStore.isLoadingMessages" class="flex items-center justify-center py-4" data-testid="state-loading">
             <svg class="w-4 h-4 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
@@ -15,7 +15,7 @@
             <span class="ml-2 txt-secondary text-sm">Loading messages...</span>
           </div>
           
-          <div v-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages" class="flex items-center justify-center h-full px-6">
+          <div v-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages" class="flex items-center justify-center h-full px-6" data-testid="state-empty">
             <div class="text-center">
               <h2 class="text-2xl font-semibold txt-primary mb-2">
                 {{ $t('welcome') }}
@@ -27,7 +27,7 @@
           </div>
 
           <template v-for="(group, groupIndex) in groupedMessages" :key="groupIndex">
-            <div class="flex items-center justify-center my-4">
+            <div class="flex items-center justify-center my-4" data-testid="item-message-group">
               <div class="px-4 py-1.5 surface-chip text-xs font-medium txt-secondary">
                 {{ group.label }}
               </div>
@@ -83,6 +83,7 @@ import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api'
 import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
 import { parseAIResponse } from '@/utils/responseParser'
+import { normalizeMediaUrl } from '@/utils/urlHelper'
 
 const { t } = useI18n()
 
@@ -546,13 +547,14 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             console.log('📎 File received:', data.type, data.url)
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
-              // Add file part based on type
+              // Add file part based on type - normalize URLs to absolute
+              const absoluteUrl = normalizeMediaUrl(data.url)
               if (data.type === 'image') {
-                message.parts.push({ type: 'image', url: data.url })
+                message.parts.push({ type: 'image', url: absoluteUrl })
               } else if (data.type === 'video') {
-                message.parts.push({ type: 'video', url: data.url })
+                message.parts.push({ type: 'video', url: absoluteUrl })
               } else if (data.type === 'audio') {
-                message.parts.push({ type: 'audio', url: data.url })
+                message.parts.push({ type: 'audio', url: absoluteUrl })
               }
             }
           } else if (data.status === 'links') {
@@ -594,34 +596,6 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               console.log('📍 Found message to update:', message.id)
               
               // ✨ NEW: Parse JSON response if AI responded in JSON format
-              if (message.parts.length > 0) {
-                const firstPart = message.parts.find(p => p.type === 'text')
-                if (firstPart && firstPart.content) {
-                  const content = firstPart.content.trim()
-                  
-                  // Check if content is JSON with BTEXT field
-                  if (content.startsWith('{')) {
-                    try {
-                      const jsonData = JSON.parse(content)
-                      if (jsonData && typeof jsonData === 'object' && 'BTEXT' in jsonData) {
-                        console.log('🔍 Found JSON response, extracting BTEXT...')
-                        
-                        // Extract BTEXT
-                        firstPart.content = jsonData.BTEXT || ''
-                        console.log('✅ Extracted BTEXT:', (firstPart.content || '').substring(0, 100))
-                        
-                        // TODO: Handle BFILETEXT and BFILE if needed
-                        // if (jsonData.BFILETEXT && jsonData.BFILE) {
-                        //   // Create file part
-                        // }
-                      }
-                    } catch (e) {
-                      console.log('⚠️ Content looks like JSON but failed to parse:', e)
-                    }
-                  }
-                }
-              }
-              
               // NOTE: againData is now generated by frontend in ChatMessage.vue
               // based on available models and message type (image/video/audio)
               
@@ -881,4 +855,3 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
   }
 }
 </script>
-

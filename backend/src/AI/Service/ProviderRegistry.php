@@ -130,7 +130,7 @@ class ProviderRegistry
      * 
      * CASE-INSENSITIVE: Supports both 'Ollama' and 'ollama'
      */
-    private function getProvider(string $capability, ?string $name = null)
+    private function getProvider(string $capability, ?string $name = null, bool $requireCapability = true)
     {
         $name = $name ?? $this->defaultProvider;
         
@@ -153,7 +153,7 @@ class ProviderRegistry
             // Case-insensitive comparison
             if ($providerLower === $normalizedName && $isAvailable) {
                 // Check if capability is enabled in DB (using normalized name)
-                if (!$this->isCapabilityEnabled($normalizedName, $capability)) {
+                if ($requireCapability && !$this->isCapabilityEnabled($normalizedName, $capability)) {
                     $this->logger->warning('Provider capability disabled in DB', [
                         'provider' => $name,
                         'normalized' => $normalizedName,
@@ -197,9 +197,9 @@ class ProviderRegistry
         return $this->getProvider('embedding', $name);
     }
 
-    public function getVisionProvider(?string $name = null): VisionProviderInterface
+    public function getVisionProvider(?string $name = null, bool $requireCapability = true): VisionProviderInterface
     {
-        return $this->getProvider('vision', $name);
+        return $this->getProvider('vision', $name, $requireCapability);
     }
 
     public function getImageGenerationProvider(?string $name = null): ImageGenerationProviderInterface
@@ -236,6 +236,43 @@ class ProviderRegistry
     public function getFileAnalysisProvider(?string $name = null): FileAnalysisProviderInterface
     {
         return $this->getProvider('file_analysis', $name);
+    }
+
+    /**
+     * Return available providers for a capability.
+     *
+     * @param string $capability Registry capability key (chat, vision, embedding, image_generation, video_generation, speech_to_text, text_to_speech, file_analysis)
+     * @param bool $includeTest  Whether to include the internal TestProvider in the results
+     *
+     * @return string[] List of provider names (preserves provider casing)
+     */
+    public function getAvailableProviders(string $capability, bool $includeTest = true, bool $requireCapability = true): array
+    {
+        $available = [];
+
+        if (!isset($this->providers[$capability]) || empty($this->providers[$capability])) {
+            return $available;
+        }
+
+        foreach ($this->providers[$capability] as $provider) {
+            $normalized = strtolower($provider->getName());
+
+            if (!$includeTest && $normalized === 'test') {
+                continue;
+            }
+
+            if (!$provider->isAvailable()) {
+                continue;
+            }
+
+            if ($requireCapability && !$this->isCapabilityEnabled($normalized, $capability)) {
+                continue;
+            }
+
+            $available[] = $provider->getName();
+        }
+
+        return $available;
     }
 
     public function getAllProviders(): array

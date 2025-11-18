@@ -1,8 +1,8 @@
 <template>
   <MainLayout>
-    <div class="h-full flex flex-col bg-chat">
+    <div class="h-full flex flex-col bg-chat" data-testid="page-widgets">
       <!-- Header -->
-      <div class="px-4 lg:px-6 py-4 lg:py-5 border-b border-light-border/30 dark:border-dark-border/20 bg-chat">
+      <div class="px-4 lg:px-6 py-4 lg:py-5 border-b border-light-border/30 dark:border-dark-border/20 bg-chat" data-testid="section-header">
         <div class="max-w-7xl mx-auto">
           <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 lg:gap-4">
             <div>
@@ -15,6 +15,7 @@
             <button
               @click="startCreation"
               class="btn-primary px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg transition-colors font-medium flex items-center gap-2 w-full sm:w-auto justify-center text-sm lg:text-base"
+              data-testid="btn-create-widget"
             >
               <Icon icon="heroicons:plus" class="w-4 h-4 lg:w-5 lg:h-5" />
               {{ $t('widgets.createNew') }}
@@ -24,22 +25,23 @@
       </div>
 
       <!-- Content Area -->
-      <div class="flex-1 overflow-y-auto px-4 lg:px-6 py-4 lg:py-6 scroll-thin">
+      <div class="flex-1 overflow-y-auto px-4 lg:px-6 py-4 lg:py-6 scroll-thin" data-testid="section-widgets-content">
         <div class="max-w-7xl mx-auto">
           <!-- Loading State -->
-          <div v-if="loading" class="surface-card p-8 text-center">
+          <div v-if="loading" class="surface-card p-8 text-center" data-testid="state-widgets-loading">
             <div class="animate-spin w-8 h-8 border-4 border-[var(--brand)] border-t-transparent rounded-full mx-auto mb-4"></div>
             <p class="txt-secondary text-sm">{{ $t('common.loading') }}</p>
           </div>
 
           <!-- Empty State -->
-          <div v-else-if="widgets.length === 0 && !showWizard" class="surface-card p-8 lg:p-12 text-center">
+          <div v-else-if="widgets.length === 0 && !showWizard" class="surface-card p-8 lg:p-12 text-center" data-testid="state-widgets-empty">
             <Icon icon="heroicons:chat-bubble-left-right" class="w-12 h-12 lg:w-16 lg:h-16 txt-secondary opacity-30 mx-auto mb-4" />
             <h3 class="text-lg lg:text-xl font-semibold txt-primary mb-2">{{ $t('widgets.emptyTitle') }}</h3>
             <p class="txt-secondary mb-6 text-sm">{{ $t('widgets.emptyDescription') }}</p>
             <button
               @click="startCreation"
               class="btn-primary px-4 lg:px-6 py-2.5 rounded-lg transition-colors font-medium inline-flex items-center gap-2 text-sm lg:text-base"
+              data-testid="btn-create-first-widget"
             >
               <Icon icon="heroicons:plus" class="w-5 h-5" />
               {{ $t('widgets.createFirst') }}
@@ -47,12 +49,13 @@
           </div>
 
           <!-- Widgets List -->
-          <div v-else-if="!showWizard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div v-else-if="!showWizard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="section-widget-cards">
             <div
               v-for="widget in widgets"
               :key="widget.id"
               class="surface-card p-4 lg:p-5 hover:shadow-lg transition-shadow cursor-pointer group"
               @click="viewWidget(widget)"
+              data-testid="item-widget"
             >
               <div class="flex items-start justify-between mb-4">
                 <div class="flex-1 min-w-0 pr-2">
@@ -90,6 +93,7 @@
                 <button
                   @click="showEmbed(widget)"
                   class="flex-1 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-2"
+                  data-testid="btn-widget-embed"
                 >
                   <Icon icon="heroicons:code-bracket" class="w-4 h-4" />
                   <span class="hidden sm:inline">{{ $t('widgets.getCode') }}</span>
@@ -99,6 +103,7 @@
                   @click="editWidget(widget)"
                   class="px-3 py-2 rounded-lg hover-surface transition-colors"
                   :title="$t('widgets.edit')"
+                  data-testid="btn-widget-edit"
                 >
                   <Icon icon="heroicons:pencil" class="w-4 h-4 txt-secondary" />
                 </button>
@@ -106,6 +111,7 @@
                   @click="confirmDelete(widget)"
                   class="px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
                   :title="$t('widgets.delete')"
+                  data-testid="btn-widget-delete"
                 >
                   <Icon icon="heroicons:trash" class="w-4 h-4 text-red-500 dark:text-red-400" />
                 </button>
@@ -121,6 +127,7 @@
       v-if="showWizard"
       @close="closeWizard"
       @created="handleWidgetCreated"
+      data-testid="comp-widget-wizard"
     />
 
     <!-- Edit Modal -->
@@ -129,6 +136,7 @@
       :widget="currentWidget"
       @close="currentWidget = null"
       @save="handleSave"
+      data-testid="comp-widget-editor-modal"
     />
 
     <!-- Embed Code Dialog -->
@@ -138,6 +146,7 @@
       :embed-code="embedCode"
       :wordpress-shortcode="wordpressShortcode"
       @close="showEmbedModal = false"
+      data-testid="comp-embed-dialog"
     />
   </MainLayout>
 </template>

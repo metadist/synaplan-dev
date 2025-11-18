@@ -36,7 +36,7 @@ class GoogleProvider implements
         private ?string $apiKey = null,
         private ?string $projectId = null,
         private string $region = 'us-central1',
-        private string $uploadDir = '/var/www/html/public/uploads'
+        private string $uploadDir = '/var/www/html/var/uploads'
     ) {
         // Ensure projectId is null if empty string
         if (empty($this->projectId)) {
@@ -659,27 +659,47 @@ class GoogleProvider implements
         }
 
         try {
-            $model = $options['model'] ?? 'gemini-2.0-flash';
+            $allowedTtsModels = [
+                'gemini-2.5-flash-preview-tts',
+                'gemini-2.5-pro-preview-tts',
+            ];
+            $model = $options['model'] ?? 'gemini-2.5-flash-preview-tts';
+            if (!in_array($model, $allowedTtsModels, true)) {
+                $model = 'gemini-2.5-flash-preview-tts';
+            }
+            $voiceName = $options['voice'] ?? 'Kore';
             
-            $this->logger->info('Google: Synthesizing speech', [
+            $this->logger->info('Google Gemini: Synthesizing speech with multimodal output', [
                 'model' => $model,
-                'text_length' => strlen($text)
+                'text_length' => strlen($text),
+                'voice' => $voiceName,
             ]);
 
-            // Use Gemini to generate speech (experimental)
+            // Use Gemini 2.0 Flash with TTS capability (audio output modality)
             $url = self::API_BASE . "/models/{$model}:generateContent";
 
+            // Gemini 2.0 Flash TTS via speech modality
             $payload = [
                 'contents' => [
                     [
                         'role' => 'user',
                         'parts' => [
                             [
-                                'text' => "Convert this text to speech: {$text}"
+                                'text' => $text
                             ]
                         ]
                     ]
                 ],
+                'generationConfig' => [
+                    'responseModalities' => ['AUDIO'], // Request audio output
+                    'speechConfig' => [
+                        'voiceConfig' => [
+                            'prebuiltVoiceConfig' => [
+                                'voiceName' => $voiceName
+                            ]
+                        ]
+                    ]
+                ]
             ];
 
             $response = $this->httpClient->request('POST', $url, [
@@ -688,11 +708,96 @@ class GoogleProvider implements
                     'x-goog-api-key' => $this->apiKey,
                 ],
                 'json' => $payload,
-                'timeout' => 60,
+                'timeout' => 240,
+                'max_duration' => 300,
             ]);
 
-            // For now, throw not implemented - Google TTS requires different API
-            throw new ProviderException('Google TTS not yet implemented - use Google Cloud Text-to-Speech API', 'google');
+            $statusCode = $response->getStatusCode();
+            if ($statusCode !== 200) {
+                $errorBody = $response->getContent(false);
+                $this->logger->error('Google Gemini TTS: API error', [
+                    'status_code' => $statusCode,
+                    'error_body' => $errorBody
+                ]);
+                throw new \Exception("Google Gemini TTS API error (HTTP $statusCode): $errorBody");
+            }
+
+            $data = $response->toArray();
+
+            $parts = $data['candidates'][0]['content']['parts'] ?? [];
+            $audioPart = null;
+            foreach ($parts as $part) {
+                if (isset($part['inline_data']['data'])) {
+                    $this->logger->info('Google Gemini TTS: Found inline_data audio part', [
+                        'keys' => array_keys($part['inline_data']),
+                        'mime_type' => $part['inline_data']['mime_type'] ?? null,
+                        'data_preview' => substr($part['inline_data']['data'], 0, 32)
+                    ]);
+                    $audioPart = $part['inline_data'];
+                    break;
+                }
+                if (isset($part['inlineData']['data'])) {
+                    $this->logger->info('Google Gemini TTS: Found inlineData audio part', [
+                        'keys' => array_keys($part['inlineData']),
+                        'mime_type' => $part['inlineData']['mimeType'] ?? null,
+                        'data_preview' => substr($part['inlineData']['data'], 0, 32)
+                    ]);
+                    $audioPart = $part['inlineData'];
+                    break;
+                }
+            }
+
+            if (!$audioPart || empty($audioPart['data'])) {
+                $this->logger->error('Google Gemini TTS: No audio data in response', [
+                    'response' => json_encode($data)
+                ]);
+                throw new \Exception('No audio data returned from Gemini TTS');
+            }
+
+            $base64Audio = $audioPart['data'];
+            $mimeType = strtolower($audioPart['mime_type'] ?? $audioPart['mimeType'] ?? 'audio/wav');
+            
+            // Decode base64 audio
+            $audioData = base64_decode($base64Audio);
+
+            if ($audioData === false || $audioData === '') {
+                throw new \Exception('Failed to decode audio data returned from Gemini TTS');
+            }
+
+            // Gemini TTS returns signed 16-bit PCM data by default (see docs)
+            // Convert PCM payload to a proper WAV container so browsers can play it
+            if ($this->isRawPcmMimeType($mimeType)) {
+                $audioData = $this->convertPcmToWav($audioData);
+                $mimeType = 'audio/wav';
+            }
+            
+            // Determine file extension from mime type (after PCM conversion)
+            $extension = match(true) {
+                str_contains($mimeType, 'wav') => 'wav',
+                str_contains($mimeType, 'mp3') => 'mp3',
+                str_contains($mimeType, 'ogg') => 'ogg',
+                default => 'wav'
+            };
+
+            // Save to file
+            $filename = 'tts_' . uniqid() . '.' . $extension;
+            $outputPath = $this->uploadDir . '/' . $filename;
+            
+            $written = file_put_contents($outputPath, $audioData);
+            if ($written === false) {
+                throw new \Exception("Failed to write audio file to {$outputPath}");
+            }
+
+            $this->logger->info('Google Gemini TTS: Audio saved', [
+                'filename' => $filename,
+                'size_bytes' => strlen($audioData),
+                'mime_type' => $mimeType
+            ]);
+
+            return $filename;
+            
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException(
                 'Google TTS error: ' . $e->getMessage(),
@@ -705,6 +810,47 @@ class GoogleProvider implements
     {
         // Google Cloud TTS voices would be loaded here
         return [];
+    }
+
+    private function isRawPcmMimeType(?string $mimeType): bool
+    {
+        if (!$mimeType) {
+            return true;
+        }
+
+        return str_contains($mimeType, 'pcm')
+            || str_contains($mimeType, 'x-raw')
+            || str_contains($mimeType, 'linear16');
+    }
+
+    /**
+     * Gemini TTS returns signed 16-bit PCM buffers (24 kHz, mono) by default.
+     * Wrap the PCM payload into a RIFF/WAVE container so browsers can play it.
+     */
+    private function convertPcmToWav(
+        string $pcmData,
+        int $sampleRate = 24000,
+        int $channels = 1,
+        int $bitsPerSample = 16
+    ): string {
+        $dataSize = strlen($pcmData);
+        $blockAlign = (int) ($channels * ($bitsPerSample / 8));
+        $byteRate = $sampleRate * $blockAlign;
+
+        $header = 'RIFF'
+            . pack('V', 36 + $dataSize)
+            . 'WAVEfmt '
+            . pack('V', 16)
+            . pack('v', 1) // PCM format
+            . pack('v', $channels)
+            . pack('V', $sampleRate)
+            . pack('V', $byteRate)
+            . pack('v', $blockAlign)
+            . pack('v', $bitsPerSample)
+            . 'data'
+            . pack('V', $dataSize);
+
+        return $header . $pcmData;
     }
 
     // ==================== HELPER METHODS ====================

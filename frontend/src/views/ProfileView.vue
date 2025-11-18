@@ -1,21 +1,21 @@
 <template>
-  <MainLayout>
+  <MainLayout data-testid="page-profile">
     <div class="h-full overflow-y-auto scroll-thin">
       <div class="max-w-4xl mx-auto p-4 md:p-8">
-        <div class="mb-8">
+        <div class="mb-8" data-testid="section-header">
           <h1 class="text-3xl font-bold txt-primary mb-2">{{ $t('profile.title') }}</h1>
           <p class="txt-secondary">{{ $t('profile.subtitle') }}</p>
         </div>
 
-        <form @submit.prevent="handleSave" class="space-y-6">
-          <section class="surface-card rounded-lg p-6">
+        <form @submit.prevent="handleSave" class="space-y-6" data-testid="comp-profile-form">
+          <section class="surface-card rounded-lg p-6" data-testid="section-personal">
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:account" class="w-5 h-5" />
               {{ $t('profile.personalInfo.title') }}
             </h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div data-testid="field-first-name">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.personalInfo.firstName') }}
                 </label>
@@ -24,10 +24,11 @@
                   type="text"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.personalInfo.firstNamePlaceholder')"
+                  data-testid="input-first-name"
                 />
               </div>
 
-              <div>
+              <div data-testid="field-last-name">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.personalInfo.lastName') }}
                 </label>
@@ -36,10 +37,11 @@
                   type="text"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.personalInfo.lastNamePlaceholder')"
+                  data-testid="input-last-name"
                 />
               </div>
 
-              <div>
+              <div data-testid="field-email">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.personalInfo.email') }}
                 </label>
@@ -49,10 +51,11 @@
                   disabled
                   class="w-full px-4 py-2.5 rounded-lg bg-chat/50 border border-light-border/30 dark:border-dark-border/20 txt-secondary cursor-not-allowed"
                   :title="$t('profile.personalInfo.emailHint')"
+                  data-testid="input-email"
                 />
               </div>
 
-              <div>
+              <div data-testid="field-phone">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.personalInfo.phone') }}
                 </label>
@@ -61,12 +64,13 @@
                   type="tel"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.personalInfo.phonePlaceholder')"
+                  data-testid="input-phone"
                 />
               </div>
             </div>
           </section>
 
-          <section class="surface-card rounded-lg p-6">
+          <section class="surface-card rounded-lg p-6" data-testid="section-company">
             <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="mdi:office-building" class="w-5 h-5" />
               {{ $t('profile.companyInfo.title') }}
@@ -74,7 +78,7 @@
             <p class="txt-secondary text-sm mb-6">{{ $t('profile.companyInfo.subtitle') }}</p>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div data-testid="field-company-name">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.companyInfo.companyName') }}
                 </label>
@@ -83,10 +87,11 @@
                   type="text"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.companyInfo.companyNamePlaceholder')"
+                  data-testid="input-company-name"
                 />
               </div>
 
-              <div>
+              <div data-testid="field-vat-id">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.companyInfo.vatId') }}
                 </label>
@@ -95,19 +100,20 @@
                   type="text"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.companyInfo.vatIdPlaceholder')"
+                  data-testid="input-vat-id"
                 />
               </div>
             </div>
           </section>
 
-          <section class="surface-card rounded-lg p-6">
+          <section class="surface-card rounded-lg p-6" data-testid="section-billing">
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:map-marker" class="w-5 h-5" />
               {{ $t('profile.billingAddress.title') }}
             </h2>
             
-            <div class="grid grid-cols-1 gap-6">
-              <div>
+            <div class="grid grid-cols-1 gap-6" data-testid="group-address">
+              <div data-testid="field-street">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.billingAddress.street') }}
                 </label>
@@ -116,11 +122,12 @@
                   type="text"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.billingAddress.streetPlaceholder')"
+                  data-testid="input-street"
                 />
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
+                <div data-testid="field-zip">
                   <label class="block txt-primary font-medium mb-2">
                     {{ $t('profile.billingAddress.zipCode') }}
                   </label>
@@ -129,10 +136,11 @@
                     type="text"
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                     :placeholder="$t('profile.billingAddress.zipCodePlaceholder')"
+                    data-testid="input-zip"
                   />
                 </div>
 
-                <div class="md:col-span-2">
+                <div class="md:col-span-2" data-testid="field-city">
                   <label class="block txt-primary font-medium mb-2">
                     {{ $t('profile.billingAddress.city') }}
                   </label>
@@ -141,17 +149,19 @@
                     type="text"
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                     :placeholder="$t('profile.billingAddress.cityPlaceholder')"
+                    data-testid="input-city"
                   />
                 </div>
               </div>
 
-              <div>
+              <div data-testid="field-country">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.billingAddress.country') }}
                 </label>
                 <select
                   v-model="formData.country"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                  data-testid="select-country"
                 >
                   <option v-for="country in countries" :key="country.code" :value="country.code">
                     {{ country.name }}
@@ -161,20 +171,21 @@
             </div>
           </section>
 
-          <section class="surface-card rounded-lg p-6">
+          <section class="surface-card rounded-lg p-6" data-testid="section-account-settings">
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:cog" class="w-5 h-5" />
               {{ $t('profile.accountSettings.title') }}
             </h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div data-testid="field-language">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.accountSettings.language') }}
                 </label>
                 <select
                   v-model="formData.language"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                  data-testid="select-language"
                 >
                   <option v-for="lang in languages" :key="lang.code" :value="lang.code">
                     {{ lang.name }}
@@ -182,13 +193,14 @@
                 </select>
               </div>
 
-              <div>
+              <div data-testid="field-timezone">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.accountSettings.timezone') }}
                 </label>
                 <select
                   v-model="formData.timezone"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                  data-testid="select-timezone"
                 >
                   <option v-for="tz in timezones" :key="tz.value" :value="tz.value">
                     {{ tz.label }}
@@ -196,7 +208,7 @@
                 </select>
               </div>
 
-              <div class="md:col-span-2">
+              <div class="md:col-span-2" data-testid="field-invoice-email">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.accountSettings.invoiceEmail') }}
                 </label>
@@ -205,12 +217,13 @@
                   type="email"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.accountSettings.invoiceEmailPlaceholder')"
+                  data-testid="input-invoice-email"
                 />
               </div>
             </div>
           </section>
 
-          <section class="surface-card rounded-lg p-6">
+          <section class="surface-card rounded-lg p-6" data-testid="section-change-password">
             <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="mdi:lock" class="w-5 h-5" />
               {{ $t('profile.changePassword.title') }}
@@ -218,7 +231,7 @@
             <p class="txt-secondary text-sm mb-6">{{ $t('profile.changePassword.subtitle') }}</p>
             
             <div class="grid grid-cols-1 gap-6 max-w-2xl">
-              <div>
+              <div data-testid="field-current-password">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.changePassword.currentPassword') }}
                 </label>
@@ -227,10 +240,11 @@
                   type="password"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.currentPasswordPlaceholder')"
+                  data-testid="input-current-password"
                 />
               </div>
 
-              <div>
+              <div data-testid="field-new-password">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.changePassword.newPassword') }}
                 </label>
@@ -239,11 +253,12 @@
                   type="password"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.newPasswordPlaceholder')"
+                  data-testid="input-new-password"
                 />
                 <p class="txt-secondary text-sm mt-1">{{ $t('profile.changePassword.newPasswordHint') }}</p>
               </div>
 
-              <div>
+              <div data-testid="field-confirm-password">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.changePassword.confirmPassword') }}
                 </label>
@@ -252,13 +267,14 @@
                   type="password"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.confirmPasswordPlaceholder')"
+                  data-testid="input-confirm-password"
                 />
                 <p class="txt-secondary text-sm mt-1">{{ $t('profile.changePassword.confirmPasswordHint') }}</p>
               </div>
             </div>
           </section>
 
-          <div class="surface-card rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <div class="surface-card rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800" data-testid="section-privacy-notice">
             <p class="txt-secondary text-sm flex items-start gap-2">
               <Icon icon="mdi:information" class="w-5 h-5 flex-shrink-0 mt-0.5" />
               <span>{{ $t('profile.privacyNotice') }}</span>
@@ -381,4 +397,3 @@ const handleDiscard = () => {
   passwordData.value = { current: '', new: '', confirm: '' }
 }
 </script>
-

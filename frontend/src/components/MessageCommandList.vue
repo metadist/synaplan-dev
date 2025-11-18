@@ -1,5 +1,5 @@
 <template>
-  <div class="my-3">
+  <div class="my-3" data-testid="section-command-list">
     <h4 class="text-sm font-medium txt-primary mb-3">{{ $t('commands.availableCommands') }}</h4>
     <div class="space-y-2">
       <div

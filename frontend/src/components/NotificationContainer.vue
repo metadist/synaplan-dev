@@ -1,10 +1,11 @@
 <template>
   <Teleport to="body">
-    <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none">
+    <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none" data-testid="comp-notification-container">
       <TransitionGroup
         name="notification"
         tag="div"
         class="flex flex-col gap-3"
+        data-testid="section-notification-list"
       >
         <div
           v-for="notification in notifications"

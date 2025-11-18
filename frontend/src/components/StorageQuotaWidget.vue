@@ -1,5 +1,5 @@
 <template>
-  <div class="storage-quota-widget surface-card rounded-lg p-4 border border-light-border/30 dark:border-dark-border/20">
+  <div class="storage-quota-widget surface-card rounded-lg p-4 border border-light-border/30 dark:border-dark-border/20" data-testid="widget-storage-quota">
     <!-- Header -->
     <div class="flex items-center justify-between mb-3">
       <div>
@@ -56,6 +56,7 @@
         v-if="stats?.user_level === 'NEW'"
         @click="$emit('upgrade')"
         class="mt-2 w-full btn-primary text-xs py-1.5 px-3 rounded"
+        data-testid="btn-storage-upgrade"
       >
         {{ $t('storage.upgradePlan') }}
       </button>
@@ -132,5 +133,4 @@ defineExpose({
   refresh: loadStats
 })
 </script>
-
 

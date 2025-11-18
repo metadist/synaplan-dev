@@ -1,15 +1,16 @@
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" data-testid="modal-limit-reached">
         <!-- Backdrop -->
         <div 
           class="absolute inset-0 bg-black/40 backdrop-blur-sm"
           @click="handleClose"
+          data-testid="modal-backdrop"
         ></div>
 
         <!-- Modal Content -->
-        <div class="relative surface-elevated max-w-md w-full p-6 animate-in">
+        <div class="relative surface-elevated max-w-md w-full p-6 animate-in" data-testid="modal-body">
           <!-- Icon -->
           <div class="flex justify-center mb-4">
             <div class="relative">
@@ -39,7 +40,7 @@
           </p>
 
           <!-- Current Usage Stats -->
-          <div class="surface-card p-4 mb-6 space-y-3">
+          <div class="surface-card p-4 mb-6 space-y-3" data-testid="section-usage">
             <div class="flex items-center justify-between text-sm">
               <span class="txt-secondary">{{ $t('limitReached.currentUsage') }}</span>
               <span class="font-semibold txt-primary">{{ used }} / {{ formatLimit(currentLimit) }}</span>
@@ -64,7 +65,7 @@
           </div>
 
           <!-- Benefits List -->
-          <div v-if="limitType === 'lifetime'" class="mb-6 space-y-2">
+          <div v-if="limitType === 'lifetime'" class="mb-6 space-y-2" data-testid="section-benefits">
             <p class="text-xs font-semibold txt-primary mb-3">
               {{ $t('limitReached.upgradesBenefits') }}
             </p>
@@ -83,6 +84,7 @@
             <button
               @click="handleUpgrade"
               class="btn-primary w-full px-6 py-3 rounded-lg font-semibold text-base flex items-center justify-center gap-2 group"
+              data-testid="btn-upgrade"
             >
               <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -95,6 +97,7 @@
               v-if="userLevel === 'ANONYMOUS' && !phoneVerified"
               @click="handleVerifyPhone"
               class="w-full px-6 py-3 rounded-lg font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+              data-testid="btn-verify-phone"
             >
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -106,6 +109,7 @@
             <button
               @click="handleClose"
               class="w-full px-6 py-2 text-sm txt-secondary hover:txt-primary transition-colors"
+              data-testid="btn-close"
             >
               {{ $t('common.close') }}
             </button>
@@ -240,4 +244,3 @@ const handleVerifyPhone = () => {
   }
 }
 </style>
-

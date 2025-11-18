@@ -1,8 +1,9 @@
 <template>
-  <div class="relative isolate">
+  <div class="relative isolate" data-testid="comp-model-select">
     <button
       @click="isOpen = !isOpen"
       class="dropdown-trigger"
+      data-testid="btn-model-select-toggle"
     >
       <GroqIcon 
         v-if="modelsStore.selectedProvider.toLowerCase().includes('groq')"
@@ -22,6 +23,7 @@
       v-if="isOpen"
       role="menu"
       class="absolute bottom-full mb-2 left-0 min-w-[220px] max-h-[60vh] overflow-auto scroll-thin dropdown-panel z-[70]"
+      data-testid="dropdown-model-select"
     >
       <button
         v-for="option in modelOptions"
@@ -107,10 +109,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 onMounted(() => {
-  // Don't set mockup data! Models should come from backend via againData
-  // if (modelsStore.chatModels.length === 0) {
-  //   modelsStore.setChatModels(defaultModelOptions)
-  // }
+  // Model options now come from aiConfigStore/useModelSelection, so avoid injecting mock data.
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 })

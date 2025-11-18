@@ -6,7 +6,6 @@ use App\Entity\Message;
 use App\Entity\File;
 use App\Entity\User;
 use App\AI\Service\AiFacade;
-use App\Service\AgainService;
 use App\Service\Message\AgainHandler;
 use App\Service\PromptService;
 use App\Service\ModelConfigService;
@@ -31,7 +30,6 @@ class MessageController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
-        private AgainService $againService,
         private AgainHandler $againHandler,
         private PromptService $promptService,
         private ModelConfigService $modelConfigService,
@@ -236,9 +234,6 @@ class MessageController extends AbstractController
                 'provider' => $aiResponse['provider'] ?? 'test'
             ]);
 
-            // Get Again data for response
-            $againData = $this->getAgainData($incomingMessage->getTopic(), null);
-
             return $this->json([
                 'success' => true,
                 'message' => [
@@ -251,8 +246,7 @@ class MessageController extends AbstractController
                     'timestamp' => $outgoingMessage->getUnixTimestamp(),
                     'trackId' => $outgoingMessage->getTrackingId(),
                     'topic' => $incomingMessage->getTopic(),
-                ],
-                'again' => $againData
+                ]
             ]);
 
         } catch (\Exception $e) {
@@ -615,24 +609,4 @@ class MessageController extends AbstractController
         return $this->json($status);
     }
 
-    /**
-     * Get Again data (eligible models and predicted next)
-     */
-    private function getAgainData(string $topic, ?int $currentModelId): array
-    {
-        // Resolve tag from topic
-        $tag = $this->againService->resolveTagFromTopic($topic);
-        
-        // Get eligible models
-        $eligibleModels = $this->againService->getEligibleModels($tag);
-        
-        // Get predicted next
-        $predictedNext = $this->againService->getPredictedNext($eligibleModels, $currentModelId);
-
-        return [
-            'eligible' => $eligibleModels,
-            'predictedNext' => $predictedNext,
-            'tag' => $tag,
-        ];
-    }
 }

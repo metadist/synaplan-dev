@@ -7,6 +7,7 @@
         'w-full appearance-none rounded-lg surface-chip txt-primary px-4 py-2 pr-10 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all',
         customClass,
       ]"
+      data-testid="input-select"
     >
       <slot />
     </select>

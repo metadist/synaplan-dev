@@ -1,3 +1,5 @@
+import { extractBTextPayload } from './jsonResponse'
+
 export interface ParsedResponsePart {
   type: 'text' | 'code' | 'json' | 'link' | 'links' | 'thinking'
   content: string
@@ -12,6 +14,7 @@ export interface ParsedResponse {
   hasLinks: boolean
   hasCode: boolean
   hasJson: boolean
+  jsonPayload?: Record<string, any> | null
 }
 
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g
@@ -24,8 +27,17 @@ export function parseAIResponse(content: string): ParsedResponse {
   let hasLinks = false
   let hasCode = false
   let hasJson = false
-  
-  let remainingContent = content
+  let jsonPayload: Record<string, any> | null = null
+
+  const extraction = extractBTextPayload(content)
+  if (extraction.text !== undefined) {
+    jsonPayload = extraction.data || null
+    hasJson = true
+    const remainder = extraction.remainder?.trim()
+    const text = extraction.text ?? ''
+    content = remainder ? `${text}\n\n${remainder}`.trim() : text
+  }
+
   let lastIndex = 0
 
   // Extract code blocks first
@@ -83,7 +95,8 @@ export function parseAIResponse(content: string): ParsedResponse {
     parts,
     hasLinks,
     hasCode,
-    hasJson
+    hasJson,
+    jsonPayload
   }
 }
 

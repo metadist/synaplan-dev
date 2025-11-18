@@ -76,7 +76,7 @@ class ModelFixtures extends Fixture
             [
                 'id' => 17,
                 'service' => 'Groq',
-                'name' => 'llama-4-scout-17b-16e-instruct',
+                'name' => 'Llama 4 Scout Vision',
                 'tag' => 'pic2text',
                 'selectable' => 1,
                 'active' => 1,
@@ -88,10 +88,10 @@ class ModelFixtures extends Fixture
                 'quality' => 8,
                 'rating' => 0,
                 'json' => [
-                    'description' => 'Groq image processing and text extraction',
-                    'prompt' => 'Describe image! List the texts in the image, if possible. If not, describe the image in short.',
+                    'description' => 'Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode',
                     'params' => [
-                        'model' => 'llama-3.2-90b-vision-preview'
+                        'model' => 'meta-llama/llama-4-scout-17b-16e-instruct',
+                        'max_completion_tokens' => 1024
                     ]
                 ]
             ],
@@ -532,7 +532,7 @@ class ModelFixtures extends Fixture
             [
                 'id' => 83,
                 'service' => 'OpenAI',
-                'name' => 'tts-1-hd (Alloy)',
+                'name' => 'tts-1-hd',
                 'tag' => 'text2sound',
                 'selectable' => 1,
                 'active' => 1,
@@ -544,54 +544,9 @@ class ModelFixtures extends Fixture
                 'quality' => 9,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'OpenAI high-quality text-to-speech with voice Alloy (neutral and balanced).',
+                    'description' => 'OpenAI high-quality text-to-speech.',
                     'params' => [
-                        'model' => 'tts-1-hd',
-                        'voice' => 'alloy'
-                    ]
-                ]
-            ],
-            [
-                'id' => 84,
-                'service' => 'OpenAI',
-                'name' => 'tts-1-hd (Echo)',
-                'tag' => 'text2sound',
-                'selectable' => 1,
-                'active' => 1,
-                'providerId' => 'tts-1-hd',
-                'priceIn' => 0.03,
-                'inUnit' => 'per1000chars',
-                'priceOut' => 0,
-                'outUnit' => '-',
-                'quality' => 9,
-                'rating' => 1,
-                'json' => [
-                    'description' => 'OpenAI high-quality text-to-speech with voice Echo (male voice).',
-                    'params' => [
-                        'model' => 'tts-1-hd',
-                        'voice' => 'echo'
-                    ]
-                ]
-            ],
-            [
-                'id' => 85,
-                'service' => 'OpenAI',
-                'name' => 'tts-1-hd (Shimmer)',
-                'tag' => 'text2sound',
-                'selectable' => 1,
-                'active' => 1,
-                'providerId' => 'tts-1-hd',
-                'priceIn' => 0.03,
-                'inUnit' => 'per1000chars',
-                'priceOut' => 0,
-                'outUnit' => '-',
-                'quality' => 9,
-                'rating' => 1,
-                'json' => [
-                    'description' => 'OpenAI high-quality text-to-speech with voice Shimmer (warm female voice).',
-                    'params' => [
-                        'model' => 'tts-1-hd',
-                        'voice' => 'shimmer'
+                        'model' => 'tts-1-hd'
                     ]
                 ]
             ],
@@ -669,22 +624,24 @@ class ModelFixtures extends Fixture
             [
                 'id' => 37,
                 'service' => 'Google',
-                'name' => 'Gemini 2.0 Flash',
+                'name' => 'Gemini 2.5 Flash TTS',
                 'tag' => 'text2sound',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'gemini-2.0-flash',
+                'providerId' => 'gemini-2.5-flash-preview-tts',
                 'priceIn' => 0.1,
                 'inUnit' => 'per1M',
                 'priceOut' => 0.4,
                 'outUnit' => 'per1M',
-                'quality' => 8,
+                'quality' => 9,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'Google Speech Generation with Gemini 2.0 Flash',
+                    'description' => 'Google Gemini 2.5 Flash Preview TTS (native speech generation)',
                     'params' => [
-                        'model' => 'gemini-2.0-flash'
-                    ]
+                        'model' => 'gemini-2.5-flash-preview-tts',
+                        'voice' => 'Kore'
+                    ],
+                    'features' => ['tts', 'audio']
                 ]
             ],
             [
