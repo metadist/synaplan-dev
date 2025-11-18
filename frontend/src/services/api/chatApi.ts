@@ -132,17 +132,6 @@ export const chatApi = {
     return httpClient<any>(`/api/v1/messages/history?${params}`, { method: 'GET' })
   },
 
-  async sendAgainMessage(
-    originalMessageId: number,
-    modelId?: number,
-    promptId?: string
-  ): Promise<MessageResponse> {
-    return httpClient<MessageResponse>('/api/v1/messages/again', {
-      method: 'POST',
-      body: JSON.stringify({ originalMessageId, modelId, promptId })
-    })
-  },
-
   async enhanceMessage(text: string): Promise<{ original: string; enhanced: string }> {
     return httpClient<{ original: string; enhanced: string }>('/api/v1/messages/enhance', {
       method: 'POST',

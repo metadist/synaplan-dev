@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { normalizeMediaUrl } from '@/utils/urlHelper'
 import type { AgainData } from '@/types/ai-models'
 
 export type PartType = 'text' | 'image' | 'video' | 'audio' | 'code' | 'links' | 'docs' | 'screenshot' | 'translation' | 'link' | 'commandList' | 'thinking'
@@ -248,21 +249,22 @@ export const useHistoryStore = defineStore('history', () => {
           
           // Add generated file (image/video/audio) as part if present
           if (m.file && m.file.path) {
+            const absoluteUrl = normalizeMediaUrl(m.file.path)
             if (m.file.type === 'image') {
               parts.push({
                 type: 'image',
-                url: m.file.path,
+                url: absoluteUrl,
                 alt: m.text || 'Generated image'
               })
             } else if (m.file.type === 'video') {
               parts.push({
                 type: 'video',
-                url: m.file.path
+                url: absoluteUrl
               })
             } else if (m.file.type === 'audio') {
               parts.push({
                 type: 'audio',
-                url: m.file.path
+                url: absoluteUrl
               })
             }
           }

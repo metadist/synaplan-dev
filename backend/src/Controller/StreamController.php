@@ -713,6 +713,13 @@ class StreamController extends AbstractController
                 if (!empty($response['metadata']['usage'])) {
                     $outgoingMessage->setMeta('ai_chat_usage', json_encode($response['metadata']['usage']));
                 }
+
+                if (!empty($response['metadata']['media_prompt'])) {
+                    $outgoingMessage->setMeta('media_prompt', $response['metadata']['media_prompt']);
+                }
+                if (!empty($response['metadata']['media_type'])) {
+                    $outgoingMessage->setMeta('media_type', $response['metadata']['media_type']);
+                }
                 
                 // Store SORTING model information in MessageMeta (from classification)
                 if (!empty($classification['sorting_provider'])) {

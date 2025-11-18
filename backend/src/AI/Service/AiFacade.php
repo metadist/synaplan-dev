@@ -214,6 +214,12 @@ class AiFacade
                 'requireCapability' => true
             ];
         }
+        $this->logger->info('AI vision request - provider selection', [
+            'requested_provider' => $requestedProvider,
+            'user_id' => $userId,
+            'image' => basename($imagePath),
+            'options' => $options
+        ]);
 
         // Add all available real providers next
         $fallbackRequireCapability = true;
@@ -228,7 +234,7 @@ class AiFacade
             $fallbackProviders = $this->registry->getAvailableProviders('vision', includeTest: false, requireCapability: false);
             $fallbackRequireCapability = false;
         }
-
+        
         foreach ($fallbackProviders as $fallbackName) {
             if ($normalizedRequested && strcasecmp($fallbackName, $requestedProvider) === 0) {
                 continue;

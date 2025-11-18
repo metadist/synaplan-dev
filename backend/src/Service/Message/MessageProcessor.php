@@ -105,19 +105,36 @@ class MessageProcessor
                     $classification['rag_min_score'] = (float) $options['rag_min_score'];
                 }
             } elseif ($isAgainRequest) {
-                // Skip classification for "Again" - use specified model directly
+                // Skip sorting but preserve/override topic & language for routing
+                $topic = strtolower($message->getTopic() ?: '');
+                $language = $message->getLanguage();
+                $language = ($language && $language !== 'NN') ? $language : 'en';
+                
+                if ($topic === '' || $topic === 'unknown') {
+                    $topic = 'chat';
+                }
+
+                if (!empty($options['model_id'])) {
+                    $modelTag = $this->modelConfigService->getModelTag((int) $options['model_id']);
+                    if ($modelTag) {
+                        $topic = $this->mapModelTagToTopic($modelTag, $topic);
+                    }
+                }
+                
                 $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
-                    'specified_model_id' => $options['model_id']
+                    'specified_model_id' => $options['model_id'],
+                    'topic' => $topic,
+                    'language' => $language
                 ]);
                 
                 $this->notify($statusCallback, 'classified', 'Using previously selected model (skipped classification)');
                 
-                // Minimal classification with specified model
                 $classification = [
-                    'topic' => 'chat',
-                    'language' => 'en',
-                    'source' => 'chat',
-                    'model_id' => $options['model_id'] // This goes to ChatHandler
+                    'topic' => $topic,
+                    'language' => $language,
+                    'source' => 'again',
+                    'intent' => $this->mapTopicToIntentForAgain($topic),
+                    'model_id' => $options['model_id']
                 ];
             } else {
                 // Normal flow: Run classification
@@ -459,16 +476,32 @@ class MessageProcessor
                     'source' => $classification['source'],
                 ]);
             } elseif ($isAgainRequest) {
+                $resolvedTopic = strtolower($message->getTopic() ?: '');
+                if ($resolvedTopic === '' || $resolvedTopic === 'unknown') {
+                    $resolvedTopic = 'chat';
+                }
+
+                $resolvedLanguage = $languageOverride ?? ($message->getLanguage() && $message->getLanguage() !== 'NN' ? $message->getLanguage() : 'en');
+
+                if (!empty($options['model_id'])) {
+                    $modelTag = $this->modelConfigService->getModelTag((int) $options['model_id']);
+                    if ($modelTag) {
+                        $resolvedTopic = $this->mapModelTagToTopic($modelTag, $resolvedTopic);
+                    }
+                }
+
                 $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
-                    'specified_model_id' => $options['model_id']
+                    'specified_model_id' => $options['model_id'],
+                    'topic' => $resolvedTopic,
+                    'language' => $resolvedLanguage
                 ]);
 
                 $classification = [
-                    'topic' => 'chat',
-                    'language' => $languageOverride ?? 'en',
-                    'source' => 'chat',
+                    'topic' => $resolvedTopic,
+                    'language' => $resolvedLanguage,
+                    'source' => 'again',
                     'model_id' => $options['model_id'],
-                    'intent' => 'chat',
+                    'intent' => $this->mapTopicToIntentForAgain($resolvedTopic),
                 ];
 
                 $this->notify($statusCallback, 'classified', 'Using previously selected model (skipped classification)', [
@@ -696,6 +729,26 @@ class MessageProcessor
             'message' => $message,
             'metadata' => $metadata
         ]);
+    }
+
+    private function mapTopicToIntentForAgain(string $topic): string
+    {
+        return match ($topic) {
+            'mediamaker', 'text2pic', 'text2vid', 'text2sound' => 'image_generation',
+            'analyzefile', 'pic2text', 'analyze' => 'file_analysis',
+            'officemaker' => 'document_generation',
+            default => 'chat',
+        };
+    }
+
+    private function mapModelTagToTopic(string $modelTag, string $fallback): string
+    {
+        return match (strtolower($modelTag)) {
+            'text2pic', 'text2vid', 'text2sound' => 'mediamaker',
+            'pic2text', 'analyze', 'vision' => 'analyzefile',
+            'document', 'officemaker', 'text2doc' => 'officemaker',
+            default => $fallback ?: 'chat',
+        };
     }
 }
 

@@ -96,7 +96,7 @@
                   class="w-5 h-5 flex-shrink-0" 
                 />
                 <div class="flex-1 min-w-0 text-left">
-                  <div class="font-medium truncate">{{ model.providerId || model.name }}</div>
+                  <div class="font-medium truncate">{{ model.name }}</div>
                   <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
                 </div>
               </button>

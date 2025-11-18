@@ -107,10 +107,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 onMounted(() => {
-  // Don't set mockup data! Models should come from backend via againData
-  // if (modelsStore.chatModels.length === 0) {
-  //   modelsStore.setChatModels(defaultModelOptions)
-  // }
+  // Model options now come from aiConfigStore/useModelSelection, so avoid injecting mock data.
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 })

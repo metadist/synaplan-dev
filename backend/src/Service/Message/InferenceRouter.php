@@ -121,6 +121,7 @@ class InferenceRouter
             'chat' => 'chat',
             'image_generation' => 'image_generation',
             'code_generation' => 'code_generation',
+            'file_analysis' => 'file_analysis', // Vision AI für Bild-zu-Text
             'summarize' => 'chat', // Nutzt Chat Handler mit speziellem Prompt
             'translate' => 'chat',
             'email' => 'tool',

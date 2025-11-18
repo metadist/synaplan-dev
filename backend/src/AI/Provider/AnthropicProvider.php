@@ -483,8 +483,6 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     {
         $baseDir = rtrim($this->uploadDir, '/');
         $fullPath = $baseDir . '/' . ltrim($imagePath, '/');
-        $baseDir = rtrim($this->uploadDir, '/');
-        $fullPath = $baseDir . '/' . ltrim($imagePath, '/');
         
         if (!file_exists($fullPath)) {
             throw new \Exception("Image file not found: {$fullPath}");

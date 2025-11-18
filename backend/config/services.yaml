@@ -56,8 +56,10 @@ services:
     App\AI\Provider\GroqProvider:
         arguments:
             $apiKey: '%env(GROQ_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
 
     App\AI\Provider\GoogleProvider:
         arguments:
@@ -123,7 +125,13 @@ services:
     
     App\Service\Message\Handler\MediaGenerationHandler:
         arguments:
-            $uploadDir: '%kernel.project_dir%/public/uploads'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.message.handler' }
+    
+    App\Service\Message\Handler\FileAnalysisHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
 
@@ -146,8 +154,6 @@ services:
             $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
             $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
 
-    # Again Service (for model suggestions)
-    App\Service\AgainService: ~
     App\Service\Message\AgainHandler: ~
 
     # File Processing Services
@@ -174,7 +180,7 @@ services:
     
     App\Controller\StaticUploadController:
         arguments:
-            $uploadDir: '%kernel.project_dir%/public/uploads'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'controller.service_arguments' }
 
