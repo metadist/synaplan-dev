@@ -7,6 +7,7 @@
       variantClasses,
       sizeClasses,
     ]"
+    data-testid="comp-button"
   >
     <slot />
   </button>

@@ -1,8 +1,8 @@
 <template>
   <MainLayout>
-    <div class="h-full flex flex-col bg-chat">
+    <div class="h-full flex flex-col bg-chat" data-testid="page-rag-search">
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20 bg-chat">
+      <div class="px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20 bg-chat" data-testid="section-header">
         <h1 class="text-2xl font-semibold txt-primary mb-1">📚 Semantic Search</h1>
         <p class="txt-secondary text-sm">AI-powered search in your vectorized documents</p>
       </div>
@@ -10,8 +10,8 @@
       <div class="flex-1 overflow-y-auto px-6 py-6 scroll-thin">
         <div class="max-w-5xl mx-auto space-y-6">
           <!-- Stats Cards -->
-          <div v-if="stats" class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default">
+          <div v-if="stats" class="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="section-stats">
+            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default" data-testid="item-stat-card">
               <div class="flex items-center gap-2 mb-2">
                 <svg class="w-5 h-5 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -20,7 +20,7 @@
               <div class="text-2xl font-bold txt-primary">{{ stats.total_documents }}</div>
               <div class="text-sm txt-secondary">Documents</div>
             </div>
-            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default">
+            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default" data-testid="item-stat-card">
               <div class="flex items-center gap-2 mb-2">
                 <svg class="w-5 h-5 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -29,7 +29,7 @@
               <div class="text-2xl font-bold txt-primary">{{ stats.total_chunks }}</div>
               <div class="text-sm txt-secondary">Chunks</div>
             </div>
-            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default">
+            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default" data-testid="item-stat-card">
               <div class="flex items-center gap-2 mb-2">
                 <svg class="w-5 h-5 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -38,7 +38,7 @@
               <div class="text-2xl font-bold txt-primary">{{ stats.total_groups }}</div>
               <div class="text-sm txt-secondary">Groups</div>
             </div>
-            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default">
+            <div class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default" data-testid="item-stat-card">
               <div class="flex items-center gap-2 mb-2">
                 <svg class="w-5 h-5 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -50,8 +50,8 @@
           </div>
 
           <!-- Search Box -->
-          <div class="surface-card p-6">
-            <form @submit.prevent="performSearch" class="space-y-4">
+          <div class="surface-card p-6" data-testid="section-search">
+            <form @submit.prevent="performSearch" class="space-y-4" data-testid="form-rag-search">
               <div>
                 <label class="block text-sm font-medium txt-primary mb-2">
                   <span class="flex items-center gap-2">
@@ -68,6 +68,7 @@
                   class="w-full px-4 py-3 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
                   :disabled="isSearching"
                   @keydown.enter.prevent="performSearch"
+                  data-testid="input-query"
                 />
               </div>
 
@@ -84,6 +85,7 @@
                   <select 
                     v-model.number="limit" 
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
+                    data-testid="input-limit"
                   >
                     <option :value="5">5 results</option>
                     <option :value="10">10 results</option>
@@ -104,6 +106,7 @@
                   <select 
                     v-model.number="minScore" 
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
+                    data-testid="input-min-score"
                   >
                     <option :value="0.3">30% (More results)</option>
                     <option :value="0.5">50% (Balanced)</option>
@@ -126,15 +129,17 @@
                     type="text"
                     placeholder="Optional"
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+                    data-testid="input-group-key"
                   />
                 </div>
               </div>
 
-              <div class="flex items-center gap-4 flex-wrap">
+              <div class="flex items-center gap-4 flex-wrap" data-testid="bar-search-actions">
                 <button
                   type="submit"
                   :disabled="isSearching || !query.trim()"
                   class="btn-primary px-8 py-3 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+                  data-testid="btn-search"
                 >
                   <svg v-if="!isSearching" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -146,7 +151,7 @@
                   <span class="font-medium">{{ isSearching ? 'Searching...' : 'Search Documents' }}</span>
                 </button>
 
-                <div v-if="searchTime" class="flex items-center gap-2 text-sm txt-secondary">
+                <div v-if="searchTime" class="flex items-center gap-2 text-sm txt-secondary" data-testid="text-search-summary">
                   <svg class="w-4 h-4 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -157,7 +162,7 @@
           </div>
 
           <!-- Results -->
-          <div v-if="results.length > 0" class="space-y-4">
+          <div v-if="results.length > 0" class="space-y-4" data-testid="section-results">
             <div class="flex items-center gap-2 mb-4">
               <svg class="w-5 h-5 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -169,6 +174,7 @@
               v-for="(result, index) in results"
               :key="result.chunk_id"
               class="surface-card p-5 hover:shadow-lg transition-all cursor-default"
+              data-testid="item-result"
             >
               <!-- Result Header -->
               <div class="flex items-start justify-between mb-3">
@@ -204,12 +210,14 @@
                 <button
                   @click="viewFile(result.message_id)"
                   class="text-sm px-3 py-1.5 rounded-lg hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
+                  data-testid="btn-view-file"
                 >
                   View File
                 </button>
                 <button
                   @click="findSimilarDocs(result.chunk_id)"
                   class="text-sm px-3 py-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
+                  data-testid="btn-find-similar"
                 >
                   Find Similar
                 </button>
@@ -218,7 +226,7 @@
           </div>
 
           <!-- Empty State -->
-          <div v-else-if="hasSearched && !isSearching" class="surface-card p-12 text-center">
+          <div v-else-if="hasSearched && !isSearching" class="surface-card p-12 text-center" data-testid="state-no-results">
             <svg class="w-16 h-16 mx-auto mb-4 txt-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -227,13 +235,13 @@
           </div>
 
           <!-- No Documents State -->
-          <div v-else-if="stats && stats.total_documents === 0 && !isSearching" class="surface-card p-12 text-center">
+          <div v-else-if="stats && stats.total_documents === 0 && !isSearching" class="surface-card p-12 text-center" data-testid="state-no-docs">
             <svg class="w-16 h-16 mx-auto mb-4 txt-secondary opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <h3 class="text-lg font-semibold txt-primary mb-2">No documents vectorized yet</h3>
             <p class="txt-secondary text-sm mb-4">Upload files with "Extract + Vectorize" to enable semantic search</p>
-            <router-link to="/files" class="btn-primary px-6 py-2.5 rounded-lg inline-block">
+            <router-link to="/files" class="btn-primary px-6 py-2.5 rounded-lg inline-block" data-testid="btn-go-files">
               Go to Files
             </router-link>
           </div>
@@ -340,4 +348,3 @@ const findSimilarDocs = async (chunkId: number) => {
   }
 }
 </script>
-

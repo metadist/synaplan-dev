@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-chat">
+  <div class="min-h-screen bg-chat" data-testid="page-shared-chat">
 
     <!-- Header -->
-    <header class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border">
+    <header class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border" data-testid="section-header">
       <div class="max-w-4xl mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -18,6 +18,7 @@
             href="https://synaplan.com" 
             target="_blank"
             class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+            data-testid="btn-try-synaplan"
           >
             Try Synaplan
           </a>
@@ -26,7 +27,7 @@
     </header>
 
     <!-- Loading State -->
-    <div v-if="loading" class="flex justify-center items-center py-20">
+    <div v-if="loading" class="flex justify-center items-center py-20" data-testid="state-loading">
       <div class="text-center">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--brand)] mx-auto mb-4"></div>
         <p class="txt-secondary">Loading chat...</p>
@@ -34,7 +35,7 @@
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="max-w-4xl mx-auto px-4 py-20">
+    <div v-else-if="error" class="max-w-4xl mx-auto px-4 py-20" data-testid="state-error">
       <div class="text-center">
         <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -51,9 +52,9 @@
     </div>
 
     <!-- Chat Content -->
-    <main v-else class="max-w-4xl mx-auto px-4 py-8">
+    <main v-else class="max-w-4xl mx-auto px-4 py-8" data-testid="section-chat-content">
       <!-- Chat Info Banner -->
-      <div class="mb-8 p-6 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/20">
+      <div class="mb-8 p-6 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/20" data-testid="section-info-banner">
         <div class="flex items-start gap-4">
           <svg class="w-6 h-6 text-[var(--brand)] mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -71,12 +72,13 @@
       </div>
 
       <!-- Messages -->
-      <div class="space-y-6">
+      <div class="space-y-6" data-testid="section-messages">
         <div 
           v-for="message in messages" 
           :key="message.id"
           class="flex gap-4"
           :class="message.direction === 'IN' ? 'flex-row' : 'flex-row-reverse'"
+          data-testid="item-message"
         >
           <!-- Avatar -->
           <div class="flex-shrink-0">
@@ -368,4 +370,3 @@ const formatMessageText = (text: string): string => {
     .replace(/\n/g, '<br />')
 }
 </script>
-

@@ -1,33 +1,36 @@
 <template>
-  <header class="bg-header">
-    <div class="flex items-center justify-between px-6 py-4">
-      <div class="flex items-center gap-3 flex-1">
+  <header class="bg-header" data-testid="comp-app-header">
+    <div class="flex items-center justify-between px-6 py-4" data-testid="section-header-bar">
+      <div class="flex items-center gap-3 flex-1" data-testid="section-header-left">
         <button
           @click="sidebarStore.toggleMobile()"
           class="md:hidden icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-lg"
           aria-label="Toggle sidebar"
+          data-testid="btn-sidebar-toggle"
         >
           <Bars3Icon class="w-6 h-6" />
         </button>
         <slot name="left" />
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3" data-testid="section-header-actions">
         <!-- Mode Switcher -->
         <button
           @click="appModeStore.toggleMode()"
           class="dropdown-trigger"
           :title="appModeStore.isEasyMode ? 'Switch to Advanced Mode' : 'Switch to Easy Mode'"
+          data-testid="btn-mode-toggle"
         >
           <AdjustmentsHorizontalIcon class="w-5 h-5" />
           <span class="hidden md:inline text-sm font-medium">{{ appModeStore.isEasyMode ? 'Easy' : 'Advanced' }}</span>
         </button>
 
-        <div class="relative isolate">
+        <div class="relative isolate" data-testid="section-language-selector">
           <button
             @click="isLangOpen = !isLangOpen"
             class="dropdown-trigger"
             aria-label="Select language"
+            data-testid="btn-language-toggle"
           >
             <GlobeAltIcon class="w-5 h-5" />
             <span class="hidden md:inline text-sm font-medium">{{ selectedLanguage.toUpperCase() }}</span>
@@ -37,6 +40,7 @@
             v-if="isLangOpen"
             role="menu"
             class="absolute top-full mt-2 right-0 min-w-[220px] max-h-[60vh] overflow-auto scroll-thin dropdown-panel z-[70]"
+            data-testid="dropdown-language-menu"
           >
             <button
               v-for="lang in languages"
@@ -59,6 +63,7 @@
           @click="cycleTheme"
           :aria-label="themeLabel"
           class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-lg"
+          data-testid="btn-theme-toggle"
         >
           <SunIcon v-if="themeStore.theme.value === 'light'" class="w-5 h-5" />
           <MoonIcon v-else class="w-5 h-5" />

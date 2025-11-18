@@ -3,10 +3,12 @@
     ref="root"
     class="group flex items-center gap-2 px-3 py-2 transition-colors relative nav-item"
     :class="isActive ? 'nav-item--active' : ''"
+    data-testid="item-chat-list-entry"
   >
     <button
       class="flex-1 text-left text-sm truncate min-h-[36px] flex flex-col justify-center"
       @click="$emit('open', chat.id)"
+      data-testid="btn-chat-entry-open"
     >
       <span class="truncate">{{ chat.title }}</span>
       <span class="text-xs txt-secondary">{{ chat.timestamp }}</span>
@@ -17,6 +19,7 @@
         class="icon-ghost transition-opacity"
         @click.stop="toggleMenu"
         aria-label="More options"
+        data-testid="btn-chat-entry-menu"
       >
         <span class="text-lg leading-none">⋯</span>
       </button>
@@ -25,18 +28,21 @@
         <button
           class="dropdown-item"
           @click.stop="handleAction('share')"
+          data-testid="btn-chat-entry-share"
         >
           Share
         </button>
         <button
           class="dropdown-item"
           @click.stop="handleAction('rename')"
+          data-testid="btn-chat-entry-rename"
         >
           Rename
         </button>
         <button
           class="dropdown-item dropdown-item--danger"
           @click.stop="handleAction('delete')"
+          data-testid="btn-chat-entry-delete"
         >
           Delete
         </button>

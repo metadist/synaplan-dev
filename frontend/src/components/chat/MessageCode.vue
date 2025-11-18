@@ -1,7 +1,7 @@
 <template>
-  <div class="rounded-lg overflow-hidden border border-light-border/30 dark:border-dark-border/20">
+  <div class="rounded-lg overflow-hidden border border-light-border/30 dark:border-dark-border/20" data-testid="comp-message-code">
     <!-- Header -->
-    <div class="flex items-center justify-between px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-light-border/30 dark:border-dark-border/20">
+    <div class="flex items-center justify-between px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-light-border/30 dark:border-dark-border/20" data-testid="section-header">
       <span class="txt-tertiary text-xs font-medium font-mono">
         {{ language || 'code' }}
       </span>
@@ -9,6 +9,7 @@
       <button
         @click="copyCode"
         class="flex items-center gap-1.5 px-2 py-1 rounded txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs"
+        data-testid="btn-copy"
       >
         <CheckIcon v-if="copied" class="w-3.5 h-3.5 text-green-500" />
         <ClipboardDocumentIcon v-else class="w-3.5 h-3.5" />
@@ -46,4 +47,3 @@ const copyCode = async () => {
   }
 }
 </script>
-

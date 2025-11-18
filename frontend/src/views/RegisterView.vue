@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden">
+  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden" data-testid="page-register">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
       <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
@@ -8,6 +8,7 @@
       <button
         @click="cycleLanguage"
         class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium"
+        data-testid="btn-language-toggle"
       >
         {{ currentLanguage.toUpperCase() }}
       </button>
@@ -15,6 +16,7 @@
         @click="toggleTheme"
         class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
         :aria-label="themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        data-testid="btn-theme-toggle"
       >
         <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-5 h-5" />
         <MoonIcon v-else class="w-5 h-5" />
@@ -32,9 +34,9 @@
         <p class="txt-secondary">{{ $t('welcome') }}</p>
       </div>
 
-      <div class="surface-card p-8">
-        <form @submit.prevent="handleRegister" class="space-y-5">
-          <div>
+      <div class="surface-card p-8" data-testid="section-register-card">
+        <form @submit.prevent="handleRegister" class="space-y-5" data-testid="form-register">
+          <div data-testid="field-full-name">
             <label for="fullName" class="block text-sm font-medium txt-primary mb-2">
               {{ $t('auth.fullName') }}
             </label>
@@ -45,10 +47,11 @@
               required
               class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
               :placeholder="$t('auth.fullName')"
+              data-testid="input-full-name"
             />
           </div>
 
-          <div>
+          <div data-testid="field-email">
             <label for="email" class="block text-sm font-medium txt-primary mb-2">
               {{ $t('auth.email') }}
             </label>
@@ -61,11 +64,12 @@
               :class="{ 'ring-2 ring-red-500': emailError }"
               :placeholder="$t('auth.email')"
               @blur="emailError = !validateEmail(email) && email ? 'Invalid email format' : ''"
+              data-testid="input-email"
             />
             <p v-if="emailError" class="text-sm text-red-600 dark:text-red-400 mt-1">{{ emailError }}</p>
           </div>
 
-          <div>
+          <div data-testid="field-password">
             <label for="password" class="block text-sm font-medium txt-primary mb-2">
               {{ $t('auth.password') }}
             </label>
@@ -77,13 +81,14 @@
               class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
               :class="{ 'ring-2 ring-red-500': passwordErrors.length > 0 }"
               :placeholder="$t('auth.password')"
+              data-testid="input-password"
             />
             <div v-if="passwordErrors.length > 0" class="mt-2 space-y-1">
               <p v-for="err in passwordErrors" :key="err" class="text-xs text-red-600 dark:text-red-400">• {{ err }}</p>
             </div>
           </div>
 
-          <div>
+          <div data-testid="field-confirm-password">
             <label for="confirmPassword" class="block text-sm font-medium txt-primary mb-2">
               {{ $t('auth.confirmPassword') }}
             </label>
@@ -94,16 +99,17 @@
               required
               class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
               :placeholder="$t('auth.confirmPassword')"
+              data-testid="input-confirm-password"
             />
           </div>
 
           <!-- Error Message -->
-          <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" data-testid="alert-register-error">
             <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
           </div>
 
           <!-- Password Mismatch Warning -->
-          <div v-if="password && confirmPassword && password !== confirmPassword" class="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+          <div v-if="password && confirmPassword && password !== confirmPassword" class="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800" data-testid="alert-password-mismatch">
             <p class="text-sm text-yellow-600 dark:text-yellow-400">{{ $t('auth.passwordMismatch') || 'Passwords do not match' }}</p>
           </div>
 
@@ -111,6 +117,7 @@
             type="submit"
             class="w-full btn-primary py-3 rounded-lg font-medium"
             :disabled="loading || password !== confirmPassword"
+            data-testid="btn-register"
           >
             <span v-if="loading">{{ $t('auth.signingUp') || 'Creating account...' }}</span>
             <span v-else>{{ $t('auth.signUp') }}</span>
@@ -128,11 +135,12 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-3 gap-3" data-testid="section-social-login">
           <button
             @click="handleSocialLogin('google')"
             type="button"
             class="flex items-center justify-center px-4 py-3 rounded-lg surface-chip txt-secondary hover-surface transition-all duration-200"
+            data-testid="btn-social-google"
           >
             <svg class="w-5 h-5" viewBox="0 0 24 24">
               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -146,6 +154,7 @@
             @click="handleSocialLogin('github')"
             type="button"
             class="flex items-center justify-center px-4 py-3 rounded-lg surface-chip txt-secondary hover-surface transition-all duration-200"
+            data-testid="btn-social-github"
           >
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
@@ -156,6 +165,7 @@
             @click="handleSocialLogin('facebook')"
             type="button"
             class="flex items-center justify-center px-4 py-3 rounded-lg surface-chip txt-secondary hover-surface transition-all duration-200"
+            data-testid="btn-social-facebook"
           >
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -175,6 +185,7 @@
           <router-link
             to="/login"
             class="font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] rounded" style="color: var(--brand)"
+            data-testid="link-go-login"
           >
             {{ $t('auth.signIn') }}
           </router-link>

@@ -1,9 +1,10 @@
 <template>
-  <div class="flex flex-col gap-2">
+  <div class="flex flex-col gap-2" data-testid="comp-sidebar-chat-list">
     <!-- New Chat Button -->
     <button
       @click="createNewChat"
       class="btn-primary w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+      data-testid="btn-chat-new"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -15,6 +16,7 @@
       <button
         @click="toggleSection('my')"
         class="w-full flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+        data-testid="btn-chat-section-my"
       >
         <ChevronRightIcon :class="['w-4 h-4 transition-transform flex-shrink-0', sections.my && 'rotate-90']" />
         <span class="text-xs font-medium uppercase tracking-wider">My Chats</span>
@@ -36,6 +38,7 @@
           v-if="!showAllMy && myChats.length > 5"
           @click="showAllMy = true"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+          data-testid="btn-chat-show-more-my"
         >
           Show more...
         </button>
@@ -44,6 +47,7 @@
           v-if="myArchivedChats.length > 0"
           @click="toggleSection('myArchived')"
           class="flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] mt-2"
+          data-testid="btn-chat-section-my-archived"
         >
           <ChevronRightIcon :class="['w-3.5 h-3.5 transition-transform flex-shrink-0', sections.myArchived && 'rotate-90']" />
           <span class="text-xs font-medium uppercase tracking-wider">Archived ({{ myArchivedChats.length }})</span>
@@ -68,6 +72,7 @@
       <button
         @click="toggleSection('widget')"
         class="w-full flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+        data-testid="btn-chat-section-widget"
       >
         <ChevronRightIcon :class="['w-4 h-4 transition-transform flex-shrink-0', sections.widget && 'rotate-90']" />
         <span class="text-xs font-medium uppercase tracking-wider">Widget Chats</span>
@@ -90,6 +95,7 @@
           v-if="!showAllWidget && widgetChats.length > 5"
           @click="showAllWidget = true"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+          data-testid="btn-chat-show-more-widget"
         >
           Show more...
         </button>
@@ -98,6 +104,7 @@
           v-if="widgetArchivedChats.length > 0"
           @click="toggleSection('widgetArchived')"
           class="flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] mt-2"
+          data-testid="btn-chat-section-widget-archived"
         >
           <ChevronRightIcon :class="['w-3.5 h-3.5 transition-transform flex-shrink-0', sections.widgetArchived && 'rotate-90']" />
           <span class="text-xs font-medium uppercase tracking-wider">Archived ({{ widgetArchivedChats.length }})</span>

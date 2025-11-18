@@ -1,14 +1,14 @@
 <template>
-  <div class="flex h-screen">
+  <div class="flex h-screen" data-testid="comp-main-layout">
     <Sidebar />
 
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0" data-testid="section-main-shell">
       <Header>
         <template #left>
           <slot name="header" />
         </template>
       </Header>
-      <main class="flex-1 overflow-y-auto">
+      <main class="flex-1 overflow-y-auto" data-testid="section-primary-content">
         <slot />
       </main>
     </div>

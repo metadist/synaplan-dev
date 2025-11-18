@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-testid="page-config-task-prompts">
     <!-- Header Card with Dropdown -->
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-selector">
       <div class="flex items-start justify-between mb-6">
         <div>
           <h2 class="text-2xl font-semibold txt-primary flex items-center gap-3">
@@ -23,6 +23,7 @@
             v-model="selectedPromptId"
             @change="onPromptSelect"
             class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+            data-testid="input-prompt-select"
           >
             <option :value="null" disabled>Select a task prompt...</option>
             <option
@@ -44,6 +45,7 @@
           <button
             @click="showCreateModal = true"
             class="px-5 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+            data-testid="btn-create-prompt"
           >
             <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
             {{ $t('config.taskPrompts.createNew') }}
@@ -55,7 +57,7 @@
     <!-- Prompt Details (only shown when a prompt is selected) -->
     <template v-if="currentPrompt">
       <!-- Prompt Details Card -->
-      <div class="surface-card p-6">
+      <div class="surface-card p-6" data-testid="section-prompt-details">
         <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
           <Icon icon="heroicons:cog-6-tooth" class="w-5 h-5 text-[var(--brand)]" />
           {{ $t('config.taskPrompts.promptDetails') }}
@@ -85,6 +87,7 @@
               rows="3"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               :placeholder="$t('config.taskPrompts.rulesHelp')"
+              data-testid="input-rules"
             />
           </div>
 
@@ -98,6 +101,7 @@
               v-model="formData.aiModel"
               :disabled="currentPrompt.isDefault"
             class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="input-ai-model"
           >
             <option value="AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]">
                 ✨ {{ $t('config.taskPrompts.automated') }}
@@ -141,6 +145,7 @@
                 v-for="tool in availableTools"
               :key="tool.value"
                 class="flex items-center gap-3 p-3 rounded-lg surface-chip cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
+                data-testid="item-tool"
             >
               <input
                   v-model="formData.availableTools"
@@ -158,7 +163,7 @@
     </div>
 
       <!-- Prompt Content Card -->
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-prompt-content">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:code-bracket" class="w-5 h-5 text-[var(--brand)]" />
@@ -173,6 +178,7 @@
               @click="insertMarkdown(tool.before, tool.after)"
               class="p-2 rounded hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
               :title="tool.label"
+              data-testid="btn-markdown-tool"
             >
               <Icon :icon="tool.icon" class="w-4 h-4" />
           </button>
@@ -186,6 +192,7 @@
           rows="16"
           class="w-full px-4 py-3 surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono disabled:opacity-50 disabled:cursor-not-allowed"
           :placeholder="$t('config.taskPrompts.contentPlaceholder')"
+          data-testid="input-content"
         />
         
         <p class="text-xs txt-secondary mt-2 flex items-center gap-1">
@@ -195,7 +202,7 @@
       </div>
 
       <!-- Knowledge Base Files Card -->
-      <div v-if="!currentPrompt.isDefault" class="surface-card p-6">
+      <div v-if="!currentPrompt.isDefault" class="surface-card p-6" data-testid="section-knowledge-base">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
@@ -213,6 +220,7 @@
           <router-link
             to="/files"
             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium"
+            data-testid="link-upload-files"
           >
             <Icon icon="heroicons:cloud-arrow-up" class="w-5 h-5" />
             Upload Files in File Manager
@@ -230,11 +238,12 @@
           </div>
 
           <!-- Linked Files List -->
-          <div v-if="promptFiles.length > 0" class="space-y-2 p-3 surface-chip rounded-lg max-h-[250px] overflow-y-auto">
+          <div v-if="promptFiles.length > 0" class="space-y-2 p-3 surface-chip rounded-lg max-h-[250px] overflow-y-auto" data-testid="section-linked-files">
             <div
               v-for="file in promptFiles"
               :key="file.messageId"
               class="flex items-center justify-between p-2.5 bg-green-500/5 border border-green-500/20 rounded-lg group hover:bg-green-500/10 transition-colors"
+              data-testid="item-linked-file"
             >
               <div class="flex items-center gap-2.5 flex-1 min-w-0">
                 <Icon icon="heroicons:check-circle" class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
@@ -251,13 +260,14 @@
                 :disabled="loading"
                 class="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Unlink file from this prompt"
+                data-testid="btn-unlink"
               >
                 <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
               </button>
             </div>
           </div>
           
-          <div v-else class="text-center py-6 surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20">
+          <div v-else class="text-center py-6 surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20" data-testid="section-linked-empty">
             <Icon icon="heroicons:folder-open" class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30" />
             <p class="text-sm txt-secondary">No files linked yet</p>
             <p class="text-xs txt-secondary mt-1">Link files below to add them to this prompt's knowledge base</p>
@@ -280,21 +290,23 @@
               type="text"
               placeholder="Search files by name..."
               class="w-full pl-10 pr-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              data-testid="input-file-search"
             />
           </div>
 
           <!-- Loading -->
-          <div v-if="loadingAvailableFiles" class="text-center py-8">
+          <div v-if="loadingAvailableFiles" class="text-center py-8" data-testid="section-files-loading">
             <Icon icon="heroicons:arrow-path" class="w-8 h-8 mx-auto mb-2 txt-secondary animate-spin" />
             <p class="text-sm txt-secondary">Loading files...</p>
           </div>
 
           <!-- Available Files List -->
-          <div v-else-if="availableFiles.length > 0" class="space-y-2 max-h-[300px] overflow-y-auto">
+          <div v-else-if="availableFiles.length > 0" class="space-y-2 max-h-[300px] overflow-y-auto" data-testid="section-available-files">
             <div
               v-for="file in availableFiles"
               :key="file.messageId"
               class="flex items-center justify-between p-3 surface-chip rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              data-testid="item-available-file"
             >
               <div class="flex items-center gap-3 flex-1 min-w-0">
                 <Icon icon="heroicons:document-text" class="w-5 h-5 txt-secondary flex-shrink-0" />
@@ -317,6 +329,7 @@
                     ? 'bg-green-500/10 text-green-600 dark:text-green-400 cursor-default'
                     : 'bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20'
                 ]"
+                data-testid="btn-link-file"
               >
                 <Icon 
                   :icon="isFileLinked(file.messageId) ? 'heroicons:check-circle' : 'heroicons:link'" 
@@ -328,7 +341,7 @@
           </div>
 
           <!-- Empty State -->
-          <div v-else class="text-center py-8">
+          <div v-else class="text-center py-8" data-testid="section-files-empty">
             <Icon icon="heroicons:document-magnifying-glass" class="w-12 h-12 mx-auto mb-2 txt-secondary opacity-30" />
             <p class="text-sm txt-secondary">
               {{ availableFilesSearch ? 'No files found matching your search' : 'No vectorized files available. Upload files in the Files page first.' }}
@@ -338,7 +351,7 @@
       </div>
 
       <!-- Delete Prompt (only for custom prompts) -->
-      <div v-if="!currentPrompt.isDefault" class="surface-card p-6 border-2 border-red-500/20">
+      <div v-if="!currentPrompt.isDefault" class="surface-card p-6 border-2 border-red-500/20" data-testid="section-danger">
         <h3 class="text-lg font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
           <Icon icon="heroicons:trash" class="w-5 h-5" />
           {{ $t('config.taskPrompts.dangerZone') }}
@@ -348,6 +361,7 @@
           @click="handleDelete"
           :disabled="loading"
           class="btn-secondary px-6 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/30 font-medium flex items-center gap-2"
+          data-testid="btn-delete"
         >
           <Icon icon="heroicons:trash" class="w-5 h-5" />
           {{ $t('config.taskPrompts.deletePrompt') }}
@@ -359,9 +373,10 @@
     <div
       v-if="showCreateModal"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      data-testid="modal-task-prompt-create"
       @click.self="showCreateModal = false"
     >
-      <div class="surface-card p-6 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="surface-card p-6 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto" data-testid="section-create-modal">
         <div class="flex items-center justify-between mb-6">
           <h3 class="text-xl font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:plus-circle" class="w-6 h-6 text-[var(--brand)]" />
@@ -371,6 +386,7 @@
             @click="showCreateModal = false"
             class="p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors"
             title="Close"
+            data-testid="btn-close"
           >
             <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
           </button>
@@ -383,6 +399,7 @@
               @click="loadTemplates"
               class="text-xs px-3 py-1.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors flex items-center gap-1.5"
               title="Load template text"
+              data-testid="btn-load-template"
             >
               <Icon icon="heroicons:document-duplicate" class="w-3.5 h-3.5" />
               Load Template
@@ -400,6 +417,7 @@
                 type="text"
                 class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('config.taskPrompts.topicPlaceholder')"
+                data-testid="input-new-topic"
               />
             </div>
             <div>
@@ -412,6 +430,7 @@
                 type="text"
                 class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('config.taskPrompts.namePlaceholder')"
+                data-testid="input-new-name"
               />
             </div>
           </div>
@@ -427,6 +446,7 @@
               rows="3"
               class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
               :placeholder="SELECTION_RULES_TEMPLATE"
+              data-testid="input-new-rules"
             ></textarea>
             <p class="text-xs txt-secondary mt-1.5">
               {{ $t('config.taskPrompts.rulesHelp') }}
@@ -444,6 +464,7 @@
               rows="8"
               class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono resize-y"
               :placeholder="PROMPT_CONTENT_TEMPLATE"
+              data-testid="input-new-content"
             ></textarea>
             <p v-if="hasTemplateText" class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
               <Icon icon="heroicons:exclamation-triangle" class="w-3.5 h-3.5" />
@@ -452,7 +473,7 @@
           </div>
 
           <!-- Optional: Link Files to New Prompt -->
-          <div class="border-t border-light-border/30 dark:border-dark-border/20 pt-4">
+          <div class="border-t border-light-border/30 dark:border-dark-border/20 pt-4" data-testid="section-new-files">
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:document-plus" class="w-4 h-4" />
               Knowledge Base Files (Optional)
@@ -468,17 +489,19 @@
                 type="text"
                 placeholder="Search files by name or keyword..."
                 class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+                data-testid="input-new-file-search"
               />
             </div>
 
             <!-- Selected files for new prompt -->
-            <div v-if="newPromptSelectedFiles.length > 0" class="mb-3 space-y-1.5">
+            <div v-if="newPromptSelectedFiles.length > 0" class="mb-3 space-y-1.5" data-testid="section-new-selected-files">
               <p class="text-xs font-medium txt-primary">Selected ({{ newPromptSelectedFiles.length }}):</p>
               <div class="space-y-1">
                 <div
                   v-for="fileId in newPromptSelectedFiles"
                   :key="fileId"
                   class="flex items-center justify-between p-2 bg-green-500/5 border border-green-500/20 rounded text-xs"
+                  data-testid="item-new-selected-file"
                 >
                   <span class="txt-primary flex-1 min-w-0 truncate">
                     {{ availableFiles.find(f => f.messageId === fileId)?.fileName || 'Unknown' }}
@@ -487,6 +510,7 @@
                     @click="removeFileFromNewPrompt(fileId)"
                     class="ml-2 text-red-500 hover:text-red-600"
                     title="Remove"
+                    data-testid="btn-remove-selected-file"
                   >
                     <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
                   </button>
@@ -495,13 +519,14 @@
             </div>
 
             <!-- Available files list -->
-            <div class="max-h-[200px] overflow-y-auto space-y-1">
+            <div class="max-h-[200px] overflow-y-auto space-y-1" data-testid="section-new-available-files">
               <div
                 v-for="file in filteredNewPromptFiles"
                 :key="file.messageId"
                 @click="toggleFileForNewPrompt(file.messageId)"
                 class="flex items-center justify-between p-2 surface-chip rounded hover:bg-light-border/10 dark:hover:bg-dark-border/10 cursor-pointer transition-colors text-xs"
                 :class="{ 'bg-[var(--brand)]/10': newPromptSelectedFiles.includes(file.messageId) }"
+                data-testid="item-new-file"
               >
                 <div class="flex-1 min-w-0">
                   <p class="txt-primary font-medium truncate">{{ file.fileName }}</p>
@@ -518,7 +543,7 @@
                   class="w-4 h-4 text-[var(--brand)] flex-shrink-0 ml-2"
                 />
               </div>
-              <div v-if="filteredNewPromptFiles.length === 0" class="text-center py-4 txt-secondary text-xs">
+              <div v-if="filteredNewPromptFiles.length === 0" class="text-center py-4 txt-secondary text-xs" data-testid="section-new-files-empty">
                 {{ newPromptFilesSearch ? 'No files found' : 'No vectorized files available' }}
               </div>
             </div>
@@ -529,6 +554,7 @@
             <button
               @click="showCreateModal = false"
               class="flex-1 px-6 py-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
+              data-testid="btn-cancel-create"
             >
               Cancel
             </button>
@@ -537,6 +563,7 @@
               :disabled="!canCreatePrompt"
               class="flex-1 px-6 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               :title="hasTemplateText ? 'Please customize the template text before creating' : 'Create new prompt'"
+              data-testid="btn-confirm-create"
             >
               <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
               {{ $t('config.taskPrompts.createButton') }}
@@ -551,6 +578,7 @@
       :show="hasUnsavedChanges"
       @save="handleSave"
       @discard="handleDiscard"
+      data-testid="comp-unsaved-bar"
     />
   </div>
 </template>

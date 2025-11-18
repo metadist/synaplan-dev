@@ -1,9 +1,9 @@
 <template>
   <!-- Fullscreen Wizard -->
-  <div class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 lg:p-4">
-    <div class="surface-card rounded-xl lg:rounded-2xl w-full max-w-6xl max-h-[95vh] lg:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+  <div class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 lg:p-4" data-testid="modal-widget-creation">
+    <div class="surface-card rounded-xl lg:rounded-2xl w-full max-w-6xl max-h-[95vh] lg:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" data-testid="section-wizard-shell">
       <!-- Header -->
-      <div class="px-4 lg:px-6 py-3 lg:py-4 border-b border-light-border/30 dark:border-dark-border/20 flex items-center justify-between">
+      <div class="px-4 lg:px-6 py-3 lg:py-4 border-b border-light-border/30 dark:border-dark-border/20 flex items-center justify-between" data-testid="section-header">
         <div>
           <h2 class="text-lg lg:text-xl font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:sparkles" class="w-5 h-5 lg:w-6 lg:h-6 txt-brand" />
@@ -15,13 +15,14 @@
           @click="handleClose"
           class="w-9 h-9 lg:w-10 lg:h-10 rounded-lg hover-surface transition-colors flex items-center justify-center flex-shrink-0"
           :aria-label="$t('common.close')"
+          data-testid="btn-close"
         >
           <Icon icon="heroicons:x-mark" class="w-5 h-5 lg:w-6 lg:h-6 txt-secondary" />
         </button>
       </div>
 
       <!-- Progress Steps -->
-      <div class="px-3 lg:px-6 py-3 lg:py-4 border-b border-light-border/30 dark:border-dark-border/20">
+      <div class="px-3 lg:px-6 py-3 lg:py-4 border-b border-light-border/30 dark:border-dark-border/20" data-testid="section-progress">
         <div class="hidden sm:flex items-center justify-between max-w-3xl mx-auto w-full gap-4">
           <div
             v-for="(step, index) in steps"
@@ -110,7 +111,7 @@
           <!-- Left: Configuration -->
           <div class="space-y-4 lg:space-y-6">
             <!-- Step 1: Basic Info -->
-            <div v-if="currentStep === 0" class="space-y-4">
+            <div v-if="currentStep === 0" class="space-y-4" data-testid="section-step-basic">
               <h3 class="font-semibold txt-primary flex items-center gap-2">
                 <Icon icon="heroicons:information-circle" class="w-5 h-5" />
                 {{ $t('widgets.step1Title') }}
@@ -125,6 +126,7 @@
                   type="text"
                   :placeholder="$t('widgets.widgetNamePlaceholder')"
                   class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-widget-name"
                 />
               </div>
 
@@ -148,10 +150,11 @@
 
                 <!-- Custom Prompts Available -->
                 <div v-else>
-                  <select
-                    v-model="formData.taskPromptTopic"
-                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  >
+                <select
+                  v-model="formData.taskPromptTopic"
+                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-task-prompt"
+                >
                     <option value="">{{ $t('widgets.selectTaskPrompt') }}</option>
                     <option
                       v-for="prompt in customTaskPrompts"
@@ -170,7 +173,7 @@
             </div>
 
             <!-- Step 2: Appearance -->
-            <div v-else-if="currentStep === 1" class="space-y-4">
+            <div v-else-if="currentStep === 1" class="space-y-4" data-testid="section-step-appearance">
               <h3 class="font-semibold txt-primary flex items-center gap-2">
                 <Icon icon="heroicons:paint-brush" class="w-5 h-5" />
                 {{ $t('widgets.step2Title') }}
@@ -181,10 +184,11 @@
                   <label class="block text-sm font-medium txt-primary mb-2">
                     {{ $t('widgets.position') }}
                   </label>
-                  <select
-                    v-model="formData.config.position"
-                    class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  >
+                 <select
+                   v-model="formData.config.position"
+                   class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                   data-testid="input-position"
+                 >
                     <option value="bottom-right">{{ $t('widgets.bottomRight') }}</option>
                     <option value="bottom-left">{{ $t('widgets.bottomLeft') }}</option>
                     <option value="top-right">{{ $t('widgets.topRight') }}</option>
@@ -196,10 +200,11 @@
                   <label class="block text-sm font-medium txt-primary mb-2">
                     {{ $t('widgets.defaultTheme') }}
                   </label>
-                  <select
-                    v-model="formData.config.defaultTheme"
-                    class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  >
+                 <select
+                   v-model="formData.config.defaultTheme"
+                   class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                   data-testid="input-theme"
+                 >
                     <option value="light">{{ $t('widgets.light') }}</option>
                     <option value="dark">{{ $t('widgets.dark') }}</option>
                   </select>
@@ -209,28 +214,30 @@
                   <label class="block text-sm font-medium txt-primary mb-2">
                     {{ $t('widgets.primaryColor') }}
                   </label>
-                  <input
-                    v-model="formData.config.primaryColor"
-                    type="color"
-                    class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
-                  />
+                 <input
+                   v-model="formData.config.primaryColor"
+                   type="color"
+                   class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+                   data-testid="input-primary-color"
+                 />
                 </div>
 
                 <div>
                   <label class="block text-sm font-medium txt-primary mb-2">
                     {{ $t('widgets.iconColor') }}
                   </label>
-                  <input
-                    v-model="formData.config.iconColor"
-                    type="color"
-                    class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
-                  />
+                 <input
+                   v-model="formData.config.iconColor"
+                   type="color"
+                   class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+                   data-testid="input-icon-color"
+                 />
                 </div>
               </div>
             </div>
 
             <!-- Step 3: Behavior -->
-            <div v-else-if="currentStep === 2" class="space-y-4">
+            <div v-else-if="currentStep === 2" class="space-y-4" data-testid="section-step-behavior">
               <h3 class="font-semibold txt-primary flex items-center gap-2">
                 <Icon icon="heroicons:adjustments-horizontal" class="w-5 h-5" />
                 {{ $t('widgets.step3Title') }}
@@ -255,12 +262,13 @@
                 <label class="block text-sm font-medium txt-primary mb-2">
                   {{ $t('widgets.autoMessage') }}
                 </label>
-                <textarea
-                  v-model="formData.config.autoMessage"
-                  rows="2"
-                  :placeholder="$t('widgets.autoMessagePlaceholder')"
-                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
-                />
+               <textarea
+                 v-model="formData.config.autoMessage"
+                 rows="2"
+                 :placeholder="$t('widgets.autoMessagePlaceholder')"
+                 class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+                 data-testid="input-auto-message"
+               />
               </div>
 
               <div class="surface-chip rounded-lg p-4 space-y-3">
@@ -269,12 +277,13 @@
                     <p class="font-medium txt-primary">{{ $t('widgets.allowFileUpload') }}</p>
                     <p class="text-xs txt-secondary mt-1">{{ $t('widgets.allowFileUploadHelp') }}</p>
                   </div>
-                  <label class="relative inline-flex items-center cursor-pointer">
-                    <input
-                      v-model="formData.config.allowFileUpload"
-                      type="checkbox"
-                      class="sr-only peer"
-                    />
+                 <label class="relative inline-flex items-center cursor-pointer">
+                   <input
+                     v-model="formData.config.allowFileUpload"
+                     type="checkbox"
+                     class="sr-only peer"
+                     data-testid="input-allow-upload"
+                   />
                     <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"></div>
                   </label>
                 </div>
@@ -282,14 +291,15 @@
                   <label class="block text-sm font-medium txt-primary mb-1">
                     {{ $t('widgets.fileUploadLimit') }}
                   </label>
-                  <input
-                    v-model.number="formData.config.fileUploadLimit"
-                    type="number"
-                    min="0"
-                    max="20"
-                    :disabled="!formData.config.allowFileUpload"
-                    class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
+                 <input
+                   v-model.number="formData.config.fileUploadLimit"
+                   type="number"
+                   min="0"
+                   max="20"
+                   :disabled="!formData.config.allowFileUpload"
+                   class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                   data-testid="input-file-limit"
+                 />
                   <p class="text-xs txt-secondary mt-1.5">{{ $t('widgets.fileUploadLimitHelp') }}</p>
                 </div>
               </div>
@@ -299,13 +309,14 @@
                   <label class="block text-sm font-medium txt-primary mb-2">
                     {{ $t('widgets.messageLimit') }}
                   </label>
-                  <input
-                    v-model.number="formData.config.messageLimit"
-                    type="number"
-                    min="1"
-                    max="100"
-                    class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  />
+                 <input
+                   v-model.number="formData.config.messageLimit"
+                   type="number"
+                   min="1"
+                   max="100"
+                   class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                   data-testid="input-message-limit"
+                 />
                   <p class="text-xs txt-secondary mt-1.5">{{ $t('widgets.messageLimitHelp') }}</p>
                 </div>
 
@@ -313,19 +324,20 @@
                   <label class="block text-sm font-medium txt-primary mb-2">
                     {{ $t('widgets.maxFileSize') }} (MB)
                   </label>
-                  <input
-                    v-model.number="formData.config.maxFileSize"
-                    type="number"
-                    min="1"
-                    max="50"
-                    class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  />
+                 <input
+                   v-model.number="formData.config.maxFileSize"
+                   type="number"
+                   min="1"
+                   max="50"
+                   class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                   data-testid="input-max-file-size"
+                 />
                 </div>
               </div>
             </div>
 
             <!-- Step 4: Review & Create -->
-            <div v-else-if="currentStep === 3" class="space-y-4">
+            <div v-else-if="currentStep === 3" class="space-y-4" data-testid="section-step-security">
               <h3 class="font-semibold txt-primary flex items-center gap-2">
                 <Icon icon="heroicons:check-circle" class="w-5 h-5" />
                 {{ $t('widgets.step4Title') }}
@@ -343,18 +355,20 @@
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-2">
-                  <input
-                    v-model="newAllowedDomain"
-                    type="text"
-                    :placeholder="$t('widgets.allowedDomainsPlaceholder')"
-                    class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                    @keydown.enter.prevent="addAllowedDomain"
-                    autocomplete="off"
-                  />
-                  <button
-                    @click="addAllowedDomain"
-                    class="btn-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                  >
+                 <input
+                   v-model="newAllowedDomain"
+                   type="text"
+                   :placeholder="$t('widgets.allowedDomainsPlaceholder')"
+                   class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                   @keydown.enter.prevent="addAllowedDomain"
+                   autocomplete="off"
+                   data-testid="input-domain"
+                 />
+                 <button
+                   @click="addAllowedDomain"
+                   class="btn-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                   data-testid="btn-add-domain"
+                 >
                     <Icon icon="heroicons:plus" class="w-4 h-4" />
                     {{ $t('widgets.allowedDomainsAdd') }}
                   </button>
@@ -365,9 +379,10 @@
                   <button
                     v-for="domain in LOCAL_TEST_DOMAINS"
                     :key="domain"
-                    @click.prevent="addPredefinedDomain(domain)"
-                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-light-border/40 dark:border-dark-border/30 hover:bg-[var(--brand-alpha-light)] hover:txt-brand transition-colors"
-                  >
+                   @click.prevent="addPredefinedDomain(domain)"
+                   class="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-light-border/40 dark:border-dark-border/30 hover:bg-[var(--brand-alpha-light)] hover:txt-brand transition-colors"
+                   data-testid="btn-quick-domain"
+                 >
                     <Icon icon="heroicons:plus" class="w-3.5 h-3.5" />
                     {{ domain }}
                   </button>
@@ -402,6 +417,7 @@
                       @click="removeAllowedDomain(domain)"
                       class="w-4 h-4 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                       :aria-label="$t('widgets.removeDomain', { domain })"
+                      data-testid="btn-remove-domain"
                     >
                       <Icon icon="heroicons:x-mark" class="w-3 h-3" />
                     </button>
@@ -545,11 +561,12 @@
       </div>
 
       <!-- Footer -->
-      <div class="px-4 lg:px-6 py-3 lg:py-4 border-t border-light-border/30 dark:border-dark-border/20 flex items-center justify-between gap-3">
+      <div class="px-4 lg:px-6 py-3 lg:py-4 border-t border-light-border/30 dark:border-dark-border/20 flex items-center justify-between gap-3" data-testid="section-footer">
         <button
           v-if="currentStep > 0"
           @click="prevStep"
           class="px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg hover-surface transition-colors txt-primary font-medium flex items-center gap-2 text-sm lg:text-base"
+          data-testid="btn-prev"
         >
           <Icon icon="heroicons:arrow-left" class="w-4 h-4 lg:w-5 lg:h-5" />
           <span class="hidden sm:inline">{{ $t('common.back') }}</span>
@@ -560,6 +577,7 @@
           <button
             @click="handleClose"
             class="px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium text-sm lg:text-base"
+            data-testid="btn-cancel"
           >
             {{ $t('common.cancel') }}
           </button>
@@ -568,6 +586,7 @@
             @click="nextStep"
             :disabled="!canProceed"
             class="btn-primary px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm lg:text-base"
+            data-testid="btn-next"
           >
             <span class="hidden sm:inline">{{ $t('common.next') }}</span>
             <span class="sm:hidden">Next</span>
@@ -578,6 +597,7 @@
             @click="createWidget"
             :disabled="!canCreate || creating"
             class="btn-primary px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm lg:text-base"
+            data-testid="btn-create"
           >
             <Icon v-if="creating" icon="heroicons:arrow-path" class="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
             <Icon v-else icon="heroicons:check" class="w-4 h-4 lg:w-5 lg:h-5" />
@@ -904,4 +924,3 @@ onBeforeUnmount(() => {
   cleanupPreview()
 })
 </script>
-

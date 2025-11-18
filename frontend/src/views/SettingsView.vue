@@ -1,16 +1,16 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
+    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin" data-testid="page-settings">
       <div class="max-w-4xl mx-auto space-y-6">
         
         <!-- Header -->
-        <div class="surface-card p-6">
+        <div class="surface-card p-6" data-testid="section-header">
           <h1 class="text-2xl font-semibold txt-primary mb-1">⚙️ {{ $t('settings.title') }}</h1>
           <p class="txt-secondary text-sm">{{ $t('settings.subtitle') }}</p>
         </div>
 
         <!-- Tabs -->
-        <div class="surface-card p-2">
+        <div class="surface-card p-2" data-testid="section-tabs">
           <div class="flex gap-2">
             <button
               @click="activeTab = 'general'"
@@ -20,6 +20,7 @@
                   ? 'bg-[var(--brand)] text-white'
                   : 'txt-secondary hover-surface'
               ]"
+              data-testid="tab-general"
             >
               {{ $t('settings.tabs.general') }}
             </button>
@@ -33,6 +34,7 @@
                   ? 'bg-[var(--brand)] text-white'
                   : 'txt-secondary hover-surface'
               ]"
+              data-testid="tab-features"
             >
               {{ $t('settings.tabs.features') }}
               <span 
@@ -46,9 +48,9 @@
         </div>
 
         <!-- General Tab Content -->
-        <div v-if="activeTab === 'general'" class="space-y-6">
+        <div v-if="activeTab === 'general'" class="space-y-6" data-testid="section-general-tab">
           <!-- App Mode -->
-          <div class="surface-card p-6">
+          <div class="surface-card p-6" data-testid="section-app-mode">
             <h2 class="text-lg font-semibold txt-primary mb-2">{{ $t('settings.appMode.title') }}</h2>
             <p class="txt-secondary text-sm mb-4">{{ $t('settings.appMode.description') }}</p>
             
@@ -61,6 +63,7 @@
                     ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
                     : 'border-light-border/30 dark:border-dark-border/20 hover-surface'
                 ]"
+                data-testid="btn-mode-easy"
               >
                 <div class="font-semibold txt-primary mb-1">{{ $t('settings.appMode.easy') }}</div>
                 <div class="text-sm txt-secondary">{{ $t('settings.appMode.easyDesc') }}</div>
@@ -74,6 +77,7 @@
                     ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
                     : 'border-light-border/30 dark:border-dark-border/20 hover-surface'
                 ]"
+                data-testid="btn-mode-advanced"
               >
                 <div class="font-semibold txt-primary mb-1">{{ $t('settings.appMode.advanced') }}</div>
                 <div class="text-sm txt-secondary">{{ $t('settings.appMode.advancedDesc') }}</div>
@@ -82,7 +86,7 @@
           </div>
 
           <!-- Theme Settings -->
-          <div class="surface-card p-6">
+          <div class="surface-card p-6" data-testid="section-theme-settings">
             <h2 class="text-lg font-semibold txt-primary mb-2">{{ $t('settings.theme.title') }}</h2>
             <p class="txt-secondary text-sm mb-4">{{ $t('settings.theme.description') }}</p>
             
@@ -95,6 +99,7 @@
                     ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
                     : 'border-light-border/30 dark:border-dark-border/20 hover-surface'
                 ]"
+                data-testid="btn-theme-light"
               >
                 <SunIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
                 <div class="text-sm font-medium txt-primary text-center">{{ $t('settings.theme.light') }}</div>
@@ -108,6 +113,7 @@
                     ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
                     : 'border-light-border/30 dark:border-dark-border/20 hover-surface'
                 ]"
+                data-testid="btn-theme-dark"
               >
                 <MoonIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
                 <div class="text-sm font-medium txt-primary text-center">{{ $t('settings.theme.dark') }}</div>
@@ -121,6 +127,7 @@
                     ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
                     : 'border-light-border/30 dark:border-dark-border/20 hover-surface'
                 ]"
+                data-testid="btn-theme-system"
               >
                 <ComputerDesktopIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
                 <div class="text-sm font-medium txt-primary text-center">{{ $t('settings.theme.system') }}</div>
@@ -129,14 +136,14 @@
           </div>
 
           <!-- Account Info -->
-          <div class="surface-card p-6">
+          <div class="surface-card p-6" data-testid="section-account-info">
             <h2 class="text-lg font-semibold txt-primary mb-4">{{ $t('settings.account.title') }}</h2>
             <div class="space-y-4">
-              <div>
+              <div data-testid="text-account-email">
                 <label class="block text-sm font-medium txt-secondary mb-1">{{ $t('settings.account.email') }}</label>
                 <div class="txt-primary">{{ authStore.user?.email || 'Not logged in' }}</div>
               </div>
-              <div>
+              <div data-testid="text-account-level">
                 <label class="block text-sm font-medium txt-secondary mb-1">{{ $t('settings.account.userLevel') }}</label>
                 <div class="txt-primary">{{ authStore.user?.userLevel || 'N/A' }}</div>
               </div>
@@ -144,10 +151,11 @@
           </div>
 
           <!-- Logout -->
-          <div class="surface-card p-6">
+          <div class="surface-card p-6" data-testid="section-logout">
             <button
               @click="handleLogout"
               class="btn-primary px-6 py-2.5 rounded-lg w-full"
+              data-testid="btn-logout"
             >
               {{ $t('settings.logout') }}
             </button>
@@ -155,16 +163,16 @@
         </div>
 
         <!-- Features Tab Content -->
-        <div v-if="activeTab === 'features'" class="space-y-6">
+        <div v-if="activeTab === 'features'" class="space-y-6" data-testid="section-features-tab">
           <!-- Loading State -->
-          <div v-if="isLoadingFeatures" class="surface-card p-8 text-center">
+          <div v-if="isLoadingFeatures" class="surface-card p-8 text-center" data-testid="state-features-loading">
             <div class="txt-secondary">{{ $t('settings.features.loading') }}</div>
           </div>
 
           <!-- Error State -->
-          <div v-else-if="!featuresStatus || !featuresStatus.features" class="surface-card p-8 text-center">
+          <div v-else-if="!featuresStatus || !featuresStatus.features" class="surface-card p-8 text-center" data-testid="state-features-error">
             <div class="txt-secondary mb-4">{{ $t('common.error') }}</div>
-            <button @click="loadFeatures" class="btn-primary px-6 py-2.5 rounded-lg">
+            <button @click="loadFeatures" class="btn-primary px-6 py-2.5 rounded-lg" data-testid="btn-retry-features">
               {{ $t('common.retry') }}
             </button>
           </div>
@@ -172,7 +180,7 @@
           <!-- Features List (grouped by category) -->
           <template v-else>
             <!-- Summary Card -->
-            <div class="surface-card p-6">
+            <div class="surface-card p-6" data-testid="section-features-summary">
               <div class="flex items-center justify-between">
                 <div>
                   <h3 class="text-lg font-semibold txt-primary mb-1">System Status</h3>
@@ -194,7 +202,7 @@
             </div>
 
             <!-- Group features by category -->
-            <div v-for="(category, categoryName) in featuresByCategory" :key="categoryName" class="space-y-4">
+            <div v-for="(category, categoryName) in featuresByCategory" :key="categoryName" class="space-y-4" data-testid="section-feature-category">
               <!-- Category Header -->
               <h2 class="text-xl font-semibold txt-primary px-2">{{ categoryName }}</h2>
               
@@ -203,6 +211,7 @@
                 v-for="feature in category"
                 :key="feature.id"
                 class="surface-card p-6"
+                data-testid="item-feature"
               >
                 <!-- Feature Header -->
                 <div class="flex items-start justify-between mb-3">
@@ -238,6 +247,7 @@
                     v-for="(envVar, key) in feature.env_vars"
                     :key="key"
                     class="surface-elevated p-4 space-y-2"
+                    data-testid="item-env-var"
                   >
                     <div class="flex items-center justify-between gap-3">
                       <code class="text-sm font-mono txt-primary">{{ key }}</code>

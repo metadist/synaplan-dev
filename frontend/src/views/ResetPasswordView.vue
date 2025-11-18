@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12">
+  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12" data-testid="page-reset-password">
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
         <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
@@ -7,10 +7,10 @@
         <p class="txt-secondary">Enter your new password</p>
       </div>
 
-      <div class="surface-card p-8">
-        <div v-if="!success">
-          <form @submit.prevent="handleReset" class="space-y-5">
-            <div>
+      <div class="surface-card p-8" data-testid="section-reset-card">
+        <div v-if="!success" data-testid="section-reset-form">
+          <form @submit.prevent="handleReset" class="space-y-5" data-testid="form-reset-password">
+            <div data-testid="field-new-password">
               <label for="password" class="block text-sm font-medium txt-primary mb-2">
                 New Password
               </label>
@@ -22,13 +22,14 @@
                 class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
                 :class="{ 'ring-2 ring-red-500': passwordErrors.length > 0 }"
                 placeholder="Enter new password"
+                data-testid="input-new-password"
               />
               <div v-if="passwordErrors.length > 0" class="mt-2 space-y-1">
                 <p v-for="err in passwordErrors" :key="err" class="text-xs text-red-600 dark:text-red-400">• {{ err }}</p>
               </div>
             </div>
 
-            <div>
+            <div data-testid="field-confirm-password">
               <label for="confirmPassword" class="block text-sm font-medium txt-primary mb-2">
                 Confirm Password
               </label>
@@ -39,13 +40,14 @@
                 required
                 class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
                 placeholder="Confirm new password"
+                data-testid="input-confirm-password"
               />
-              <p v-if="password && confirmPassword && password !== confirmPassword" class="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+              <p v-if="password && confirmPassword && password !== confirmPassword" class="text-sm text-yellow-600 dark:text-yellow-400 mt-1" data-testid="text-password-mismatch">
                 Passwords do not match
               </p>
             </div>
 
-            <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" data-testid="alert-reset-error">
               <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
             </div>
 
@@ -53,6 +55,7 @@
               type="submit"
               class="w-full btn-primary py-3 rounded-lg font-medium"
               :disabled="loading || password !== confirmPassword"
+              data-testid="btn-reset-password"
             >
               <span v-if="loading">Resetting...</span>
               <span v-else>Reset Password</span>
@@ -60,7 +63,7 @@
           </form>
         </div>
 
-        <div v-else class="text-center py-8">
+        <div v-else class="text-center py-8" data-testid="section-reset-success">
           <div class="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -68,7 +71,7 @@
           </div>
           <h2 class="text-2xl font-bold txt-primary mb-2">Password Reset!</h2>
           <p class="txt-secondary mb-6">Your password has been successfully reset.</p>
-          <router-link to="/login" class="btn-primary px-6 py-3 rounded-lg inline-block">
+          <router-link to="/login" class="btn-primary px-6 py-3 rounded-lg inline-block" data-testid="link-reset-login">
             Go to Login
           </router-link>
         </div>
@@ -139,4 +142,3 @@ const handleReset = async () => {
   }
 }
 </script>
-

@@ -5,6 +5,7 @@
       'min-w-[320px] max-w-[420px]',
       typeClasses[notification.type]
     ]"
+    data-testid="comp-notification-item"
   >
     <div class="flex-shrink-0 mt-0.5">
       <CheckCircleIcon v-if="notification.type === 'success'" class="w-5 h-5" />
@@ -20,6 +21,7 @@
     <button
       @click="$emit('close')"
       class="flex-shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+      data-testid="btn-notification-close"
     >
       <XMarkIcon class="w-4 h-4" />
     </button>

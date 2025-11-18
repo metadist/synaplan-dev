@@ -1,5 +1,5 @@
 <template>
-  <div class="prose prose-sm max-w-none txt-primary">
+  <div class="prose prose-sm max-w-none txt-primary" data-testid="section-message-text">
     <div v-html="formattedContent" class="whitespace-pre-wrap"></div>
   </div>
 </template>

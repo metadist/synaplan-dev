@@ -1,23 +1,24 @@
 <template>
-  <div class="space-y-6">
-    <div class="surface-card p-6">
+  <div class="space-y-6" data-testid="page-config-ai-models">
+    <div class="surface-card p-6" data-testid="section-default-config">
       <h2 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
         <CpuChipIcon class="w-6 h-6 text-[var(--brand)]" />
         Default Model Configuration
       </h2>
 
-      <div v-if="loading" class="text-center py-8">
+      <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"></div>
         <p class="mt-2 txt-secondary">Loading models...</p>
       </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
         <div
           v-for="(label, capability) in purposeLabels"
           :key="capability"
           :ref="(el: any) => { if (el) capabilityRefs[capability as Capability] = el as HTMLElement }"
           class="space-y-2 transition-all duration-300"
           :class="(highlightedCapability === capability || highlightedCapability === 'ALL') ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5' : ''"
+          data-testid="item-capability"
         >
           <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
@@ -39,6 +40,7 @@
                   : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 openDropdown === capability && 'ring-2 ring-[var(--brand)]'
               ]"
+              data-testid="btn-model-dropdown"
             >
               <span class="block truncate">
                 {{ getSelectedModelLabel(capability as Capability) }}
@@ -72,6 +74,7 @@
                 type="button"
                 @click="selectModel(capability as Capability, null)"
                 class="dropdown-item w-full"
+                data-testid="btn-model-option"
               >
                 <span class="txt-secondary italic">-- Select Model --</span>
               </button>
@@ -84,6 +87,7 @@
                   'dropdown-item w-full',
                   defaultConfig[capability as Capability] === model.id && 'dropdown-item--active'
                 ]"
+                data-testid="btn-model-option"
               >
                 <GroqIcon 
                   v-if="model.service.toLowerCase().includes('groq')"
@@ -109,6 +113,7 @@
         <button
           @click="resetForm"
           class="px-6 py-2.5 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+          data-testid="btn-reset"
         >
           Reset Form
         </button>
@@ -116,6 +121,7 @@
           @click="saveConfiguration"
           :disabled="saving || !hasChanges"
           class="btn-primary px-6 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-save"
         >
           <div v-if="saving" class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
           <CheckIcon v-else class="w-5 h-5" />
@@ -129,7 +135,7 @@
       </div>
     </div>
 
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-purpose-filters">
       <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
         <FunnelIcon class="w-5 h-5" />
         Models & Purposes
@@ -144,6 +150,7 @@
               ? 'bg-[var(--brand)] text-white'
               : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5'
           ]"
+          data-testid="btn-filter-all"
         >
           All Models
         </button>
@@ -157,19 +164,20 @@
               ? 'bg-[var(--brand)] text-white'
               : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5'
           ]"
+          data-testid="btn-filter"
         >
           {{ capability }}
         </button>
       </div>
     </div>
 
-    <div class="surface-card p-6">
+    <div class="surface-card p-6" data-testid="section-models-table">
       <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
         <ListBulletIcon class="w-5 h-5" />
         Available Models
       </h2>
 
-      <div v-if="filteredModels.length === 0" class="text-center py-12 txt-secondary">
+      <div v-if="filteredModels.length === 0" class="text-center py-12 txt-secondary" data-testid="section-models-empty">
         No models available for this purpose
       </div>
 
@@ -189,7 +197,7 @@
               v-for="model in filteredModels"
               :key="model.id"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            >
+            data-testid="item-model">
               <td class="py-3 px-2 sm:px-3">
                 <span class="pill text-xs">{{ model.id }}</span>
               </td>
@@ -541,4 +549,3 @@ const resetForm = () => {
 }
 
 </script>
-

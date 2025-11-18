@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isEnabled">
+  <div v-if="isEnabled" data-testid="comp-help-host">
     <HelpButton v-if="currentHelp" @click="openHelp" />
     <HelpTour :show="isOpen" :steps="currentHelp?.steps || []" @close="closeHelp" />
   </div>

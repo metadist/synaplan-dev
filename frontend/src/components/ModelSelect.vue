@@ -1,8 +1,9 @@
 <template>
-  <div class="relative isolate">
+  <div class="relative isolate" data-testid="comp-model-select">
     <button
       @click="isOpen = !isOpen"
       class="dropdown-trigger"
+      data-testid="btn-model-select-toggle"
     >
       <GroqIcon 
         v-if="modelsStore.selectedProvider.toLowerCase().includes('groq')"
@@ -22,6 +23,7 @@
       v-if="isOpen"
       role="menu"
       class="absolute bottom-full mb-2 left-0 min-w-[220px] max-h-[60vh] overflow-auto scroll-thin dropdown-panel z-[70]"
+      data-testid="dropdown-model-select"
     >
       <button
         v-for="option in modelOptions"
