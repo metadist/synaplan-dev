@@ -326,6 +326,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
+import { parseAIResponse } from '@/utils/responseParser'
 
 interface Props {
   widgetId: string
@@ -835,17 +836,16 @@ const handleNewChatEvent = (event: Event) => {
 const normalizeServerMessage = (raw: any): Message => {
   let content = raw.text ?? ''
   if (typeof content === 'string') {
-    try {
-      const parsed = JSON.parse(content)
-      if (parsed && typeof parsed === 'object') {
-        if ('BTEXT' in parsed && typeof parsed.BTEXT === 'string') {
-          content = parsed.BTEXT
-        } else if ('content' in parsed && typeof parsed.content === 'string') {
-          content = parsed.content
-        }
-      }
-    } catch {
-      // ignore parse errors
+    const parsed = parseAIResponse(content)
+    const textParts = parsed.parts
+      .filter(part => part.type === 'text' && part.content)
+      .map(part => part.content.trim())
+      .filter(Boolean)
+
+    if (textParts.length > 0) {
+      content = textParts.join('\n\n')
+    } else if (parsed.parts.length > 0) {
+      content = parsed.parts.map(part => part.content).join('\n\n')
     }
   }
 

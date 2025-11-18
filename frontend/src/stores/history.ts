@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { extractBTextPayload } from '@/utils/jsonResponse'
 import type { AgainData } from '@/types/ai-models'
 
 export type PartType = 'text' | 'image' | 'video' | 'audio' | 'code' | 'links' | 'docs' | 'screenshot' | 'translation' | 'link' | 'commandList' | 'thinking'
@@ -78,6 +79,13 @@ export interface Message {
  * Parse content to extract thinking blocks and regular text
  */
 function parseContentWithThinking(content: string): Part[] {
+  const extraction = extractBTextPayload(content)
+  if (extraction.text !== undefined) {
+    const remainder = extraction.remainder?.trim()
+    const text = extraction.text ?? ''
+    content = remainder ? `${text}\n\n${remainder}`.trim() : text
+  }
+
   const parts: Part[] = []
   
   // Extract thinking blocks
@@ -233,19 +241,7 @@ export const useHistoryStore = defineStore('history', () => {
         const loadedMessages: Message[] = response.messages.map((m: any) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
           
-          // Parse text - handle both plain text and JSON format
-          let messageText = m.text || ''
-          try {
-            // If text is a JSON object with BTEXT property, extract BTEXT
-            const parsed = JSON.parse(messageText)
-            if (parsed && typeof parsed === 'object' && 'BTEXT' in parsed) {
-              messageText = parsed.BTEXT || ''
-            }
-          } catch (e) {
-            // Not JSON, use as-is
-          }
-          
-          const parts = parseContentWithThinking(messageText)
+          const parts = parseContentWithThinking(m.text || '')
           
           // Add generated file (image/video/audio) as part if present
           if (m.file && m.file.path) {
